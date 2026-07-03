@@ -2,7 +2,32 @@
   "permissions": {
     "allow": [
       "Bash(npm -v)",
-      "Bash(npx --yes create-next-app@latest . --ts --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)"
+      "Bash(npx --yes create-next-app@latest . --ts --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Bash(npm install *)",
+      "Bash(mkdir -p src/lib data && ls src)",
+      "Bash(mkdir -p src/app/api/categories/\\\\[id\\\\] src/app/api/incomes/\\\\[id\\\\] src/app/api/allocations/\\\\[id\\\\] src/app/api/expenses/\\\\[id\\\\])",
+      "Skill(dataviz)",
+      "Skill(dataviz:*)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(timeout 30 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 1; done')",
+      "Bash(npx playwright *)",
+      "Read(//root/.cache/**)",
+      "Bash(ls ~/.cache/ms-playwright 2>&1)",
+      "Read(//home/felip/.cache/**)",
+      "Bash(mkdir -p /tmp/claude-1000/-home-felip-projetos-dindin/11fe58b4-cb1d-42aa-b6ed-3412a4bd4259/scratchpad/pw-driver)",
+      "Bash(npm init *)",
+      "Bash(node test.js)",
+      "Bash(node view.js)",
+      "Bash(git add *)"
+    ],
+    "additionalDirectories": [
+      "/home/felip/projetos/dindin/src",
+      "/home/felip/projetos/dindin/src/app/api/categories"
     ]
   }
 }
