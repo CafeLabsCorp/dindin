@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 const _destinations = [
@@ -28,9 +29,9 @@ class AppShell extends StatelessWidget {
               selectedIndex: navigationShell.currentIndex,
               onDestinationSelected: (i) => navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
               labelType: NavigationRailLabelType.all,
-              leading: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text('dindin', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+              leading: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: SvgPicture.asset('assets/logo.svg', height: 32),
               ),
               destinations: [
                 for (final d in _destinations)
@@ -49,7 +50,7 @@ class AppShell extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('dindin')),
+      appBar: AppBar(title: SvgPicture.asset('assets/logo.svg', height: 28)),
       body: SafeArea(
         child: Padding(padding: const EdgeInsets.all(16), child: navigationShell),
       ),
