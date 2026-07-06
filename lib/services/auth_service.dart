@@ -15,7 +15,14 @@ class AuthService {
 
   AuthService({FirebaseAuth? auth, GoogleSignIn? googleSignIn})
     : _auth = auth ?? FirebaseAuth.instance,
-      _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+      _googleSignIn = googleSignIn ?? GoogleSignIn.instance {
+    // Explicit, since a browser tab getting recreated (not just reloaded)
+    // has occasionally been reported to lose the session without this on
+    // some Firebase Auth JS SDK versions. Web-only API.
+    if (kIsWeb) {
+      _auth.setPersistence(Persistence.LOCAL);
+    }
+  }
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 

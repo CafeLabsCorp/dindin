@@ -196,14 +196,22 @@
       "Bash(getent hosts *)",
       "Read(//mnt/wsl/**)",
       "Bash(curl -s -H \"accept: application/dns-json\" \"https://cloudflare-dns.com/dns-query?name=dindin.cafelabs.net&type=CNAME\")",
-      "Bash(curl -s \"https://dns.google/resolve?name=dindin.cafelabs.net&type=CNAME\")"
+      "Bash(curl -s \"https://dns.google/resolve?name=dindin.cafelabs.net&type=CNAME\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://dindin.cafelabs.net/)",
+      "Bash(firebase auth:export /tmp/authcheck.json --project dindin-cafelabs)",
+      "Bash(rm -f /tmp/authcheck.json)",
+      "Bash(grep -rn \"enum Persistence\\\\|LOCAL\\\\|SESSION\\\\|setPersistence\" ~/.pub-cache/hosted/pub.dev/firebase_auth_platform_interface-*/lib/src/*.dart 2>/dev/null | head -20)",
+      "Read(//home/felip/.pub-cache/hosted/pub.dev/firebase_auth-6.5.4/lib/src/**)",
+      "Read(//home/felip/.pub-cache/hosted/pub.dev/firebase_auth_platform_interface-9.0.3/lib/src/**)",
+      "Bash(sed -n '420,440p' ~/.pub-cache/hosted/pub.dev/firebase_auth-6.5.4/lib/src/firebase_auth.dart)"
     ],
     "additionalDirectories": [
       "/home/felip/projetos/dindin/src",
       "/home/felip/projetos/dindin/src/app/api/categories",
       "/home/felip/projetos/dindin/data",
       "/tmp/claude-1000/-home-felip-projetos-dindin/4b8e16d3-36c0-42be-8fda-463923de3f2f/scratchpad/pw/node_modules",
-      "/mnt/c/Users/felip/Downloads"
+      "/mnt/c/Users/felip/Downloads",
+      "/tmp"
     ]
   }
 }
