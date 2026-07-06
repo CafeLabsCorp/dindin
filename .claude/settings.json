@@ -118,12 +118,46 @@
       "Bash(sed -n '1,60p' /home/felip/projetos/domo/lib/features/auth/data/repositories/auth_repository_impl.dart)",
       "Read(//home/felip/projetos/domo/lib/features/auth/data/repositories/**)",
       "Bash(git status *)",
-      "Bash(flutter test *)"
+      "Bash(flutter test *)",
+      "Bash(chromium-cli --help)",
+      "Bash(find / -maxdepth 6 -iname \"*chromium-cli*\")",
+      "Bash(find / -maxdepth 8 -iname \"chromium-cli*\")",
+      "Bash(python3 -c \"import playwright; print\\('py playwright ok'\\)\")",
+      "Bash(pip show *)",
+      "Bash(timeout 10 curl -sI https://registry.npmjs.org)",
+      "Bash(mkdir -p /tmp/claude-1000/-home-felip-projetos-dindin/4b8e16d3-36c0-42be-8fda-463923de3f2f/scratchpad/pw)",
+      "Bash(nohup flutter run -d web-server --web-port=8765 --web-hostname=127.0.0.1)",
+      "Bash(timeout 90 bash -c 'until curl -sf http://127.0.0.1:8765 >/dev/null 2>&1; do sleep 2; done')",
+      "Bash(node drive2.js)",
+      "Bash(node drive3.js)",
+      "Bash(node inspect.js)",
+      "Bash(tail -100 /tmp/flutter_web.log)",
+      "Bash(pkill -f \"flutter_tools.snapshot run -d web-server\")",
+      "Bash(flutter build *)",
+      "Bash(nohup python3 -m http.server 8766 --bind 127.0.0.1)",
+      "Bash(timeout 15 bash -c 'until curl -sf http://127.0.0.1:8766 >/dev/null 2>&1; do sleep 1; done')",
+      "Bash(pkill -f \"http.server 8766\")",
+      "Bash(ps aux *)",
+      "Bash(firebase login *)",
+      "Bash(jobs -l)",
+      "Bash(curl -sI https://dindin-cafelabs.web.app)",
+      "Bash(git remote *)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(echo \"exit: $?\")",
+      "Read(//home/felip/.ssh/**)",
+      "Bash(gh auth *)",
+      "Bash(git fetch *)",
+      "Bash(wslpath -w /home/felip/projetos/dindin/next/data/db.json)",
+      "Read(//usr/lib/**)",
+      "Bash(wsl.exe -l -q)",
+      "Bash(git rm *)",
+      "Bash(git reset *)"
     ],
     "additionalDirectories": [
       "/home/felip/projetos/dindin/src",
       "/home/felip/projetos/dindin/src/app/api/categories",
-      "/home/felip/projetos/dindin/data"
+      "/home/felip/projetos/dindin/data",
+      "/tmp/claude-1000/-home-felip-projetos-dindin/4b8e16d3-36c0-42be-8fda-463923de3f2f/scratchpad/pw/node_modules"
     ]
   }
 }
