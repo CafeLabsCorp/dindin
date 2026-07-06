@@ -55,20 +55,6 @@ final expensesProvider = StreamProvider<List<Expense>>((ref) {
   return firestore.watchExpenses();
 });
 
-/// Unallocated amount per income id, derived the same way as the Next.js
-/// `/api/incomes` route (`unallocatedByIncome` in `aggregations.ts`).
-final unallocatedByIncomeProvider = Provider<Map<String, double>>((ref) {
-  final incomes = ref.watch(incomesProvider).value ?? [];
-  final allocations = ref.watch(allocationsProvider).value ?? [];
-  final db = AppDb(
-    categories: const [],
-    incomes: incomes,
-    allocations: allocations,
-    expenses: const [],
-  );
-  return unallocatedByIncome(db);
-});
-
 /// Combines the 4 streams into the same summary shape as the Next.js
 /// `/api/summary` route.
 final summaryProvider = Provider<Summary?>((ref) {

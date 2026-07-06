@@ -1,8 +1,6 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/category.dart';
 import '../../models/income.dart';
 import '../../models/income_source.dart';
 import '../../providers/providers.dart';
@@ -71,7 +69,6 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remover receita?'),
-        content: const Text('As alocações feitas a partir dela também somem.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remover')),
@@ -85,15 +82,14 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   @override
   Widget build(BuildContext context) {
     final incomesAsync = ref.watch(incomesProvider);
-    final categories = ref.watch(categoriesProvider).value ?? const <Category>[];
-    final unallocated = ref.watch(unallocatedByIncomeProvider);
 
     return ListView(
       children: [
         Text('Receitas', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Text(
-          'Lance o quanto entrou, de onde veio, e depois separe entre as caixinhas.',
+          'Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\n'
+          'aloque em caixinhas quando quiser, no Dashboard.',
           style: TextStyle(color: context.tokens.muted),
         ),
         const SizedBox(height: 24),
@@ -173,13 +169,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                   if (incomes.isEmpty) return const EmptyState('Nenhuma receita lançada ainda.');
                   return Column(
                     children: [
-                      for (final income in incomes)
-                        _IncomeRow(
-                          income: income,
-                          categories: categories,
-                          unallocated: unallocated[income.id] ?? 0,
-                          onDelete: () => _delete(income.id),
-                        ),
+                      for (var i = 0; i < incomes.length; i++) _IncomeRow(income: incomes[i], onDelete: () => _delete(incomes[i].id), divider: i > 0),
                     ],
                   );
                 },
@@ -194,147 +184,43 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   }
 }
 
-class _IncomeRow extends ConsumerStatefulWidget {
+class _IncomeRow extends StatelessWidget {
   final Income income;
-  final List<Category> categories;
-  final double unallocated;
   final VoidCallback onDelete;
+  final bool divider;
 
-  const _IncomeRow({
-    required this.income,
-    required this.categories,
-    required this.unallocated,
-    required this.onDelete,
-  });
-
-  @override
-  ConsumerState<_IncomeRow> createState() => _IncomeRowState();
-}
-
-class _IncomeRowState extends ConsumerState<_IncomeRow> {
-  bool _open = false;
-  String? _categoryId;
-  final _amountController = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _allocate() async {
-    final categoryId = _categoryId ?? widget.categories.firstOrNull?.id;
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
-    if (categoryId == null || value == null || value <= 0) {
-      setState(() => _error = 'Escolha uma categoria e um valor válido.');
-      return;
-    }
-    setState(() => _error = null);
-    try {
-      await ref.read(firestoreServiceProvider)!.createAllocation(
-        incomeId: widget.income.id,
-        categoryId: categoryId,
-        amount: value,
-        date: widget.income.date,
-      );
-      _amountController.clear();
-    } catch (e) {
-      setState(() => _error = e.toString());
-    }
-  }
+  const _IncomeRow({required this.income, required this.onDelete, required this.divider});
 
   @override
   Widget build(BuildContext context) {
-    final fullyAllocated = widget.unallocated <= 0.009;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: context.tokens.border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: formatCurrency(widget.income.amount), style: const TextStyle(fontWeight: FontWeight.w500)),
-                          TextSpan(
-                            text: ' · ${widget.income.source.value} · ${widget.income.date}',
-                            style: TextStyle(color: context.tokens.subtle),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (widget.income.description != null)
-                      Text(widget.income.description!, style: TextStyle(fontSize: 12, color: context.tokens.subtle)),
-                  ],
-                ),
-              ),
-              Text(
-                fullyAllocated ? 'Totalmente alocada' : '${formatCurrency(widget.unallocated)} a alocar',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: fullyAllocated ? const Color(0xFF0CA30C) : const Color(0xFFEDA100),
-                ),
-              ),
-              TextButton(onPressed: () => setState(() => _open = !_open), child: Text(_open ? 'Fechar' : 'Alocar')),
-              TextButton(
-                onPressed: widget.onDelete,
-                style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-                child: const Text('Remover'),
-              ),
-            ],
-          ),
-          if (_open) ...[
-            const Divider(height: 24),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.end,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 180,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _categoryId ?? widget.categories.firstOrNull?.id,
-                    decoration: const InputDecoration(labelText: 'Caixinha'),
-                    items: widget.categories.isEmpty
-                        ? [const DropdownMenuItem(value: null, child: Text('Nenhuma categoria criada'))]
-                        : [for (final c in widget.categories) DropdownMenuItem(value: c.id, child: Text(c.name))],
-                    onChanged: (v) => setState(() => _categoryId = v),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: formatCurrency(income.amount), style: const TextStyle(fontWeight: FontWeight.w500)),
+                      TextSpan(text: ' · ${income.source.value} · ${income.date}', style: TextStyle(color: context.tokens.subtle)),
+                    ],
                   ),
                 ),
-                SizedBox(
-                  width: 120,
-                  child: TextField(
-                    controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _amountController.text = widget.unallocated.toStringAsFixed(2)),
-                  child: const Text('Preencher restante'),
-                ),
-                FilledButton(onPressed: _allocate, child: const Text('Confirmar')),
+                if (income.description != null)
+                  Text(income.description!, style: TextStyle(fontSize: 12, color: context.tokens.subtle)),
               ],
             ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-          ],
+          ),
+          TextButton(
+            onPressed: onDelete,
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Remover'),
+          ),
         ],
       ),
     );

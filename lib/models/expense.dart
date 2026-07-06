@@ -1,16 +1,18 @@
 /// Mirrors `ExpenseSchema` in the Next.js app's `src/lib/schemas.ts`.
+/// [categoryId] is nullable — null means the expense came straight out of
+/// the general account balance instead of a caixinha.
 class Expense {
   final String id;
   final String date; // ISO date string (YYYY-MM-DD)
   final double amount;
-  final String categoryId;
+  final String? categoryId;
   final String? description;
 
   const Expense({
     required this.id,
     required this.date,
     required this.amount,
-    required this.categoryId,
+    this.categoryId,
     this.description,
   });
 
@@ -19,7 +21,7 @@ class Expense {
       id: id,
       date: map['date'] as String,
       amount: (map['amount'] as num).toDouble(),
-      categoryId: map['categoryId'] as String,
+      categoryId: map['categoryId'] as String?,
       description: map['description'] as String?,
     );
   }
@@ -28,7 +30,7 @@ class Expense {
     return {
       'date': date,
       'amount': amount,
-      'categoryId': categoryId,
+      if (categoryId != null) 'categoryId': categoryId,
       if (description != null) 'description': description,
     };
   }

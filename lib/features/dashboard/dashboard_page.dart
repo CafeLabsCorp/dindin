@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../../theme/theme.dart';
@@ -34,7 +35,45 @@ class DashboardPage extends ConsumerWidget {
         const SizedBox(height: 4),
         Text('Visão geral da conta e do mês atual.', style: TextStyle(color: context.tokens.muted)),
         const SizedBox(height: 24),
-        StatTile(label: 'Saldo total (todas as caixinhas)', value: formatCurrency(summary.total)),
+        StatTile(label: 'Saldo total', value: formatCurrency(summary.total)),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Conta',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: context.tokens.muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatCurrency(summary.accountBalance),
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Dinheiro recebido e ainda não alocado em nenhuma caixinha.',
+                      style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.tonal(
+                onPressed: categories.isEmpty || summary.accountBalance <= 0
+                    ? null
+                    : () => _showAllocateDialog(context, ref, categories, summary.accountBalance),
+                child: const Text('Alocar'),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -110,6 +149,102 @@ class DashboardPage extends ConsumerWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+Future<void> _showAllocateDialog(
+  BuildContext context,
+  WidgetRef ref,
+  List<Category> categories,
+  double accountBalance,
+) {
+  return showDialog(
+    context: context,
+    builder: (ctx) => _AllocateDialog(categories: categories, accountBalance: accountBalance, ref: ref),
+  );
+}
+
+class _AllocateDialog extends StatefulWidget {
+  final List<Category> categories;
+  final double accountBalance;
+  final WidgetRef ref;
+
+  const _AllocateDialog({required this.categories, required this.accountBalance, required this.ref});
+
+  @override
+  State<_AllocateDialog> createState() => _AllocateDialogState();
+}
+
+class _AllocateDialogState extends State<_AllocateDialog> {
+  late String _categoryId = widget.categories.first.id;
+  final _amountController = TextEditingController();
+  String? _error;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    if (value == null || value <= 0) {
+      setState(() => _error = 'Informe um valor válido.');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.ref.read(firestoreServiceProvider)!.createAllocation(
+        categoryId: _categoryId,
+        amount: value,
+        date: DateTime.now().toIso8601String().substring(0, 10),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Alocar pra caixinha'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Disponível na conta: ${formatCurrency(widget.accountBalance)}', style: TextStyle(color: context.tokens.subtle)),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _categoryId,
+            decoration: const InputDecoration(labelText: 'Caixinha'),
+            items: [for (final c in widget.categories) DropdownMenuItem(value: c.id, child: Text(c.name))],
+            onChanged: (v) => setState(() => _categoryId = v ?? _categoryId),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(onPressed: _submitting ? null : _confirm, child: const Text('Confirmar')),
       ],
     );
   }
