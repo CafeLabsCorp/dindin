@@ -151,13 +151,36 @@
       "Read(//usr/lib/**)",
       "Bash(wsl.exe -l -q)",
       "Bash(git rm *)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "Read(//mnt/c/Users/felip/Downloads/**)",
+      "Bash(node view_logo.js)",
+      "Read(//usr/bin/**)",
+      "Bash(snap list *)",
+      "Read(//opt/google/chrome/**)",
+      "Bash(dpkg -l)",
+      "Bash(sed -i \"s#executablePath: '/usr/bin/chromium-browser'#executablePath: '/usr/bin/google-chrome'#\" view_logo2.js)",
+      "Bash(node view_logo2.js)",
+      "Bash(node -e ' *)",
+      "Bash(ls -la /home/felip/projetos/dindin/next/data/ 2>&1; echo \"---trash---\"; ls -la ~/.local/share/Trash/files/ 2>&1 | grep -i db; find ~/.local/share/Trash -iname \"*db.json*\" 2>/dev/null)",
+      "Read(//home/felip/.local/share/Trash/**)",
+      "Read(//home/felip/.local/share/**)",
+      "Bash(firebase firestore:backups:schedules:list --database='\\(default\\)' --project dindin-cafelabs)",
+      "Bash(mkdir -p /home/felip/projetos/dindin/assets/icon && \\\\ *)",
+      "Bash(dart run *)",
+      "Bash(nohup python3 -m http.server 8767 --bind 127.0.0.1)",
+      "Bash(timeout 15 bash -c 'until curl -sf http://127.0.0.1:8767 >/dev/null 2>&1; do sleep 1; done')",
+      "Bash(disown)",
+      "Bash(curl -sI http://127.0.0.1:8767)",
+      "Bash(pkill -f \"http.server 8767\")"
     ],
     "additionalDirectories": [
       "/home/felip/projetos/dindin/src",
       "/home/felip/projetos/dindin/src/app/api/categories",
       "/home/felip/projetos/dindin/data",
-      "/tmp/claude-1000/-home-felip-projetos-dindin/4b8e16d3-36c0-42be-8fda-463923de3f2f/scratchpad/pw/node_modules"
+      "/tmp/claude-1000/-home-felip-projetos-dindin/4b8e16d3-36c0-42be-8fda-463923de3f2f/scratchpad/pw/node_modules",
+      "/mnt/c/Users/felip/Downloads"
     ]
   }
 }
