@@ -117,7 +117,8 @@
       "Bash(chmod +x /home/felip/projetos/dindin/run_web.sh)",
       "Bash(sed -n '1,60p' /home/felip/projetos/domo/lib/features/auth/data/repositories/auth_repository_impl.dart)",
       "Read(//home/felip/projetos/domo/lib/features/auth/data/repositories/**)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(flutter test *)"
     ],
     "additionalDirectories": [
       "/home/felip/projetos/dindin/src",
