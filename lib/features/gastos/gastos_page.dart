@@ -7,6 +7,10 @@ import '../../utils/format.dart';
 import '../../widgets/app_card.dart';
 import '../receitas/receitas_page.dart' show todayIsoFrom;
 
+/// Sentinel for the "Conta" dropdown entry — an expense charged directly
+/// against the account balance instead of a caixinha.
+const _accountOption = '__account__';
+
 class GastosPage extends ConsumerStatefulWidget {
   const GastosPage({super.key});
 
@@ -18,7 +22,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime _date = DateTime.now();
-  String? _categoryId;
+  String _selection = _accountOption;
   String? _error;
   bool _submitting = false;
 
@@ -29,10 +33,10 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     super.dispose();
   }
 
-  Future<void> _submit(String effectiveCategoryId) async {
+  Future<void> _submit() async {
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
-      setState(() => _error = 'Escolha uma categoria e um valor válido.');
+      setState(() => _error = 'Informe um valor válido.');
       return;
     }
     final firestore = ref.read(firestoreServiceProvider);
@@ -45,7 +49,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
       await firestore.createExpense(
         date: todayIsoFrom(_date),
         amount: value,
-        categoryId: effectiveCategoryId,
+        categoryId: _selection == _accountOption ? null : _selection,
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
       );
       _amountController.clear();
@@ -78,84 +82,83 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final categories = ref.watch(categoriesProvider).value ?? [];
     final summary = ref.watch(summaryProvider);
 
-    final effectiveCategoryId = _categoryId ?? (categories.isNotEmpty ? categories.first.id : null);
     final categoryName = {for (final c in categories) c.id: c.name};
-    final availableBalance = effectiveCategoryId != null ? (summary?.balancesByCategory[effectiveCategoryId] ?? 0) : 0.0;
+    final availableBalance = _selection == _accountOption
+        ? (summary?.accountBalance ?? 0)
+        : (summary?.balancesByCategory[_selection] ?? 0);
 
     return ListView(
       children: [
         Text('Gastos', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        Text('Registre saídas de dinheiro de uma caixinha específica.', style: TextStyle(color: context.tokens.muted)),
+        Text('Registre uma saída direto da conta ou de uma caixinha específica.', style: TextStyle(color: context.tokens.muted)),
         const SizedBox(height: 24),
         AppCard(
-          child: categories.isEmpty
-              ? const EmptyState('Crie uma categoria antes de lançar gastos.')
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        SizedBox(
-                          width: 160,
-                          child: InkWell(
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _date,
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) setState(() => _date = picked);
-                            },
-                            child: InputDecorator(
-                              decoration: const InputDecoration(labelText: 'Data'),
-                              child: Text(formatDate(todayIsoFrom(_date))),
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 140,
-                          child: TextField(
-                            controller: _amountController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 200,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: effectiveCategoryId,
-                            decoration: const InputDecoration(labelText: 'Caixinha'),
-                            items: [for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name))],
-                            onChanged: (v) => setState(() => _categoryId = v),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 220,
-                          child: TextField(
-                            controller: _descriptionController,
-                            decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: supermercado'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Disponível: ${formatCurrency(availableBalance)}', style: TextStyle(fontSize: 12, color: context.tokens.subtle)),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _submitting || effectiveCategoryId == null ? null : () => _submit(effectiveCategoryId),
-                      child: const Text('Lançar gasto'),
-                    ),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: 160,
+                    child: InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _date,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) setState(() => _date = picked);
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Data'),
+                        child: Text(formatDate(todayIsoFrom(_date))),
                       ),
-                  ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 140,
+                    child: TextField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 200,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selection,
+                      decoration: const InputDecoration(labelText: 'De onde sai'),
+                      items: [
+                        const DropdownMenuItem(value: _accountOption, child: Text('Conta')),
+                        for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
+                      ],
+                      onChanged: (v) => setState(() => _selection = v ?? _accountOption),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: TextField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: supermercado'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text('Disponível: ${formatCurrency(availableBalance)}', style: TextStyle(fontSize: 12, color: context.tokens.subtle)),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _submitting ? null : _submit, child: const Text('Lançar gasto')),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         AppCard(
@@ -190,8 +193,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                                             style: const TextStyle(fontWeight: FontWeight.w500),
                                           ),
                                           TextSpan(
-                                            text:
-                                                ' · ${categoryName[expenses[i].categoryId] ?? 'categoria removida'} · ${expenses[i].date}',
+                                            text: ' · ${_originLabel(expenses[i].categoryId, categoryName)} · ${expenses[i].date}',
                                             style: TextStyle(color: context.tokens.subtle),
                                           ),
                                         ],
@@ -225,4 +227,9 @@ class _GastosPageState extends ConsumerState<GastosPage> {
       ],
     );
   }
+}
+
+String _originLabel(String? categoryId, Map<String, String> categoryName) {
+  if (categoryId == null) return 'Conta';
+  return categoryName[categoryId] ?? 'categoria removida';
 }

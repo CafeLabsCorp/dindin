@@ -16,22 +16,34 @@ void main() {
   const salario = Income(id: 'i1', date: '2026-01-05', amount: 1000, source: IncomeSource.estagio);
   const freela = Income(id: 'i2', date: '2026-02-05', amount: 500, source: IncomeSource.freela);
 
-  const allocSalarioCasa = Allocation(id: 'a1', incomeId: 'i1', categoryId: 'c1', amount: 600, date: '2026-01-05');
-  const allocSalarioLazer = Allocation(id: 'a2', incomeId: 'i1', categoryId: 'c2', amount: 300, date: '2026-01-05');
-  const allocFreelaCasa = Allocation(id: 'a3', incomeId: 'i2', categoryId: 'c1', amount: 200, date: '2026-02-05');
+  const allocCasa = Allocation(id: 'a1', categoryId: 'c1', amount: 600, date: '2026-01-05');
+  const allocLazer = Allocation(id: 'a2', categoryId: 'c2', amount: 300, date: '2026-01-05');
+  const allocCasaExtra = Allocation(id: 'a3', categoryId: 'c1', amount: 200, date: '2026-02-05');
 
   const despesaCasa = Expense(id: 'e1', date: '2026-01-10', amount: 150, categoryId: 'c1');
   const despesaLazer = Expense(id: 'e2', date: '2026-02-15', amount: 50, categoryId: 'c2');
+  const despesaConta = Expense(id: 'e3', date: '2026-02-20', amount: 80, categoryId: null);
 
   final db = AppDb(
     categories: [casa, lazer, semMovimento],
     incomes: [salario, freela],
-    allocations: [allocSalarioCasa, allocSalarioLazer, allocFreelaCasa],
-    expenses: [despesaCasa, despesaLazer],
+    allocations: [allocCasa, allocLazer, allocCasaExtra],
+    expenses: [despesaCasa, despesaLazer, despesaConta],
   );
 
   test('monthKey extrai o prefixo YYYY-MM de uma data ISO', () {
     expect(monthKey('2026-03-17'), '2026-03');
+  });
+
+  group('accountBalance', () {
+    test('é o total recebido menos o alocado menos os gastos diretos da conta', () {
+      // 1500 recebido - 1100 alocado (600+300+200) - 80 gasto direto = 320
+      expect(accountBalance(db), 320);
+    });
+
+    test('sem nenhum lançamento fica em zero', () {
+      expect(accountBalance(AppDb.empty), 0);
+    });
   });
 
   group('categoryBalances', () {
@@ -45,32 +57,20 @@ void main() {
       expect(categoryBalances(db)['c3'], 0);
     });
 
+    test('gastos direto da conta (categoryId nulo) não entram em nenhuma caixinha', () {
+      final balances = categoryBalances(db);
+      expect(balances.values.fold(0.0, (s, v) => s + v), 900); // 650 + 250 + 0, sem o gasto da conta
+    });
+
     test('AppDb vazio não gera categorias', () {
       expect(categoryBalances(AppDb.empty), isEmpty);
     });
   });
 
-  test('totalBalance soma o saldo de todas as categorias', () {
-    expect(totalBalance(db), 900); // 650 + 250 + 0
-  });
-
-  group('unallocatedByIncome', () {
-    test('subtrai o total já alocado do valor da receita', () {
-      final unallocated = unallocatedByIncome(db);
-      expect(unallocated['i1'], 100); // 1000 - (600 + 300)
-      expect(unallocated['i2'], 300); // 500 - 200
-    });
-
-    test('receita sem nenhuma alocação fica com o valor cheio', () {
-      const semAlocacao = Income(id: 'i3', date: '2026-03-01', amount: 400, source: IncomeSource.outro);
-      final dbComExtra = AppDb(
-        categories: db.categories,
-        incomes: [...db.incomes, semAlocacao],
-        allocations: db.allocations,
-        expenses: db.expenses,
-      );
-      expect(unallocatedByIncome(dbComExtra)['i3'], 400);
-    });
+  test('totalBalance soma a conta com o saldo de todas as categorias', () {
+    // 320 (conta) + 650 (c1) + 250 (c2) + 0 (c3) = 1220
+    // equivale a: total recebido (1500) - total gasto (150+50+80=280) = 1220
+    expect(totalBalance(db), 1220);
   });
 
   group('monthSummary', () {
@@ -84,11 +84,11 @@ void main() {
       expect(summary.expenseByCategory, {'c1': 150});
     });
 
-    test('mês diferente traz outros totais', () {
+    test('inclui gastos diretos da conta no total, mas não no detalhe por categoria', () {
       final summary = monthSummary(db, '2026-02');
       expect(summary.totalIncome, 500);
-      expect(summary.totalExpense, 50);
-      expect(summary.net, 450);
+      expect(summary.totalExpense, 130); // 50 (c2) + 80 (conta)
+      expect(summary.net, 370);
       expect(summary.incomeBySource, {'freela': 500});
       expect(summary.expenseByCategory, {'c2': 50});
     });
@@ -118,9 +118,10 @@ void main() {
     expect(currentMonthKey(), matches(RegExp(r'^\d{4}-\d{2}$')));
   });
 
-  test('buildSummary combina saldo total, por categoria e histórico', () {
+  test('buildSummary combina saldo total, da conta, por categoria e histórico', () {
     final summary = buildSummary(db);
     expect(summary.total, totalBalance(db));
+    expect(summary.accountBalance, accountBalance(db));
     expect(summary.balancesByCategory, categoryBalances(db));
     expect(summary.currentMonth.month, currentMonthKey());
     expect(summary.history.map((m) => m.month), allMonths(db));

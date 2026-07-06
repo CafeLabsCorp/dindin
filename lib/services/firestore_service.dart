@@ -120,44 +120,42 @@ class FirestoreService {
     return income;
   }
 
-  /// Deletes the income and cascades to allocations made from it, matching
-  /// `next/src/app/api/incomes/[id]/route.ts`.
-  Future<void> deleteIncome(String id) async {
-    final batch = _db.batch();
-    batch.delete(_incomes.doc(id));
-    for (final d in (await _allocations.where('incomeId', isEqualTo: id).get()).docs) {
-      batch.delete(d.reference);
-    }
-    await batch.commit();
+  Future<void> deleteIncome(String id) => _incomes.doc(id).delete();
+
+  /// The general account balance: total income minus what's been allocated
+  /// to caixinhas minus expenses charged directly against the account.
+  Future<double> _accountBalance() async {
+    final incomes = await _incomes.get();
+    final allocations = await _allocations.get();
+    final accountExpenses = await _expenses.where('categoryId', isNull: true).get();
+
+    final totalIncome = incomes.docs.fold<double>(0, (t, d) => t + (d.data()['amount'] as num).toDouble());
+    final totalAllocated = allocations.docs.fold<double>(0, (t, d) => t + (d.data()['amount'] as num).toDouble());
+    final totalAccountExpenses = accountExpenses.docs.fold<double>(
+      0,
+      (t, d) => t + (d.data()['amount'] as num).toDouble(),
+    );
+    return totalIncome - totalAllocated - totalAccountExpenses;
   }
 
-  /// Mirrors `next/src/app/api/allocations/route.ts`: an allocation can't
-  /// push the income's total allocated amount past the income's own amount.
+  /// An allocation moves money from the pooled account balance into a
+  /// caixinha — it can't push the account balance negative.
   Future<Allocation> createAllocation({
-    required String incomeId,
     required String categoryId,
     required double amount,
     required String date,
   }) async {
-    final incomeSnap = await _incomes.doc(incomeId).get();
-    if (!incomeSnap.exists) throw StateError('income not found');
     final categorySnap = await _categories.doc(categoryId).get();
     if (!categorySnap.exists) throw StateError('category not found');
 
-    final income = Income.fromMap(incomeSnap.id, incomeSnap.data()!);
-    final existing = await _allocations.where('incomeId', isEqualTo: incomeId).get();
-    final alreadyAllocated = existing.docs.fold<double>(
-      0,
-      (total, d) => total + (d.data()['amount'] as num).toDouble(),
-    );
-    if (alreadyAllocated + amount > income.amount + 1e-9) {
-      throw StateError('amount exceeds unallocated income');
+    final available = await _accountBalance();
+    if (amount > available + 1e-9) {
+      throw StateError('amount exceeds account balance');
     }
 
     final doc = _allocations.doc();
     final allocation = Allocation(
       id: doc.id,
-      incomeId: incomeId,
       categoryId: categoryId,
       amount: amount,
       date: date,
@@ -169,29 +167,35 @@ class FirestoreService {
   Future<void> deleteAllocation(String id) => _allocations.doc(id).delete();
 
   /// Mirrors `next/src/app/api/expenses/route.ts`: an expense can't exceed
-  /// the category's current balance (allocated minus already spent).
+  /// the available balance — either a caixinha's (allocated minus already
+  /// spent) or, when [categoryId] is null, the general account's.
   Future<Expense> createExpense({
     required String date,
     required double amount,
-    required String categoryId,
+    String? categoryId,
     String? description,
   }) async {
-    final categorySnap = await _categories.doc(categoryId).get();
-    if (!categorySnap.exists) throw StateError('category not found');
+    double available;
+    if (categoryId == null) {
+      available = await _accountBalance();
+    } else {
+      final categorySnap = await _categories.doc(categoryId).get();
+      if (!categorySnap.exists) throw StateError('category not found');
 
-    final allocs = await _allocations.where('categoryId', isEqualTo: categoryId).get();
-    final expenses = await _expenses.where('categoryId', isEqualTo: categoryId).get();
-    final allocated = allocs.docs.fold<double>(
-      0,
-      (total, d) => total + (d.data()['amount'] as num).toDouble(),
-    );
-    final spent = expenses.docs.fold<double>(
-      0,
-      (total, d) => total + (d.data()['amount'] as num).toDouble(),
-    );
-    final available = allocated - spent;
+      final allocs = await _allocations.where('categoryId', isEqualTo: categoryId).get();
+      final expenses = await _expenses.where('categoryId', isEqualTo: categoryId).get();
+      final allocated = allocs.docs.fold<double>(
+        0,
+        (total, d) => total + (d.data()['amount'] as num).toDouble(),
+      );
+      final spent = expenses.docs.fold<double>(
+        0,
+        (total, d) => total + (d.data()['amount'] as num).toDouble(),
+      );
+      available = allocated - spent;
+    }
     if (amount > available + 1e-9) {
-      throw StateError('amount exceeds caixinha balance');
+      throw StateError('amount exceeds available balance');
     }
 
     final doc = _expenses.doc();

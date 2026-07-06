@@ -173,7 +173,12 @@
       "Bash(timeout 15 bash -c 'until curl -sf http://127.0.0.1:8767 >/dev/null 2>&1; do sleep 1; done')",
       "Bash(disown)",
       "Bash(curl -sI http://127.0.0.1:8767)",
-      "Bash(pkill -f \"http.server 8767\")"
+      "Bash(pkill -f \"http.server 8767\")",
+      "Bash(rm -f /home/felip/projetos/dindin/.git/gc.log)",
+      "Bash(git prune *)",
+      "Bash(nohup python3 -m http.server 8768 --bind 127.0.0.1)",
+      "Bash(curl -sI http://127.0.0.1:8768)",
+      "Bash(pkill -f \"http.server 8768\")"
     ],
     "additionalDirectories": [
       "/home/felip/projetos/dindin/src",
