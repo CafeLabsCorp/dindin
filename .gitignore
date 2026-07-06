@@ -30,15 +30,6 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
-# --- Next.js app (kept under next/ during migration) ---
-next/node_modules
-next/.next/
-next/out/
-next/build
-next/*.tsbuildinfo
-next/next-env.d.ts
-next/data/db.json
-
 # misc
 .DS_Store
 *.pem
