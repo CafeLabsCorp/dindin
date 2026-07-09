@@ -7,6 +7,7 @@ import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../utils/format.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/responsive_form_row.dart';
 
 const _sources = [
   (value: IncomeSource.estagio, label: 'Estágio'),
@@ -97,12 +98,10 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: 160,
+              ResponsiveFormRow(
+                fields: [
+                  (
+                    width: 160.0,
                     child: InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
@@ -119,16 +118,16 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: 140,
+                  (
+                    width: 140.0,
                     child: TextField(
                       controller: _amountController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
                     ),
                   ),
-                  SizedBox(
-                    width: 160,
+                  (
+                    width: 160.0,
                     child: DropdownButtonFormField<IncomeSource>(
                       initialValue: _source,
                       decoration: const InputDecoration(labelText: 'Origem'),
@@ -138,8 +137,8 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                       onChanged: (v) => setState(() => _source = v ?? IncomeSource.estagio),
                     ),
                   ),
-                  SizedBox(
-                    width: 220,
+                  (
+                    width: 220.0,
                     child: TextField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: salário julho'),

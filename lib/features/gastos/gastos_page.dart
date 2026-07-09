@@ -5,6 +5,7 @@ import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../utils/format.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/responsive_form_row.dart';
 import '../receitas/receitas_page.dart' show todayIsoFrom;
 
 /// Sentinel for the "Conta" dropdown entry — an expense charged directly
@@ -97,12 +98,10 @@ class _GastosPageState extends ConsumerState<GastosPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: 160,
+              ResponsiveFormRow(
+                fields: [
+                  (
+                    width: 160.0,
                     child: InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
@@ -119,16 +118,16 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: 140,
+                  (
+                    width: 140.0,
                     child: TextField(
                       controller: _amountController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
                     ),
                   ),
-                  SizedBox(
-                    width: 200,
+                  (
+                    width: 200.0,
                     child: DropdownButtonFormField<String>(
                       initialValue: _selection,
                       decoration: const InputDecoration(labelText: 'De onde sai'),
@@ -139,8 +138,8 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       onChanged: (v) => setState(() => _selection = v ?? _accountOption),
                     ),
                   ),
-                  SizedBox(
-                    width: 220,
+                  (
+                    width: 220.0,
                     child: TextField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: supermercado'),
