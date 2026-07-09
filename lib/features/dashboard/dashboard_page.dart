@@ -85,6 +85,7 @@ class DashboardPage extends ConsumerWidget {
             ];
             if (!wide) {
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [for (final t in tiles) ...[t, const SizedBox(height: 12)]],
               );
             }
