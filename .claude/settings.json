@@ -203,7 +203,10 @@
       "Bash(grep -rn \"enum Persistence\\\\|LOCAL\\\\|SESSION\\\\|setPersistence\" ~/.pub-cache/hosted/pub.dev/firebase_auth_platform_interface-*/lib/src/*.dart 2>/dev/null | head -20)",
       "Read(//home/felip/.pub-cache/hosted/pub.dev/firebase_auth-6.5.4/lib/src/**)",
       "Read(//home/felip/.pub-cache/hosted/pub.dev/firebase_auth_platform_interface-9.0.3/lib/src/**)",
-      "Bash(sed -n '420,440p' ~/.pub-cache/hosted/pub.dev/firebase_auth-6.5.4/lib/src/firebase_auth.dart)"
+      "Bash(sed -n '420,440p' ~/.pub-cache/hosted/pub.dev/firebase_auth-6.5.4/lib/src/firebase_auth.dart)",
+      "Read(//home/felip/.claude/projects/**)",
+      "Bash(find / -maxdepth 3 -iname \"*domo*\")",
+      "Read(//home/felip/.claude/projects/-home-felip-projetos-domo/memory/**)"
     ],
     "additionalDirectories": [
       "/home/felip/projetos/dindin/src",
