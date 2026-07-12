@@ -114,6 +114,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ],
           ),
         ),
+        const SizedBox(height: 24),
+        Center(
+          child: Text(
+            'Dindin — um produto Café Labs',
+            style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+          ),
+        ),
       ],
     );
   }
