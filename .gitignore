@@ -30,6 +30,15 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
+# --- Node (scripts/, functions/, test/rules/) ---
+node_modules/
+
+# Firebase admin / service-account keys — never commit
+*serviceAccount*.json
+*service-account*.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+
 # misc
 .DS_Store
 *.pem

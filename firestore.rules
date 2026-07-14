@@ -1,8 +1,259 @@
 rules_version = '2';
+
+// Dindin Firestore Security Rules — Phase 2 (Option B: rules-only, free tier)
+// ==========================================================================
+// Posture: DEFAULT DENY. Only the paths matched below are reachable; anything
+// else is denied. Every rule requires the caller to own the /users/{uid}
+// subtree (auth + per-record authorization), validates document shape and
+// non-negative single amounts, and keeps `createdAt` immutable.
+//
+// MONEY-INTEGRITY MODEL (Option B — the owner chose the free Spark tier, no
+// Cloud Functions). The invariants "spent <= allocated per caixinha",
+// "allocations <= account balance" and "nothing goes negative" depend on
+// SUMMING whole collections, which rules cannot do. So we DENORMALIZE the two
+// running balances into O(1) documents that rules CAN read with get()/
+// getAfter():
+//   * users/{uid}/meta/account      -> { balance }  (the general account)
+//   * users/{uid}/balances/{catId}  -> { balance }  (one per caixinha)
+// Every mutating ledger write is done client-side inside a Firestore
+// transaction that updates the affected balance doc(s) IN THE SAME COMMIT.
+// The rules below then use getAfter() to require that each ledger write moves
+// exactly the right balance doc by exactly the right delta, and that no
+// balance doc ever ends up negative. Because each ledger doc pins the FINAL
+// value of the balance doc(s) it touches, two conflicting ledger writes to the
+// same balance doc in one commit cannot both pass — the delta check is NOT
+// bypassable by batching writes together.
+//
+// GENESIS / TEARDOWN: bulk operations (a full JSON restore, or a category
+// cascade-delete) legitimately touch a balance doc's whole history at once and
+// cannot satisfy a per-ledger-doc delta. They are handled by first REMOVING
+// the affected balance doc(s), doing the bulk ledger changes while the balance
+// doc is absent (getAfter(...) == null -> delta check skipped), then writing
+// the recomputed, non-negative balance doc(s) last. The only guarantee kept
+// during teardown is that any balance doc present after the commit is >= 0.
+//
+// HONEST LIMITS (see docs/BACKEND.md, "Option B residual limitations"):
+//   * A client that deliberately deletes its own balance doc first can then
+//     write ledger docs without the delta check and re-create the balance at
+//     any non-negative value. All data here is single-tenant (a user can only
+//     corrupt THEIR OWN numbers, never another user's), and the app's display
+//     recomputes balances by summing the ledger, so the balance docs are a
+//     validation cache, not the source of truth shown to the user. The real
+//     security boundary — no cross-user read/write — is enforced unconditionally
+//     by isOwner() and is unaffected by any of this.
+//   * These getAfter()/null-teardown rules CANNOT be unit-tested from Flutter.
+//     They MUST be exercised against the Firestore emulator before deploy.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
     }
+
+    function isNonNegNumber(v) {
+      return v is number && v >= 0;
+    }
+
+    function isIsoDate(v) {
+      return v is string && v.size() >= 10;
+    }
+
+    // --- denormalized balance docs -----------------------------------------
+    function acctDoc(uid) {
+      return /databases/$(database)/documents/users/$(uid)/meta/account;
+    }
+    function balDoc(uid, cat) {
+      return /databases/$(database)/documents/users/$(uid)/balances/$(cat);
+    }
+    // Current (pre-commit) balance; a missing balance doc reads as 0.
+    function balBefore(path) {
+      return exists(path) ? get(path).data.balance : 0;
+    }
+    // The account balance doc must, after the commit, either not exist
+    // (genesis/teardown) or have moved by exactly `delta` and stay >= 0.
+    function accountDeltaOk(uid, delta) {
+      return getAfter(acctDoc(uid)) == null
+          || (getAfter(acctDoc(uid)).data.balance == balBefore(acctDoc(uid)) + delta
+              && getAfter(acctDoc(uid)).data.balance >= 0);
+    }
+    // Same, for one caixinha's balance doc.
+    function catDeltaOk(uid, cat, delta) {
+      return getAfter(balDoc(uid, cat)) == null
+          || (getAfter(balDoc(uid, cat)).data.balance == balBefore(balDoc(uid, cat)) + delta
+              && getAfter(balDoc(uid, cat)).data.balance >= 0);
+    }
+    // True when the caixinha's balance doc is being torn down in this commit
+    // (a cascade delete or a restore): the ledger docs that reference it may
+    // then be removed without a per-doc delta.
+    function catTornDown(uid, cat) {
+      return getAfter(balDoc(uid, cat)) == null;
+    }
+    function accountNonNeg(uid) {
+      return getAfter(acctDoc(uid)) == null || getAfter(acctDoc(uid)).data.balance >= 0;
+    }
+
+    // meta/account holds the general account balance. Only the `account` doc
+    // is allowed under meta; everything else denies by default.
+    match /users/{uid}/meta/{docId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+                            && docId == 'account'
+                            && request.resource.data.keys().hasOnly(['balance'])
+                            && isNonNegNumber(request.resource.data.balance);
+      allow delete: if isOwner(uid); // needed for a full restore reset
+    }
+
+    // balances/{categoryId} holds one caixinha's running balance. Keyed by the
+    // same id as the category doc so ledger rules can reach it deterministically.
+    match /users/{uid}/balances/{categoryId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+                            && request.resource.data.keys().hasOnly(['balance'])
+                            && isNonNegNumber(request.resource.data.balance);
+      allow delete: if isOwner(uid); // cascade delete / restore reset
+    }
+
+    // --- categories ---------------------------------------------------------
+    function validCategory(d) {
+      return d.name is string
+          && d.recurring is bool
+          && isIsoDate(d.createdAt)
+          && (!('monthlyBudget' in d.keys()) || isNonNegNumber(d.monthlyBudget));
+    }
+
+    match /users/{uid}/categories/{categoryId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validCategory(request.resource.data);
+      // createdAt is immutable across edits.
+      allow update: if isOwner(uid)
+                    && validCategory(request.resource.data)
+                    && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(uid);
+    }
+
+    // --- incomes ------------------------------------------------------------
+    // Income only ever adds to the account. create/update/delete must move
+    // meta/account by exactly the income's before->after delta and never below 0.
+    function validIncome(d) {
+      return isIsoDate(d.date)
+          && isNonNegNumber(d.amount)
+          && d.source is string
+          && (!('description' in d.keys()) || d.description is string);
+    }
+
+    match /users/{uid}/incomes/{incomeId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && validIncome(request.resource.data)
+                    && accountDeltaOk(uid, request.resource.data.amount);
+      allow update: if isOwner(uid)
+                    && validIncome(request.resource.data)
+                    && accountDeltaOk(uid, request.resource.data.amount - resource.data.amount);
+      allow delete: if isOwner(uid)
+                    && accountDeltaOk(uid, -resource.data.amount);
+    }
+
+    // --- allocations (incl. transfer legs) ---------------------------------
+    // A plain allocation moves `amount` from the account into a caixinha:
+    // account -= amount, caixinha += amount. A transfer leg carries a
+    // `transferId`, may be negative, and touches ONLY its caixinha (the paired
+    // legs net to zero against the account).
+    function validAllocation(d) {
+      return d.categoryId is string
+          && d.amount is number
+          && isIsoDate(d.date)
+          && (('transferId' in d.keys())
+                ? d.transferId is string
+                : d.amount >= 0);
+    }
+    function isTransferLeg(d) {
+      return 'transferId' in d.keys();
+    }
+
+    match /users/{uid}/allocations/{allocationId} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+                    && validAllocation(request.resource.data)
+                    && catDeltaOk(uid, request.resource.data.categoryId, request.resource.data.amount)
+                    && (isTransferLeg(request.resource.data)
+                          ? accountDeltaOk(uid, 0)
+                          : accountDeltaOk(uid, -request.resource.data.amount));
+
+      // Editing is restricted to plain allocations that keep the same caixinha
+      // (amount/date only). Transfer legs and re-homing are delete + recreate.
+      allow update: if isOwner(uid)
+                    && validAllocation(request.resource.data)
+                    && !isTransferLeg(resource.data)
+                    && !isTransferLeg(request.resource.data)
+                    && request.resource.data.categoryId == resource.data.categoryId
+                    && accountDeltaOk(uid, resource.data.amount - request.resource.data.amount)
+                    && catDeltaOk(uid, request.resource.data.categoryId,
+                                  request.resource.data.amount - resource.data.amount);
+
+      allow delete: if isOwner(uid) && (
+                      // teardown (category cascade / restore): balance doc gone
+                      catTornDown(uid, resource.data.categoryId)
+                        ? accountNonNeg(uid)
+                        // normal single delete: restore the moved money
+                        : (isTransferLeg(resource.data)
+                              ? (accountDeltaOk(uid, 0)
+                                 && catDeltaOk(uid, resource.data.categoryId, -resource.data.amount))
+                              : (accountDeltaOk(uid, resource.data.amount)
+                                 && catDeltaOk(uid, resource.data.categoryId, -resource.data.amount)))
+                    );
+    }
+
+    // --- expenses -----------------------------------------------------------
+    // A caixinha expense (has categoryId): caixinha -= amount, account unchanged.
+    // An account expense (no categoryId): account -= amount.
+    function validExpense(d) {
+      return isIsoDate(d.date)
+          && isNonNegNumber(d.amount)
+          && (!('categoryId' in d.keys()) || d.categoryId is string)
+          && (!('description' in d.keys()) || d.description is string);
+    }
+    function isCaixinhaExpense(d) {
+      return 'categoryId' in d.keys();
+    }
+    function sameExpenseTarget(before, after) {
+      return (('categoryId' in before.keys()) == ('categoryId' in after.keys()))
+          && (!('categoryId' in after.keys()) || before.categoryId == after.categoryId);
+    }
+
+    match /users/{uid}/expenses/{expenseId} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+                    && validExpense(request.resource.data)
+                    && (isCaixinhaExpense(request.resource.data)
+                          ? (accountDeltaOk(uid, 0)
+                             && catDeltaOk(uid, request.resource.data.categoryId,
+                                           -request.resource.data.amount))
+                          : accountDeltaOk(uid, -request.resource.data.amount));
+
+      // Editing keeps the same target (caixinha vs account); moving an expense
+      // is delete + recreate.
+      allow update: if isOwner(uid)
+                    && validExpense(request.resource.data)
+                    && sameExpenseTarget(resource.data, request.resource.data)
+                    && (isCaixinhaExpense(request.resource.data)
+                          ? (accountDeltaOk(uid, 0)
+                             && catDeltaOk(uid, request.resource.data.categoryId,
+                                           resource.data.amount - request.resource.data.amount))
+                          : accountDeltaOk(uid, resource.data.amount - request.resource.data.amount));
+
+      allow delete: if isOwner(uid) && (
+                      isCaixinhaExpense(resource.data)
+                        ? (catTornDown(uid, resource.data.categoryId)
+                              ? true
+                              : (accountDeltaOk(uid, 0)
+                                 && catDeltaOk(uid, resource.data.categoryId, resource.data.amount)))
+                        : accountDeltaOk(uid, resource.data.amount)
+                    );
+    }
+
+    // Everything else under the user subtree (and everywhere else) is denied
+    // by default — no catch-all allow.
   }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "dindin-functions",
+  "description": "Server-side money-integrity writes for Dindin (callable Cloud Functions).",
+  "type": "module",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "private": true
+}
