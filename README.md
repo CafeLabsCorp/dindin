@@ -1,5 +1,7 @@
 # dindin
 
+Um produto [Café Labs](https://cafelabs.net).
+
 App pessoal de controle financeiro por "caixinhas": receitas entram, são alocadas
 entre categorias, e os gastos saem de cada categoria.
 
