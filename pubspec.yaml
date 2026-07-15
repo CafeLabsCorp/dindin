@@ -58,6 +58,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  fake_cloud_firestore: ^4.1.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -103,6 +104,23 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Fraunces-SemiBold.ttf
+          weight: 600
+    - family: Work Sans
+      fonts:
+        - asset: assets/fonts/WorkSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/WorkSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/WorkSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/WorkSans-Bold.ttf
+          weight: 700
 
 flutter_launcher_icons:
   image_path: "assets/icon/logo_1024.png"
