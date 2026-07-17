@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/providers.dart';
 import '../../widgets/app_card.dart';
 
@@ -65,6 +66,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -90,22 +93,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          _isRegister ? 'Criar conta' : 'Entrar',
+                          _isRegister ? l10n.authCreateAccountTitle : l10n.authSignInTitle,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(labelText: 'E-mail'),
-                          validator: (v) => (v == null || !v.contains('@')) ? 'E-mail inválido' : null,
+                          decoration: InputDecoration(labelText: l10n.emailLabel),
+                          validator: (v) => (v == null || !v.contains('@')) ? l10n.emailInvalidError : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
                           obscureText: true,
-                          decoration: const InputDecoration(labelText: 'Senha'),
-                          validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
+                          decoration: InputDecoration(labelText: l10n.passwordLabel),
+                          validator: (v) => (v == null || v.length < 6) ? l10n.passwordMinLengthError : null,
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 12),
@@ -114,18 +117,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _loading ? null : _submitEmail,
-                          child: Text(_isRegister ? 'Criar conta' : 'Entrar'),
+                          child: Text(_isRegister ? l10n.authCreateAccountTitle : l10n.authSignInTitle),
                         ),
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: _loading ? null : () => setState(() => _isRegister = !_isRegister),
-                          child: Text(_isRegister ? 'Já tenho conta' : 'Criar uma conta'),
+                          child: Text(_isRegister ? l10n.haveAccountToggle : l10n.createAccountToggle),
                         ),
                         const Divider(height: 32),
                         OutlinedButton.icon(
                           onPressed: _loading ? null : _submitGoogle,
                           icon: const FaIcon(FontAwesomeIcons.google, size: 18),
-                          label: const Text('Entrar com Google'),
+                          label: Text(l10n.signInWithGoogle),
                         ),
                       ],
                     ),

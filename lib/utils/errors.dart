@@ -1,34 +1,39 @@
+import '../l10n/app_localizations.dart';
+
 /// Maps a raw error thrown by [FirestoreService] (today, always a `StateError`
-/// with an English message, or a Firestore `FirebaseException`) into a short
-/// pt-BR string safe to show inline under a form — every create/edit form in
-/// the app previously showed `e.toString()` verbatim (something like `Bad
+/// with an English message, or a Firestore `FirebaseException`) into a short,
+/// localized string safe to show inline under a form — every create/edit form
+/// in the app previously showed `e.toString()` verbatim (something like `Bad
 /// state: amount exceeds available balance`). Flagged in `docs/DESIGN.md`
 /// §5.1 as a small pre-existing rough edge worth fixing while this code is
 /// being touched anyway for the edit-transaction feature.
-String friendlyErrorMessage(Object error) {
+///
+/// Takes [l10n] directly (not a `BuildContext`) so it stays callable from
+/// plain unit tests — mirrors `categoriaLabel`-style helpers, see the i18n
+/// pass that added it.
+String friendlyErrorMessage(AppLocalizations l10n, Object error) {
   final message = error.toString();
   if (message.contains('not found')) {
-    return 'Esse lançamento não existe mais.';
+    return l10n.errorNotFound;
   }
   if (message.contains('source and destination must differ')) {
-    return 'Origem e destino precisam ser diferentes.';
+    return l10n.originDestinationMustDifferError;
   }
   if (message.contains('cannot edit a transfer leg') ||
       message.contains('changing') ||
       message.contains('moving')) {
-    return 'Essa alteração não é suportada — remova e lance de novo.';
+    return l10n.errorUnsupportedEdit;
   }
   if (message.contains('settle the debt')) {
-    return 'Quite a dívida dessa caixinha (saldo de volta a zero) antes de '
-        'convertê-la em cofrinho ou removê-la.';
+    return l10n.errorSettleDebt;
   }
   if (message.contains('exceeds') || message.contains('overdraw')) {
-    return 'Esse valor ultrapassa o saldo disponível.';
+    return l10n.errorExceedsBalance;
   }
   if (message.contains('cannot be negative') || message.contains('must be positive')) {
-    return 'Informe um valor válido.';
+    return l10n.invalidAmountError;
   }
-  return 'Não foi possível salvar. Tente novamente.';
+  return l10n.errorGenericSave;
 }
 
 /// Whether [error] means the underlying document is already gone — edited on

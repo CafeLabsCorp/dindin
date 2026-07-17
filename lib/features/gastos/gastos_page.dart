@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
 import '../../models/expense.dart';
 import '../../providers/providers.dart';
@@ -58,13 +59,14 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   }
 
   Future<void> _submit(List<Category> categories, num? availableBalance) async {
+    final l10n = AppLocalizations.of(context)!;
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
-      setState(() => _error = 'Informe um valor válido.');
+      setState(() => _error = l10n.invalidAmountError);
       return;
     }
     if (_blockedByFrozenDebt(categories, availableBalance)) {
-      setState(() => _error = 'Essa caixinha está devendo e não permite saldo negativo. Aloque para ela antes de lançar novos gastos.');
+      setState(() => _error = l10n.frozenDebtBlockShort);
       return;
     }
     final firestore = ref.read(firestoreServiceProvider);
@@ -83,20 +85,22 @@ class _GastosPageState extends ConsumerState<GastosPage> {
       _amountController.clear();
       _descriptionController.clear();
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   Future<void> _delete(String id) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover esse gasto?'),
+        title: Text(l10n.removeExpenseConfirmTitle),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remover')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
         ],
       ),
     );
@@ -122,6 +126,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final expensesAsync = ref.watch(expensesProvider);
     final categories = ref.watch(categoriesProvider).value ?? [];
     final summary = ref.watch(summaryProvider);
@@ -135,9 +140,9 @@ class _GastosPageState extends ConsumerState<GastosPage> {
 
     return ListView(
       children: [
-        Text('Gastos', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+        Text(l10n.gastosTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        Text('Registre uma saída direto da conta ou de uma caixinha específica.', style: TextStyle(color: context.tokens.muted)),
+        Text(l10n.gastosSubtitle, style: TextStyle(color: context.tokens.muted)),
         const SizedBox(height: 24),
         AppCard(
           child: Column(
@@ -158,7 +163,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                         if (picked != null) setState(() => _date = picked);
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Data'),
+                        decoration: InputDecoration(labelText: l10n.dateLabel),
                         child: Text(formatDate(isoDateFrom(_date))),
                       ),
                     ),
@@ -169,7 +174,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       controller: _amountController,
                       enabled: !blocked,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
                     ),
                   ),
                   (
@@ -177,9 +182,9 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                     child: DropdownButtonFormField<String>(
                       initialValue: _selection,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'De onde sai'),
+                      decoration: InputDecoration(labelText: l10n.expenseSourceLabel),
                       items: [
-                        const DropdownMenuItem(value: _accountOption, child: Text('Conta')),
+                        DropdownMenuItem(value: _accountOption, child: Text(l10n.accountLabel)),
                         for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
                       ],
                       onChanged: (v) => setState(() {
@@ -193,14 +198,14 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                     child: TextField(
                       controller: _descriptionController,
                       enabled: !blocked,
-                      decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: supermercado'),
+                      decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel, hintText: l10n.expenseDescriptionHint),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                'Disponível: ${formatCurrency(availableBalance)}',
+                l10n.availableLabel(formatCurrency(availableBalance)),
                 style: TextStyle(
                   fontSize: 12,
                   color: availableBalance < 0 ? context.tokens.statusCritical : context.tokens.subtle,
@@ -211,14 +216,14 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    'Essa caixinha está devendo e não permite saldo negativo. Aloque para ela antes de lançar novos gastos, ou ligue "Permitir saldo negativo" na categoria.',
+                    l10n.frozenDebtBlockLong,
                     style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
                   ),
                 ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _submitting || blocked ? null : () => _submit(categories, availableBalance),
-                child: const Text('Lançar gasto'),
+                child: Text(l10n.submitExpenseButton),
               ),
               if (_error != null)
                 Padding(
@@ -248,7 +253,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                         if (picked != null) setState(() => _filterFrom = picked);
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'De'),
+                        decoration: InputDecoration(labelText: l10n.filterFromLabel),
                         child: Text(_filterFrom == null ? '—' : formatDate(isoDateFrom(_filterFrom!))),
                       ),
                     ),
@@ -266,7 +271,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                         if (picked != null) setState(() => _filterTo = picked);
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Até'),
+                        decoration: InputDecoration(labelText: l10n.filterToLabel),
                         child: Text(_filterTo == null ? '—' : formatDate(isoDateFrom(_filterTo!))),
                       ),
                     ),
@@ -276,22 +281,22 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       width: 140.0,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: TextButton(onPressed: _clearFilter, child: const Text('Limpar filtro')),
+                        child: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
                       ),
                     ),
                 ],
               ),
               const SizedBox(height: 12),
-              Text('Gastos lançados', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              Text(l10n.expensesListTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               expensesAsync.when(
                 data: (expenses) {
-                  if (expenses.isEmpty) return const EmptyState('Nenhum gasto lançado ainda.');
+                  if (expenses.isEmpty) return EmptyState(l10n.expensesEmptyState);
                   final filtered = expenses.where((e) => isDateWithinRange(e.date, _filterFrom, _filterTo)).toList();
                   if (filtered.isEmpty) {
                     return EmptyState(
-                      _filteredEmptyMessage(_filterFrom, _filterTo),
-                      action: TextButton(onPressed: _clearFilter, child: const Text('Limpar filtro')),
+                      _filteredEmptyMessage(l10n, _filterFrom, _filterTo),
+                      action: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
                     );
                   }
                   return Column(
@@ -308,7 +313,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text('Erro: $e'),
+                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
               ),
             ],
           ),
@@ -318,17 +323,17 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   }
 }
 
-String _filteredEmptyMessage(DateTime? from, DateTime? to) {
+String _filteredEmptyMessage(AppLocalizations l10n, DateTime? from, DateTime? to) {
   if (from != null && to != null) {
-    return 'Nenhum gasto entre ${formatDate(isoDateFrom(from))} e ${formatDate(isoDateFrom(to))}.';
+    return l10n.expensesEmptyFilteredRange(formatDate(isoDateFrom(from)), formatDate(isoDateFrom(to)));
   }
   if (from != null) {
-    return 'Nenhum gasto a partir de ${formatDate(isoDateFrom(from))}.';
+    return l10n.expensesEmptyFilteredFrom(formatDate(isoDateFrom(from)));
   }
   if (to != null) {
-    return 'Nenhum gasto até ${formatDate(isoDateFrom(to))}.';
+    return l10n.expensesEmptyFilteredTo(formatDate(isoDateFrom(to)));
   }
-  return 'Nenhum gasto lançado ainda.';
+  return l10n.expensesEmptyState;
 }
 
 class _ExpenseRow extends StatelessWidget {
@@ -348,6 +353,8 @@ class _ExpenseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -371,7 +378,7 @@ class _ExpenseRow extends StatelessWidget {
                           ),
                         ),
                         TextSpan(
-                          text: ' · ${_originLabel(expense.categoryId, categoryName)} · ${expense.date}',
+                          text: ' · ${_originLabel(l10n, expense.categoryId, categoryName)} · ${expense.date}',
                           style: TextStyle(color: context.tokens.subtle),
                         ),
                       ],
@@ -385,7 +392,7 @@ class _ExpenseRow extends StatelessWidget {
             IconButton(
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Remover gasto',
+              tooltip: l10n.removeExpenseTooltip,
               color: Theme.of(context).colorScheme.error,
             ),
           ],
@@ -395,7 +402,7 @@ class _ExpenseRow extends StatelessWidget {
   }
 }
 
-String _originLabel(String? categoryId, Map<String, String> categoryName) {
-  if (categoryId == null) return 'Conta';
-  return categoryName[categoryId] ?? 'categoria removida';
+String _originLabel(AppLocalizations l10n, String? categoryId, Map<String, String> categoryName) {
+  if (categoryId == null) return l10n.accountLabel;
+  return categoryName[categoryId] ?? l10n.removedCategoryLabel;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/income.dart';
 import '../../models/income_source.dart';
 import '../../providers/providers.dart';
@@ -39,9 +40,10 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
-      setState(() => _error = 'Informe um valor válido.');
+      setState(() => _error = l10n.invalidAmountError);
       return;
     }
     final firestore = ref.read(firestoreServiceProvider);
@@ -60,20 +62,22 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
       _amountController.clear();
       _descriptionController.clear();
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   Future<void> _delete(String id) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover receita?'),
+        title: Text(l10n.removeIncomeConfirmTitle),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remover')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
         ],
       ),
     );
@@ -94,16 +98,16 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final incomesAsync = ref.watch(incomesProvider);
     final filterActive = _filterFrom != null || _filterTo != null;
 
     return ListView(
       children: [
-        Text('Receitas', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+        Text(l10n.receitasTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Text(
-          'Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\n'
-          'aloque em caixinhas quando quiser, no Dashboard.',
+          l10n.receitasSubtitle,
           style: TextStyle(color: context.tokens.muted),
         ),
         const SizedBox(height: 24),
@@ -126,7 +130,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                         if (picked != null) setState(() => _date = picked);
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Data'),
+                        decoration: InputDecoration(labelText: l10n.dateLabel),
                         child: Text(formatDate(isoDateFrom(_date))),
                       ),
                     ),
@@ -136,7 +140,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                     child: TextField(
                       controller: _amountController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
                     ),
                   ),
                   (
@@ -144,9 +148,10 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                     child: DropdownButtonFormField<IncomeSource>(
                       initialValue: _source,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Origem'),
+                      decoration: InputDecoration(labelText: l10n.incomeSourceFieldLabel),
                       items: [
-                        for (final s in incomeSourceOptions) DropdownMenuItem(value: s.value, child: Text(s.label)),
+                        for (final s in incomeSourceValues)
+                          DropdownMenuItem(value: s, child: Text(incomeSourceLabel(l10n, s))),
                       ],
                       onChanged: (v) => setState(() => _source = v ?? IncomeSource.estagio),
                     ),
@@ -155,13 +160,13 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                     width: 220.0,
                     child: TextField(
                       controller: _descriptionController,
-                      decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: salário julho'),
+                      decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel, hintText: l10n.incomeDescriptionHint),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _submitting ? null : _submit, child: const Text('Lançar receita')),
+              FilledButton(onPressed: _submitting ? null : _submit, child: Text(l10n.submitIncomeButton)),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -190,7 +195,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                         if (picked != null) setState(() => _filterFrom = picked);
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'De'),
+                        decoration: InputDecoration(labelText: l10n.filterFromLabel),
                         child: Text(_filterFrom == null ? '—' : formatDate(isoDateFrom(_filterFrom!))),
                       ),
                     ),
@@ -208,7 +213,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                         if (picked != null) setState(() => _filterTo = picked);
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Até'),
+                        decoration: InputDecoration(labelText: l10n.filterToLabel),
                         child: Text(_filterTo == null ? '—' : formatDate(isoDateFrom(_filterTo!))),
                       ),
                     ),
@@ -218,22 +223,22 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                       width: 140.0,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: TextButton(onPressed: _clearFilter, child: const Text('Limpar filtro')),
+                        child: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
                       ),
                     ),
                 ],
               ),
               const SizedBox(height: 12),
-              Text('Receitas lançadas', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              Text(l10n.incomesListTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               incomesAsync.when(
                 data: (incomes) {
-                  if (incomes.isEmpty) return const EmptyState('Nenhuma receita lançada ainda.');
+                  if (incomes.isEmpty) return EmptyState(l10n.incomesEmptyState);
                   final filtered = incomes.where((i) => isDateWithinRange(i.date, _filterFrom, _filterTo)).toList();
                   if (filtered.isEmpty) {
                     return EmptyState(
-                      _filteredEmptyMessage(_filterFrom, _filterTo),
-                      action: TextButton(onPressed: _clearFilter, child: const Text('Limpar filtro')),
+                      _filteredEmptyMessage(l10n, _filterFrom, _filterTo),
+                      action: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
                     );
                   }
                   return Column(
@@ -249,7 +254,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text('Erro: $e'),
+                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
               ),
             ],
           ),
@@ -259,17 +264,17 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   }
 }
 
-String _filteredEmptyMessage(DateTime? from, DateTime? to) {
+String _filteredEmptyMessage(AppLocalizations l10n, DateTime? from, DateTime? to) {
   if (from != null && to != null) {
-    return 'Nenhuma receita entre ${formatDate(isoDateFrom(from))} e ${formatDate(isoDateFrom(to))}.';
+    return l10n.incomesEmptyFilteredRange(formatDate(isoDateFrom(from)), formatDate(isoDateFrom(to)));
   }
   if (from != null) {
-    return 'Nenhuma receita a partir de ${formatDate(isoDateFrom(from))}.';
+    return l10n.incomesEmptyFilteredFrom(formatDate(isoDateFrom(from)));
   }
   if (to != null) {
-    return 'Nenhuma receita até ${formatDate(isoDateFrom(to))}.';
+    return l10n.incomesEmptyFilteredTo(formatDate(isoDateFrom(to)));
   }
-  return 'Nenhuma receita lançada ainda.';
+  return l10n.incomesEmptyState;
 }
 
 class _IncomeRow extends StatelessWidget {
@@ -282,6 +287,8 @@ class _IncomeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -304,7 +311,10 @@ class _IncomeRow extends StatelessWidget {
                             fontFeatures: [FontFeature.tabularFigures()],
                           ),
                         ),
-                        TextSpan(text: ' · ${income.source.value} · ${income.date}', style: TextStyle(color: context.tokens.subtle)),
+                        TextSpan(
+                          text: ' · ${incomeSourceLabel(l10n, income.source)} · ${income.date}',
+                          style: TextStyle(color: context.tokens.subtle),
+                        ),
                       ],
                     ),
                   ),
@@ -316,7 +326,7 @@ class _IncomeRow extends StatelessWidget {
             IconButton(
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Remover receita',
+              tooltip: l10n.removeIncomeTooltip,
               color: Theme.of(context).colorScheme.error,
             ),
           ],

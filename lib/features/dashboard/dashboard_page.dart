@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
@@ -18,6 +19,7 @@ class DashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final summary = ref.watch(summaryProvider);
     final categories = ref.watch(categoriesProvider).value;
 
@@ -57,11 +59,11 @@ class DashboardPage extends ConsumerWidget {
 
     return ListView(
       children: [
-        Text('Dashboard', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+        Text(l10n.dashboardTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        Text('Visão geral da conta e do mês atual.', style: TextStyle(color: context.tokens.muted)),
+        Text(l10n.dashboardSubtitle, style: TextStyle(color: context.tokens.muted)),
         const SizedBox(height: 24),
-        StatTile(label: 'Saldo total', value: formatCurrency(summary.total)),
+        StatTile(label: l10n.totalBalanceLabel, value: formatCurrency(summary.total)),
         const SizedBox(height: 16),
         AppCard(
           child: Row(
@@ -72,7 +74,7 @@ class DashboardPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Conta',
+                      l10n.accountLabel,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: context.tokens.muted,
                         fontWeight: FontWeight.w500,
@@ -85,7 +87,7 @@ class DashboardPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Dinheiro recebido e ainda não alocado em nenhuma caixinha.',
+                      l10n.accountBalanceDescription,
                       style: TextStyle(fontSize: 12, color: context.tokens.subtle),
                     ),
                   ],
@@ -95,7 +97,7 @@ class DashboardPage extends ConsumerWidget {
                 onPressed: categories.isEmpty || summary.accountBalance <= 0
                     ? null
                     : () => _showAllocateDialog(context, ref, categories, summary.accountBalance),
-                child: const Text('Alocar'),
+                child: Text(l10n.allocateButton),
               ),
             ],
           ),
@@ -105,9 +107,9 @@ class DashboardPage extends ConsumerWidget {
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 560;
             final tiles = [
-              StatTile(label: 'Recebido este mês', value: formatCurrency(summary.currentMonth.totalIncome)),
-              StatTile(label: 'Gasto este mês', value: formatCurrency(summary.currentMonth.totalExpense)),
-              StatTile(label: 'Saldo do mês', value: formatCurrency(summary.currentMonth.net), color: netColor),
+              StatTile(label: l10n.receivedThisMonthLabel, value: formatCurrency(summary.currentMonth.totalIncome)),
+              StatTile(label: l10n.spentThisMonthLabel, value: formatCurrency(summary.currentMonth.totalExpense)),
+              StatTile(label: l10n.monthBalanceLabel, value: formatCurrency(summary.currentMonth.net), color: netColor),
             ];
             if (!wide) {
               return Column(
@@ -128,7 +130,7 @@ class DashboardPage extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Caixinhas', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(l10n.caixinhasTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                   FilledButton(
                     onPressed: canTransfer
                         ? () => _showTransferDialog(context, ref, categories, eligibleOrigins, summary.balancesByCategory)
@@ -137,13 +139,13 @@ class DashboardPage extends ConsumerWidget {
                       backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
                       foregroundColor: Theme.of(context).colorScheme.onTertiaryContainer,
                     ),
-                    child: const Text('Transferir'),
+                    child: Text(l10n.transferButton),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               if (caixinhas.isEmpty)
-                const EmptyState('Crie categorias e aloque receitas para ver suas caixinhas aqui.')
+                EmptyState(l10n.caixinhasEmptyState)
               else
                 for (var i = 0; i < caixinhas.length; i++)
                   Container(
@@ -168,7 +170,7 @@ class DashboardPage extends ConsumerWidget {
                                     labelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
                                   ),
                                   Text(
-                                    'desde ${formatDate(caixinhas[i].createdAt)}',
+                                    l10n.sinceDatePrefix(formatDate(caixinhas[i].createdAt)),
                                     style: TextStyle(fontSize: 12, color: context.tokens.subtle),
                                   ),
                                 ],
@@ -216,12 +218,12 @@ class DashboardPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Histórico mensal — recebido x gasto',
+                l10n.historyTitle,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
               if (summary.history.isEmpty)
-                const EmptyState('Lance receitas e gastos para ver o histórico por mês.')
+                EmptyState(l10n.historyEmptyState)
               else
                 SizedBox(height: 280, child: _HistoryChart(history: summary.history)),
             ],
@@ -268,9 +270,10 @@ class _AllocateDialogState extends State<_AllocateDialog> {
   }
 
   Future<void> _confirm() async {
+    final l10n = AppLocalizations.of(context)!;
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
-      setState(() => _error = 'Informe um valor válido.');
+      setState(() => _error = l10n.invalidAmountError);
       return;
     }
     setState(() {
@@ -285,7 +288,8 @@ class _AllocateDialogState extends State<_AllocateDialog> {
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -293,18 +297,23 @@ class _AllocateDialogState extends State<_AllocateDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return AlertDialog(
-      title: const Text('Alocar pra caixinha'),
+      title: Text(l10n.allocateDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Disponível na conta: ${formatCurrency(widget.accountBalance)}', style: TextStyle(color: context.tokens.subtle)),
+          Text(
+            l10n.availableInAccountLabel(formatCurrency(widget.accountBalance)),
+            style: TextStyle(color: context.tokens.subtle),
+          ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             initialValue: _categoryId,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Caixinha'),
+            decoration: InputDecoration(labelText: l10n.caixinhaLabel),
             items: [for (final c in widget.categories) DropdownMenuItem(value: c.id, child: Text(c.name))],
             onChanged: (v) => setState(() => _categoryId = v ?? _categoryId),
           ),
@@ -312,7 +321,7 @@ class _AllocateDialogState extends State<_AllocateDialog> {
           TextField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+            decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
           ),
           if (_error != null)
             Padding(
@@ -322,8 +331,8 @@ class _AllocateDialogState extends State<_AllocateDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: _submitting ? null : _confirm, child: const Text('Confirmar')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
+        FilledButton(onPressed: _submitting ? null : _confirm, child: Text(l10n.confirm)),
       ],
     );
   }
@@ -387,13 +396,14 @@ class _TransferDialogState extends State<_TransferDialog> {
   }
 
   Future<void> _confirm() async {
+    final l10n = AppLocalizations.of(context)!;
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
-      setState(() => _error = 'Informe um valor válido.');
+      setState(() => _error = l10n.invalidAmountError);
       return;
     }
     if (_fromId == _toId) {
-      setState(() => _error = 'Origem e destino precisam ser diferentes.');
+      setState(() => _error = l10n.originDestinationMustDifferError);
       return;
     }
     setState(() {
@@ -409,7 +419,8 @@ class _TransferDialogState extends State<_TransferDialog> {
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -417,6 +428,7 @@ class _TransferDialogState extends State<_TransferDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final fromBalance = widget.balancesByCategory[_fromId] ?? 0;
     final destinationOptions = widget.categories.where((c) => c.id != _fromId).toList();
@@ -425,17 +437,17 @@ class _TransferDialogState extends State<_TransferDialog> {
         : (destinationOptions.isNotEmpty ? destinationOptions.first.id : _toId);
 
     return AlertDialog(
-      title: const Text('Transferir entre caixinhas'),
+      title: Text(l10n.transferDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Disponível na origem: ${formatCurrency(fromBalance)}', style: TextStyle(color: context.tokens.subtle)),
+          Text(l10n.availableAtOriginLabel(formatCurrency(fromBalance)), style: TextStyle(color: context.tokens.subtle)),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             initialValue: _fromId,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Origem'),
+            decoration: InputDecoration(labelText: l10n.transferOriginLabel),
             items: [
               for (final c in widget.eligibleOrigins)
                 DropdownMenuItem(
@@ -455,7 +467,7 @@ class _TransferDialogState extends State<_TransferDialog> {
           DropdownButtonFormField<String>(
             initialValue: toId,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Destino'),
+            decoration: InputDecoration(labelText: l10n.transferDestinationLabel),
             items: [
               for (final c in destinationOptions)
                 DropdownMenuItem(
@@ -469,7 +481,7 @@ class _TransferDialogState extends State<_TransferDialog> {
           TextField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+            decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
           ),
           if (_error != null)
             Padding(
@@ -479,8 +491,8 @@ class _TransferDialogState extends State<_TransferDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: _submitting ? null : () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: _submitting ? null : _confirm, child: const Text('Confirmar')),
+        TextButton(onPressed: _submitting ? null : () => Navigator.pop(context), child: Text(l10n.cancel)),
+        FilledButton(onPressed: _submitting ? null : _confirm, child: Text(l10n.confirm)),
       ],
     );
   }
@@ -493,6 +505,7 @@ class _HistoryChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final palette = dark ? AppPalette.categoricalDark : AppPalette.categorical;
     final gridColor = context.tokens.border;
@@ -582,9 +595,9 @@ class _HistoryChart extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CaixinhaColorDot(color: palette[0], label: 'Recebido'),
+            CaixinhaColorDot(color: palette[0], label: l10n.receivedLegend),
             const SizedBox(width: 16),
-            CaixinhaColorDot(color: palette[1], label: 'Gasto'),
+            CaixinhaColorDot(color: palette[1], label: l10n.spentLegend),
           ],
         ),
       ],
