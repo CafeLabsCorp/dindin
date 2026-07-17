@@ -1,0 +1,14 @@
+{
+  "name": "dindin-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Firestore Security Rules tests (Phase 2 money-integrity invariants) run against the local emulator. Standalone Node harness, NOT part of the Flutter app's pubspec/dependency tree.",
+  "scripts": {
+    "test": "node --test rules.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0"
+  }
+}

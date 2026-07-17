@@ -126,4 +126,131 @@ void main() {
     expect(summary.currentMonth.month, currentMonthKey());
     expect(summary.history.map((m) => m.month), allMonths(db));
   });
+
+  // ---------------------------------------------------------------------
+  // Transfers: a pair of allocations sharing a transferId (negative leg on
+  // the source, positive leg on the destination). Money-math regression:
+  // the pair must net to zero against the account and simply move balance
+  // between the two caixinhas.
+  // ---------------------------------------------------------------------
+  group('transferências (par de allocations com transferId)', () {
+    const origem = Category(id: 'c1', name: 'Casa', recurring: true, createdAt: '2026-01-01');
+    const destino = Category(id: 'c2', name: 'Lazer', recurring: false, createdAt: '2026-01-01');
+    const receita = Income(id: 'i1', date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+    // Pre-existing plain allocation funding the source caixinha.
+    const allocOrigem = Allocation(id: 'a1', categoryId: 'c1', amount: 400, date: '2026-01-02');
+    // The transfer pair: -150 on the source, +150 on the destination.
+    const legOrigem = Allocation(
+      id: 't1a',
+      categoryId: 'c1',
+      amount: -150,
+      date: '2026-01-03',
+      transferId: 'transfer-1',
+    );
+    const legDestino = Allocation(
+      id: 't1b',
+      categoryId: 'c2',
+      amount: 150,
+      date: '2026-01-03',
+      transferId: 'transfer-1',
+    );
+
+    final dbComTransfer = AppDb(
+      categories: [origem, destino],
+      incomes: [receita],
+      allocations: [allocOrigem, legOrigem, legDestino],
+      expenses: const [],
+    );
+
+    test('o par neteia zero no total alocado e não afeta o saldo da conta', () {
+      // totalAllocated soma tudo, incl. os dois legs: 400 - 150 + 150 = 400,
+      // igual ao caso sem transferência nenhuma.
+      expect(totalAllocated(dbComTransfer), 400);
+      expect(accountBalance(dbComTransfer), 1000 - 400); // 600, como se a transferência não existisse
+    });
+
+    test('move o saldo exatamente entre as duas caixinhas', () {
+      final balances = categoryBalances(dbComTransfer);
+      expect(balances['c1'], 250); // 400 - 150
+      expect(balances['c2'], 150); // 0 + 150
+    });
+
+    test('totalBalance é preservado (dinheiro só mudou de caixinha, não some nem aparece)', () {
+      final semTransfer = AppDb(
+        categories: [origem, destino],
+        incomes: [receita],
+        allocations: [allocOrigem],
+        expenses: const [],
+      );
+      expect(totalBalance(dbComTransfer), totalBalance(semTransfer));
+    });
+
+    test('gasto na caixinha de destino após a transferência sai do saldo transferido', () {
+      const gastoDestino = Expense(id: 'e1', date: '2026-01-10', amount: 100, categoryId: 'c2');
+      final withExpense = AppDb(
+        categories: [origem, destino],
+        incomes: [receita],
+        allocations: [allocOrigem, legOrigem, legDestino],
+        expenses: [gastoDestino],
+      );
+      expect(categoryBalances(withExpense)['c2'], 50); // 150 - 100
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Monthly budget per caixinha: `Category.monthlyBudget` (soft limit) vs.
+  // `MonthSummary.expenseByCategory` (spent this month) — aggregation itself
+  // doesn't compute a "spent vs budget" ratio, but this locks in that the
+  // two numbers a screen would compare are each computed correctly and that
+  // the field survives round-trip through the model.
+  // ---------------------------------------------------------------------
+  group('orçamento mensal por caixinha (monthlyBudget vs. spent)', () {
+    const comLimite = Category(
+      id: 'c1',
+      name: 'Lazer',
+      recurring: false,
+      createdAt: '2026-01-01',
+      monthlyBudget: 200,
+    );
+    const semLimite = Category(id: 'c2', name: 'Casa', recurring: true, createdAt: '2026-01-01');
+
+    const gasto1 = Expense(id: 'e1', date: '2026-03-05', amount: 120, categoryId: 'c1');
+    const gasto2 = Expense(id: 'e2', date: '2026-03-20', amount: 90, categoryId: 'c1');
+    const gastoOutroMes = Expense(id: 'e3', date: '2026-04-01', amount: 500, categoryId: 'c1');
+
+    final dbComLimite = AppDb(
+      categories: [comLimite, semLimite],
+      incomes: const [],
+      allocations: const [],
+      expenses: [gasto1, gasto2, gastoOutroMes],
+    );
+
+    test('spent do mês (expenseByCategory) soma só os gastos daquele mês, ultrapassando o limite', () {
+      final summary = monthSummary(dbComLimite, '2026-03');
+      final spent = summary.expenseByCategory['c1'];
+      expect(spent, 210); // 120 + 90
+      expect(spent! > comLimite.monthlyBudget!, isTrue); // 210 > 200 -> acima do limite
+    });
+
+    test('mês seguinte não herda o gasto do mês anterior (o limite é sempre "este mês")', () {
+      final summary = monthSummary(dbComLimite, '2026-04');
+      expect(summary.expenseByCategory['c1'], 500);
+    });
+
+    test('categoria sem monthlyBudget definido fica null (sem limite)', () {
+      expect(semLimite.monthlyBudget, isNull);
+    });
+
+    test('monthlyBudget sobrevive ao round-trip toMap/fromMap', () {
+      final map = comLimite.toMap();
+      expect(map['monthlyBudget'], 200);
+      final restored = Category.fromMap('c1', map);
+      expect(restored.monthlyBudget, 200);
+    });
+
+    test('toMap omite monthlyBudget quando null (não escreve o campo)', () {
+      final map = semLimite.toMap();
+      expect(map.containsKey('monthlyBudget'), isFalse);
+    });
+  });
 }
