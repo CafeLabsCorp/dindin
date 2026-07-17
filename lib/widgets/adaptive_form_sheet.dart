@@ -22,7 +22,19 @@ Future<T?> showAdaptiveFormSheet<T>(
       builder: (ctx) => Dialog(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxDialogWidth),
-          child: Padding(padding: const EdgeInsets.all(24), child: contentBuilder(ctx)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            // Unlike the narrow/bottom-sheet path below, `Dialog` doesn't cap
+            // its child's height to the viewport on its own — a form tall
+            // enough (e.g. one with a conditionally-shown hint/warning line)
+            // would overflow instead of scrolling. Mirror the bottom sheet's
+            // `SingleChildScrollView` so variable-length content is always
+            // accommodated the same way in both breakpoints.
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.8),
+              child: SingleChildScrollView(child: contentBuilder(ctx)),
+            ),
+          ),
         ),
       ),
     );
