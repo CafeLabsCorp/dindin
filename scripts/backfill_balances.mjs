@@ -46,6 +46,12 @@ const db = getFirestore();
 
 const num = (v) => (typeof v === "number" && !Number.isNaN(v) ? v : 0);
 
+// Sums over many docs accumulate binary floating-point error (e.g. an account
+// that is truly R$0 can sum to -1.7e-13). Round to the cent before comparing
+// against zero or persisting — otherwise a mathematically-zero balance can be
+// stored as a hair negative, which fails the rules' `>= 0` check for real.
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 // Legacy data predating the client-side invariants can legitimately sum
 // negative. A negative balance doc under Phase-2 rules blocks that user's
 // future spending writes, so negatives must be reconciled in the ledger BEFORE
@@ -66,7 +72,7 @@ async function backfillUser(uid) {
   const accountExpenses = expenses.docs
     .filter((d) => d.get("categoryId") == null)
     .reduce((t, d) => t + num(d.get("amount")), 0);
-  const account = totalIncome - totalAllocated - accountExpenses;
+  const account = round2(totalIncome - totalAllocated - accountExpenses);
 
   // One balance per existing category, plus any category id referenced by the
   // ledger (defensive — should match the category set).
@@ -82,6 +88,7 @@ async function backfillUser(uid) {
     if (cat == null) continue;
     catBalances.set(cat, (catBalances.get(cat) ?? 0) - num(e.get("amount")));
   }
+  for (const [cat, bal] of catBalances) catBalances.set(cat, round2(bal));
 
   console.log(`user ${uid}: account=${account.toFixed(2)}`);
   if (account < 0) {
