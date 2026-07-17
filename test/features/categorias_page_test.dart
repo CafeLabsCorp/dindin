@@ -40,18 +40,42 @@ void main() {
     );
   }
 
-  testWidgets('formulário de criação tem o campo "Limite mensal (opcional)" (§5.2)', (tester) async {
+  testWidgets('formulário de criação abre no modo Guardar (meta) e alterna pra Gastar (limite)', (tester) async {
     await pump(tester, categories: []);
     await tester.pumpAndSettle();
 
-    expect(find.text('Limite mensal (opcional)'), findsOneWidget);
+    // Default purpose is "Guardar" → goal field visible, no monthly limit.
+    expect(find.text('Meta de valor (opcional)'), findsOneWidget);
+    expect(find.text('Limite mensal de gasto (opcional)'), findsNothing);
+
+    await tester.tap(find.text('Gastar').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Limite mensal de gasto (opcional)'), findsOneWidget);
+    expect(find.text('Meta de valor (opcional)'), findsNothing);
   });
 
   testWidgets('categoria com limite mostra a CaixinhaBudgetBar com o gasto do mês', (tester) async {
     await pump(tester, categories: [casaComLimite], expenses: [gastoDoMes]);
     await tester.pumpAndSettle();
 
-    expect(find.text('${formatCurrency(30)} de ${formatCurrency(100)} este mês'), findsOneWidget);
+    expect(find.text('Gasto: ${formatCurrency(30)} de ${formatCurrency(100)} este mês'), findsOneWidget);
+  });
+
+  testWidgets('caixinha de guardar com meta mostra a CaixinhaGoalBar com o saldo acumulado', (tester) async {
+    const cofrinho = Category(
+      id: 'c2',
+      name: 'Viagem',
+      recurring: true,
+      createdAt: '2026-01-01',
+      kind: CategoryKind.save,
+      goalAmount: 1000,
+    );
+    await pump(tester, categories: [cofrinho]);
+    await tester.pumpAndSettle();
+
+    // No allocations in the overrides → saved = 0 of 1000.
+    expect(find.text('${formatCurrency(0)} de ${formatCurrency(1000)} guardados (0%)'), findsOneWidget);
   });
 
   testWidgets('tocar na linha abre a edição pré-preenchida (nome + limite mensal)', (tester) async {

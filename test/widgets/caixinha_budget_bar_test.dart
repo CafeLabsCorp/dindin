@@ -23,7 +23,7 @@ void main() {
   testWidgets('abaixo de 80%: barra neutra, sem aviso de estouro', (tester) async {
     await pump(tester, spent: 50, limit: 200); // 25%
 
-    expect(find.text('${formatCurrency(50)} de ${formatCurrency(200)} este mês'), findsOneWidget);
+    expect(find.text('Gasto: ${formatCurrency(50)} de ${formatCurrency(200)} este mês'), findsOneWidget);
     expect(find.textContaining('acima do limite'), findsNothing);
 
     final indicator = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
@@ -33,14 +33,14 @@ void main() {
   testWidgets('entre 80% e 100%: mostra aviso mas não de estouro', (tester) async {
     await pump(tester, spent: 90, limit: 100); // 90%
 
-    expect(find.text('${formatCurrency(90)} de ${formatCurrency(100)} este mês'), findsOneWidget);
+    expect(find.text('Gasto: ${formatCurrency(90)} de ${formatCurrency(100)} este mês'), findsOneWidget);
     expect(find.textContaining('acima do limite'), findsNothing);
   });
 
   testWidgets('acima de 100%: barra capada em 100% e mostra quanto passou', (tester) async {
     await pump(tester, spent: 150, limit: 100); // 150%
 
-    expect(find.text('${formatCurrency(150)} de ${formatCurrency(100)} este mês'), findsOneWidget);
+    expect(find.text('Gasto: ${formatCurrency(150)} de ${formatCurrency(100)} este mês'), findsOneWidget);
     expect(find.text('+${formatCurrency(50)} acima do limite'), findsOneWidget);
 
     final indicator = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));

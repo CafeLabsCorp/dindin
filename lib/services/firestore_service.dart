@@ -122,6 +122,8 @@ class FirestoreService {
     required String name,
     required bool recurring,
     double? monthlyBudget,
+    CategoryKind? kind,
+    double? goalAmount,
   }) async {
     final doc = _categories.doc();
     final category = Category(
@@ -130,6 +132,8 @@ class FirestoreService {
       recurring: recurring,
       createdAt: DateTime.now().toIso8601String(),
       monthlyBudget: monthlyBudget,
+      kind: kind,
+      goalAmount: goalAmount,
     );
     final batch = _db.batch();
     batch.set(doc, category.toMap());
@@ -148,6 +152,9 @@ class FirestoreService {
     bool? recurring,
     double? monthlyBudget,
     bool clearMonthlyBudget = false,
+    CategoryKind? kind,
+    double? goalAmount,
+    bool clearGoalAmount = false,
   }) async {
     final snap = await _categories.doc(id).get();
     if (!snap.exists) throw StateError('category not found');
@@ -159,6 +166,8 @@ class FirestoreService {
       createdAt: current.createdAt,
       monthlyBudget:
           clearMonthlyBudget ? null : (monthlyBudget ?? current.monthlyBudget),
+      kind: kind ?? current.kind,
+      goalAmount: clearGoalAmount ? null : (goalAmount ?? current.goalAmount),
     );
     await _categories.doc(id).set(updated.toMap());
   }

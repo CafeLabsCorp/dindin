@@ -21,7 +21,9 @@ class CategoriasPage extends ConsumerStatefulWidget {
 class _CategoriasPageState extends ConsumerState<CategoriasPage> {
   final _nameController = TextEditingController();
   final _monthlyBudgetController = TextEditingController();
+  final _goalController = TextEditingController();
   bool _recurring = true;
+  CategoryKind _kind = CategoryKind.save;
   String? _error;
   bool _submitting = false;
 
@@ -29,19 +31,32 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
   void dispose() {
     _nameController.dispose();
     _monthlyBudgetController.dispose();
+    _goalController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
-    final budgetText = _monthlyBudgetController.text.trim();
     double? budget;
-    if (budgetText.isNotEmpty) {
-      budget = double.tryParse(budgetText.replaceAll(',', '.'));
-      if (budget == null || budget <= 0) {
-        setState(() => _error = 'Informe um limite válido ou deixe em branco.');
-        return;
+    double? goal;
+    if (_kind == CategoryKind.spend) {
+      final budgetText = _monthlyBudgetController.text.trim();
+      if (budgetText.isNotEmpty) {
+        budget = double.tryParse(budgetText.replaceAll(',', '.'));
+        if (budget == null || budget <= 0) {
+          setState(() => _error = 'Informe um limite válido ou deixe em branco.');
+          return;
+        }
+      }
+    } else {
+      final goalText = _goalController.text.trim();
+      if (goalText.isNotEmpty) {
+        goal = double.tryParse(goalText.replaceAll(',', '.'));
+        if (goal == null || goal <= 0) {
+          setState(() => _error = 'Informe uma meta válida ou deixe em branco.');
+          return;
+        }
       }
     }
     final firestore = ref.read(firestoreServiceProvider);
@@ -51,9 +66,16 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
       _error = null;
     });
     try {
-      await firestore.createCategory(name: name, recurring: _recurring, monthlyBudget: budget);
+      await firestore.createCategory(
+        name: name,
+        recurring: _recurring,
+        monthlyBudget: budget,
+        kind: _kind,
+        goalAmount: goal,
+      );
       _nameController.clear();
       _monthlyBudgetController.clear();
+      _goalController.clear();
       setState(() => _recurring = true);
     } catch (e) {
       setState(() => _error = friendlyErrorMessage(e));
@@ -115,11 +137,42 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _monthlyBudgetController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Limite mensal (opcional)', hintText: '0,00'),
+              SegmentedButton<CategoryKind>(
+                segments: const [
+                  ButtonSegment(
+                    value: CategoryKind.save,
+                    label: Text('Guardar'),
+                    icon: Icon(Icons.savings_outlined),
+                  ),
+                  ButtonSegment(
+                    value: CategoryKind.spend,
+                    label: Text('Gastar'),
+                    icon: Icon(Icons.shopping_bag_outlined),
+                  ),
+                ],
+                selected: {_kind},
+                onSelectionChanged: _submitting ? null : (s) => setState(() => _kind = s.first),
               ),
+              const SizedBox(height: 4),
+              Text(
+                _kind == CategoryKind.save
+                    ? 'Cofrinho: dinheiro que você junta (viagem, reserva, projeto).'
+                    : 'Envelope: dinheiro que você separa pra gastar no mês.',
+                style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+              ),
+              const SizedBox(height: 12),
+              if (_kind == CategoryKind.spend)
+                TextField(
+                  controller: _monthlyBudgetController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Limite mensal de gasto (opcional)', hintText: '0,00'),
+                )
+              else
+                TextField(
+                  controller: _goalController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Meta de valor (opcional)', hintText: 'Ex: 5000,00'),
+                ),
               CheckboxListTile(
                 value: _recurring,
                 onChanged: (v) => setState(() => _recurring = v ?? true),
@@ -182,7 +235,19 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                                 ),
                               ],
                             ),
-                            if (categories[i].monthlyBudget != null) ...[
+                            if (categories[i].effectiveKind == CategoryKind.save &&
+                                categories[i].goalAmount != null) ...[
+                              const SizedBox(height: 8),
+                              CaixinhaGoalBar(
+                                saved: summary?.balancesByCategory[categories[i].id] ?? 0,
+                                goal: categories[i].goalAmount!,
+                              ),
+                            ] else if (categories[i].effectiveKind == CategoryKind.save) ...[
+                              const SizedBox(height: 4),
+                              CaixinhaSavedThisMonth(
+                                savedThisMonth: summary?.savedThisMonthByCat[categories[i].id] ?? 0,
+                              ),
+                            ] else if (categories[i].monthlyBudget != null) ...[
                               const SizedBox(height: 8),
                               CaixinhaBudgetBar(
                                 spent: summary?.currentMonth.expenseByCategory[categories[i].id] ?? 0,
@@ -223,7 +288,11 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
   late final TextEditingController _monthlyBudgetController = TextEditingController(
     text: widget.category.monthlyBudget != null ? formatAmountInput(widget.category.monthlyBudget!) : '',
   );
+  late final TextEditingController _goalController = TextEditingController(
+    text: widget.category.goalAmount != null ? formatAmountInput(widget.category.goalAmount!) : '',
+  );
   late bool _recurring = widget.category.recurring;
+  late CategoryKind _kind = widget.category.effectiveKind;
   String? _error;
   bool _submitting = false;
 
@@ -231,6 +300,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
   void dispose() {
     _nameController.dispose();
     _monthlyBudgetController.dispose();
+    _goalController.dispose();
     super.dispose();
   }
 
@@ -240,13 +310,25 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
       setState(() => _error = 'Informe um nome.');
       return;
     }
-    final budgetText = _monthlyBudgetController.text.trim();
     double? budget;
-    if (budgetText.isNotEmpty) {
-      budget = double.tryParse(budgetText.replaceAll(',', '.'));
-      if (budget == null || budget <= 0) {
-        setState(() => _error = 'Informe um limite válido ou deixe em branco.');
-        return;
+    double? goal;
+    if (_kind == CategoryKind.spend) {
+      final budgetText = _monthlyBudgetController.text.trim();
+      if (budgetText.isNotEmpty) {
+        budget = double.tryParse(budgetText.replaceAll(',', '.'));
+        if (budget == null || budget <= 0) {
+          setState(() => _error = 'Informe um limite válido ou deixe em branco.');
+          return;
+        }
+      }
+    } else {
+      final goalText = _goalController.text.trim();
+      if (goalText.isNotEmpty) {
+        goal = double.tryParse(goalText.replaceAll(',', '.'));
+        if (goal == null || goal <= 0) {
+          setState(() => _error = 'Informe uma meta válida ou deixe em branco.');
+          return;
+        }
       }
     }
     final firestore = widget.ref.read(firestoreServiceProvider);
@@ -262,6 +344,9 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
         recurring: _recurring,
         monthlyBudget: budget,
         clearMonthlyBudget: budget == null,
+        kind: _kind,
+        goalAmount: goal,
+        clearGoalAmount: goal == null,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -285,12 +370,37 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           decoration: const InputDecoration(labelText: 'Nome da categoria'),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _monthlyBudgetController,
-          enabled: !_submitting,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Limite mensal (opcional)', hintText: '0,00'),
+        SegmentedButton<CategoryKind>(
+          segments: const [
+            ButtonSegment(
+              value: CategoryKind.save,
+              label: Text('Guardar'),
+              icon: Icon(Icons.savings_outlined),
+            ),
+            ButtonSegment(
+              value: CategoryKind.spend,
+              label: Text('Gastar'),
+              icon: Icon(Icons.shopping_bag_outlined),
+            ),
+          ],
+          selected: {_kind},
+          onSelectionChanged: _submitting ? null : (s) => setState(() => _kind = s.first),
         ),
+        const SizedBox(height: 12),
+        if (_kind == CategoryKind.spend)
+          TextField(
+            controller: _monthlyBudgetController,
+            enabled: !_submitting,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Limite mensal de gasto (opcional)', hintText: '0,00'),
+          )
+        else
+          TextField(
+            controller: _goalController,
+            enabled: !_submitting,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Meta de valor (opcional)', hintText: 'Ex: 5000,00'),
+          ),
         CheckboxListTile(
           value: _recurring,
           onChanged: _submitting ? null : (v) => setState(() => _recurring = v ?? true),

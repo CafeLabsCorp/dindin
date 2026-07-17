@@ -43,6 +43,23 @@ double totalBalance(AppDb db) {
   return round2(accountBalance(db) + categoryBalances(db).values.fold(0.0, (sum, v) => sum + v));
 }
 
+/// Net amount saved into each caixinha in [month]: allocations dated in the
+/// month (including transfer legs, which are signed) minus expenses charged
+/// to the caixinha in the month. This is the "guardou +R$ X este mês"
+/// feedback shown for savings caixinhas without a goal.
+Map<String, double> savedThisMonthByCategory(AppDb db, String month) {
+  final saved = <String, double>{};
+  for (final a in db.allocations.where((a) => monthKey(a.date) == month)) {
+    saved[a.categoryId] = (saved[a.categoryId] ?? 0) + a.amount;
+  }
+  for (final e in db.expenses.where((e) => monthKey(e.date) == month)) {
+    final categoryId = e.categoryId;
+    if (categoryId == null) continue;
+    saved[categoryId] = (saved[categoryId] ?? 0) - e.amount;
+  }
+  return saved.map((id, v) => MapEntry(id, round2(v)));
+}
+
 class MonthSummary {
   final String month; // "YYYY-MM"
   final double totalIncome;
@@ -118,12 +135,16 @@ class Summary {
   final MonthSummary currentMonth;
   final List<MonthSummary> history;
 
+  /// Net saved into each caixinha this month (see [savedThisMonthByCategory]).
+  final Map<String, double> savedThisMonthByCat;
+
   const Summary({
     required this.total,
     required this.accountBalance,
     required this.balancesByCategory,
     required this.currentMonth,
     required this.history,
+    this.savedThisMonthByCat = const {},
   });
 }
 
@@ -135,5 +156,6 @@ Summary buildSummary(AppDb db) {
     balancesByCategory: categoryBalances(db),
     currentMonth: monthSummary(db, currentMonthKey()),
     history: monthlyHistory(db),
+    savedThisMonthByCat: savedThisMonthByCategory(db, currentMonthKey()),
   );
 }
