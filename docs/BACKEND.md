@@ -49,8 +49,20 @@ Before onboarding real users there is a working path for both:
   changes, and the JSON backup stays consistent (transfers live inside the
   existing `allocations` array). The UI should group/label rows sharing a
   `transferId` as a transfer rather than two loose allocations.
+- `categories/{id}.kind` — optional `'spend' | 'save'`. What the caixinha is
+  *for*: `spend` gets the monthly-budget bar (`monthlyBudget`, above), `save`
+  gets a savings-goal bar (`goalAmount`, below) or a "saved this month"
+  feedback line when no goal is set. `null`/absent (a doc predating this
+  field) behaves as `spend` — the only semantics that existed before.
+  Validated in `firestore.rules` (`validCategory`) to be one of the two
+  literal strings when present.
+- `categories/{id}.goalAmount` — optional `number` (BRL), meaningful only for
+  `kind == 'save'`. The target total the user wants to accumulate in that
+  caixinha. Like `monthlyBudget`, this is reporting-only — it does not gate
+  any money-integrity invariant.
 
-Old JSON backups (no `monthlyBudget`, no `transferId`) import unchanged.
+Old JSON backups (no `monthlyBudget`, no `transferId`, no `kind`/`goalAmount`)
+import unchanged.
 
 ### Denormalized balance docs (Option B — see below)
 
@@ -218,8 +230,8 @@ whether a write goes direct (today / Option B) or through a callable (Option A).
 Callable names and payloads in `functions/index.js` mirror these argument
 names 1:1, returning `{ id }` (or `{ transferId }`):
 
-- `createCategory(name, recurring, monthlyBudget?)`
-- `updateCategory(id, name?, recurring?, monthlyBudget?, clearMonthlyBudget?)`
+- `createCategory(name, recurring, monthlyBudget?, kind?, goalAmount?)`
+- `updateCategory(id, name?, recurring?, monthlyBudget?, clearMonthlyBudget?, kind?, goalAmount?, clearGoalAmount?)`
 - `deleteCategory(id)`
 - `createIncome(date, amount, source, description?)` / `updateIncome(id, ...)` / `deleteIncome(id)`
 - `createAllocation(categoryId, amount, date)` / `updateAllocation(id, ...)` / `deleteAllocation(id)`
