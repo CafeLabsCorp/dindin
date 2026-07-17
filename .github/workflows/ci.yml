@@ -29,7 +29,7 @@ jobs:
       - run: flutter test
 
   rules:
-    name: firestore rules test (emulator)
+    name: firestore rules + backfill tests (emulator)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -52,6 +52,11 @@ jobs:
       # command, then tears the emulator down — no manual start/stop needed
       # and no project credentials required (emulator-only, never touches
       # production). Mirrors the local repro steps documented in
-      # test/rules/rules.test.mjs's header.
-      - name: Run rules tests against the Firestore emulator
+      # test/rules/rules.test.mjs's header. `npm test` (see test/rules/
+      # package.json) runs BOTH rules.test.mjs (Security Rules) AND
+      # backfill.test.mjs (scripts/backfill_balances.mjs's debt/corruption
+      # classification, run as a real subprocess against this same emulator)
+      # in one pass — a new test file here is picked up automatically only if
+      # it's added to that script's file list, not by directory convention.
+      - name: Run rules + backfill tests against the Firestore emulator
         run: npx --yes firebase-tools emulators:exec --only firestore --project dindin-rules-test "npm test --prefix test/rules"

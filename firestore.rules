@@ -29,16 +29,29 @@ rules_version = '2';
 // cannot satisfy a per-ledger-doc delta. They are handled by first REMOVING
 // the affected balance doc(s), doing the bulk ledger changes while the balance
 // doc is absent (getAfter(...) == null -> delta check skipped), then writing
-// the recomputed, non-negative balance doc(s) last. The only guarantee kept
-// during teardown is that any balance doc present after the commit is >= 0.
+// the recomputed balance doc(s) last. The guarantee kept during teardown is
+// that any balance doc present after the commit is >= 0, EXCEPT that a spend
+// caixinha may be re-created at a negative value (a frozen debt recomputed from
+// the ledger — catMayHoldNeg); the account and 'save' caixinhas still must be
+// >= 0. Without this exception a supported state (allowNegative turned off while
+// negative) would be impossible to restore.
 //
 // HONEST LIMITS (see docs/BACKEND.md, "Option B residual limitations"):
 //   * A client that deliberately deletes its own balance doc first can then
 //     write ledger docs without the delta check and re-create the balance at
-//     any non-negative value. All data here is single-tenant (a user can only
-//     corrupt THEIR OWN numbers, never another user's), and the app's display
-//     recomputes balances by summing the ledger, so the balance docs are a
-//     validation cache, not the source of truth shown to the user. The real
+//     any non-negative value — and, for a SPEND caixinha, at any negative value
+//     too (catMayHoldNeg on the genesis path; needed so a frozen debt survives a
+//     restore, see below). This does NOT extend to the account or to 'save'
+//     caixinhas, which stay floored at >= 0 even on genesis. All data here is
+//     single-tenant (a user can only corrupt THEIR OWN numbers, never another
+//     user's), and the app's display recomputes balances by summing the ledger,
+//     so the balance docs are a validation cache, not the source of truth shown
+//     to the user; a self-inflicted wrong balance only over-restricts that same
+//     user's future writes, it can never let them overspend or touch anyone
+//     else. Perfectly preventing a client from unfreezing its OWN debt via
+//     teardown is impossible without summing the ledger (which rules cannot do)
+//     or Cloud Functions (Blaze, declined for the free-tier build); permitting
+//     it for spend caixinhas only is the honest Option-B ceiling. The real
 //     security boundary — no cross-user read/write — is enforced unconditionally
 //     by isOwner() and is unaffected by any of this.
 //   * These getAfter()/null-teardown rules CANNOT be unit-tested from Flutter.
@@ -65,9 +78,63 @@ service cloud.firestore {
     function balDoc(uid, cat) {
       return /databases/$(database)/documents/users/$(uid)/balances/$(cat);
     }
+    function catDoc(uid, cat) {
+      return /databases/$(database)/documents/users/$(uid)/categories/$(cat);
+    }
     // Current (pre-commit) balance; a missing balance doc reads as 0.
     function balBefore(path) {
       return exists(path) ? get(path).data.balance : 0;
+    }
+    // True iff this caixinha is CURRENTLY configured to hold a negative balance:
+    // allowNegative == true AND it is a spend envelope (kind 'spend', or a legacy
+    // doc with no kind, which behaves as 'spend'). Reads the LIVE category doc so
+    // the source of truth is the real toggle, never a denormalized copy. A missing
+    // category (defensive / mid-teardown) is not eligible -> deny going negative.
+    // Only evaluated when a write would actually end (more) negative, so its extra
+    // document read is not paid on the common non-negative path.
+    function catAllowsNeg(uid, cat) {
+      return exists(catDoc(uid, cat))
+          && get(catDoc(uid, cat)).data.get('allowNegative', false) == true
+          && get(catDoc(uid, cat)).data.get('kind', 'spend') == 'spend';
+    }
+    // WIDER question than catAllowsNeg, asked ONLY on the genesis/teardown path
+    // (a balance doc being CREATED — resource == null): may this caixinha
+    // legitimately HOLD a negative balance that was recomputed from its ledger
+    // during a restore? A spend envelope can carry a debt that was incurred
+    // while allowNegative was ON and later FROZEN by turning the toggle OFF; the
+    // debt lives in the ledger and must survive a restore even though the toggle
+    // is now off. So this IGNORES the toggle and asks only whether the caixinha
+    // is a spend envelope at all (kind 'spend', or a legacy doc with no kind).
+    // A 'save' caixinha can NEVER hold a debt, and a missing category (deleted /
+    // mid-teardown) is not eligible -> both stay floored at >= 0 on genesis.
+    // This is DELIBERATELY not usable to DEEPEN a live debt: catAllowsNeg (toggle
+    // required) still governs every write where the balance doc EXISTS across the
+    // commit, so a frozen caixinha cannot be pushed further negative by a normal
+    // write. The only new power is re-CREATING an already-recorded negative from
+    // an absent doc. See HONEST LIMITS for the trade-off.
+    function catMayHoldNeg(uid, cat) {
+      return exists(catDoc(uid, cat))
+          && get(catDoc(uid, cat)).data.get('kind', 'spend') == 'spend';
+    }
+    // A caixinha is "debt-free" iff its balance doc currently (pre-commit) holds
+    // no open debt: >= 0 within the same 1e-9 float tolerance the client uses
+    // (FirestoreService._eps), so accumulated float dust never falsely blocks.
+    // A missing balance doc reads as 0 (debt-free) — see balBefore. This gates
+    // the two ONE-WAY transitions that would STRAND an existing debt: converting
+    // a spend caixinha to 'save' (a 'save' box may never be negative), and
+    // deleting the caixinha (its debt would simply vanish, breaking money
+    // conservation). Both are refused as corruption by restore/backfill after the
+    // fact; this stops the app from CREATING the invalid state in the first place.
+    function catDebtFree(uid, cat) {
+      return balBefore(balDoc(uid, cat)) >= -0.000000001;
+    }
+    // True iff this category update flips a spend envelope (kind 'spend', or a
+    // legacy doc with no kind) into a 'save' box. Reads only request/resource
+    // data (no document gets), so it costs nothing; the balance get() behind
+    // catDebtFree is only paid when this is actually true (see the update rule).
+    function convertsSpendToSave(before, after) {
+      return before.get('kind', 'spend') == 'spend'
+          && after.get('kind', 'spend') == 'save';
     }
     // The account balance doc must, after the commit, either not exist
     // (genesis/teardown) or have moved by exactly `delta` and stay >= 0.
@@ -76,11 +143,22 @@ service cloud.firestore {
           || (getAfter(acctDoc(uid)).data.balance == balBefore(acctDoc(uid)) + delta
               && getAfter(acctDoc(uid)).data.balance >= 0);
     }
-    // Same, for one caixinha's balance doc.
+    // Same, for one caixinha's balance doc. The DELTA linkage (getAfter == before
+    // + delta) is unconditional and MUST stay so — it is the anti-race guarantee.
+    // Only the non-negativity FLOOR is relaxed, and only in two safe ways:
+    //   * delta >= 0  -> the write does not deepen the caixinha (an allocation or
+    //     transfer-in paying down a debt, or a refund). Always allowed, even while
+    //     still negative, so a frozen debt (toggle turned off) can be paid back
+    //     down to >= 0. Can never CREATE a negative from >= 0 (that needs delta<0).
+    //   * catAllowsNeg -> the caixinha is currently an allowNegative spend envelope,
+    //     so it may deepen into (more) negative.
+    // Neither branch touches the account or any other caixinha.
     function catDeltaOk(uid, cat, delta) {
       return getAfter(balDoc(uid, cat)) == null
           || (getAfter(balDoc(uid, cat)).data.balance == balBefore(balDoc(uid, cat)) + delta
-              && getAfter(balDoc(uid, cat)).data.balance >= 0);
+              && (getAfter(balDoc(uid, cat)).data.balance >= 0
+                  || delta >= 0
+                  || catAllowsNeg(uid, cat)));
     }
     // True when the caixinha's balance doc is being torn down in this commit
     // (a cascade delete or a restore): the ledger docs that reference it may
@@ -107,9 +185,25 @@ service cloud.firestore {
     // same id as the category doc so ledger rules can reach it deterministically.
     match /users/{uid}/balances/{categoryId} {
       allow read: if isOwner(uid);
+      // Shape is still strict ({ balance } only, must be a number). The >= 0 floor
+      // is relaxed on exactly the same two safe conditions as catDeltaOk, in the
+      // same short-circuit order so the extra reads are only paid when a write
+      // actually ends negative: a non-negative result needs no read; a result
+      // that only holds/reduces an existing debt (new >= current) needs no
+      // category read; only genuinely deepening into negative reads the live
+      // category to confirm it is an allowNegative spend envelope.
+      // A fourth branch handles ONLY genesis/restore (resource == null, the doc
+      // is being created): a spend caixinha's frozen debt recomputed from the
+      // ledger can be re-materialized even with the toggle currently off, via
+      // catMayHoldNeg. This never fires on an update (a live write to an
+      // existing balance doc), so the freeze still holds in normal operation.
       allow create, update: if isOwner(uid)
                             && request.resource.data.keys().hasOnly(['balance'])
-                            && isNonNegNumber(request.resource.data.balance);
+                            && request.resource.data.balance is number
+                            && (request.resource.data.balance >= 0
+                                || request.resource.data.balance >= balBefore(balDoc(uid, categoryId))
+                                || catAllowsNeg(uid, categoryId)
+                                || (resource == null && catMayHoldNeg(uid, categoryId)));
       allow delete: if isOwner(uid); // cascade delete / restore reset
     }
 
@@ -120,17 +214,33 @@ service cloud.firestore {
           && isIsoDate(d.createdAt)
           && (!('monthlyBudget' in d.keys()) || isNonNegNumber(d.monthlyBudget))
           && (!('kind' in d.keys()) || d.kind in ['spend', 'save'])
-          && (!('goalAmount' in d.keys()) || isNonNegNumber(d.goalAmount));
+          && (!('goalAmount' in d.keys()) || isNonNegNumber(d.goalAmount))
+          && (!('allowNegative' in d.keys()) || d.allowNegative is bool);
     }
 
     match /users/{uid}/categories/{categoryId} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid) && validCategory(request.resource.data);
-      // createdAt is immutable across edits.
+      // createdAt is immutable across edits. A spend->save conversion is refused
+      // while the caixinha still holds a debt (must be settled to >= 0 first);
+      // every other edit — name, budget, goal, the allowNegative toggle itself,
+      // or converting/keeping a caixinha that is already debt-free — is allowed.
+      // catDebtFree's balance read is short-circuited away unless this update is
+      // actually a spend->save conversion.
       allow update: if isOwner(uid)
                     && validCategory(request.resource.data)
-                    && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if isOwner(uid);
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && (!convertsSpendToSave(resource.data, request.resource.data)
+                        || catDebtFree(uid, categoryId));
+      // Deleting a caixinha is refused while it holds a debt (negative balance):
+      // the debt must be paid back to >= 0 first, otherwise the cascade delete
+      // would destroy an open debt and break money conservation. During a full
+      // restore the balance doc is torn down in an EARLIER committed batch, so by
+      // the time the category doc is deleted catDebtFree reads a missing (=0)
+      // balance and the teardown passes; only a live single-caixinha delete that
+      // removes the category and its still-negative balance doc IN ONE COMMIT is
+      // caught here (catDebtFree reads the pre-commit debt).
+      allow delete: if isOwner(uid) && catDebtFree(uid, categoryId);
     }
 
     // --- incomes ------------------------------------------------------------

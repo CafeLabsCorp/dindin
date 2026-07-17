@@ -6,7 +6,9 @@ App pessoal de controle financeiro por "caixinhas": receitas entram e ficam
 como saldo da conta até serem alocadas numa caixinha; os gastos saem de uma
 caixinha (ou direto da conta). Cada caixinha tem um propósito — **gastar**
 (com limite mensal opcional) ou **guardar** (com meta de poupança opcional) —
-e dá pra transferir dinheiro entre caixinhas.
+e dá pra transferir dinheiro entre caixinhas. Uma caixinha de gastar pode,
+opcionalmente, permitir saldo negativo (uma "dívida" que a próxima alocação
+quita automaticamente).
 
 Flutter multiplataforma (Web, Android, alvo Windows) com Firebase como backend.
 

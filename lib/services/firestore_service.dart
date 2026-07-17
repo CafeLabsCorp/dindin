@@ -65,7 +65,31 @@ class FirestoreService {
     return (data['balance'] as num).toDouble();
   }
 
+  /// Reads a balance doc OUTSIDE a transaction, treating a missing doc as 0.
+  /// Used by the metadata-only pre-write guards (spend->save conversion), which
+  /// don't run in a transaction because they never mutate a balance.
+  Future<double> _readBalanceOnce(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async {
+    final data = (await ref.get()).data();
+    if (data == null) return 0;
+    return (data['balance'] as num).toDouble();
+  }
+
   static const _eps = 1e-9;
+
+  /// Mirrors `catDeltaOk` in `firestore.rules`: a write to a caixinha's
+  /// balance doc is fine if the result stays non-negative, OR the write
+  /// doesn't deepen an existing debt (settling it back up, even partially),
+  /// OR the caixinha is currently configured to allow a negative balance.
+  /// [before]/[after] are the balance doc's value before/after this write.
+  /// Kept in lockstep with the deployed rules so the client never blocks a
+  /// write the server would accept, nor optimistically allows one the server
+  /// will reject with a raw permission error.
+  bool _catDeltaOk(Category category, double before, double after) {
+    final delta = after - before;
+    return after >= -_eps || delta >= -_eps || category.allowsNegativeBalance;
+  }
 
   Stream<List<Category>> watchCategories() {
     return _categories.orderBy('createdAt').snapshots().map(
@@ -124,6 +148,7 @@ class FirestoreService {
     double? monthlyBudget,
     CategoryKind? kind,
     double? goalAmount,
+    bool? allowNegative,
   }) async {
     final doc = _categories.doc();
     final category = Category(
@@ -134,6 +159,7 @@ class FirestoreService {
       monthlyBudget: monthlyBudget,
       kind: kind,
       goalAmount: goalAmount,
+      allowNegative: allowNegative,
     );
     final batch = _db.batch();
     batch.set(doc, category.toMap());
@@ -146,6 +172,13 @@ class FirestoreService {
   /// Pass [clearMonthlyBudget] to remove an existing budget (setting
   /// [monthlyBudget] to null alone is treated as "leave unchanged"). Metadata
   /// only — never touches the caixinha balance.
+  ///
+  /// [allowNegative] doesn't need a `clearAllowNegative` sibling like the
+  /// amount fields: it's a boolean toggle, so the UI always sends an explicit
+  /// `true`/`false` when the user's choice applies (including `false` when
+  /// [kind] is being set/kept to [CategoryKind.save], where the toggle is
+  /// meaningless — see [Category.allowsNegativeBalance]); `null` here only
+  /// ever means "this call isn't touching it, keep the current value".
   Future<void> updateCategory(
     String id, {
     String? name,
@@ -155,6 +188,7 @@ class FirestoreService {
     CategoryKind? kind,
     double? goalAmount,
     bool clearGoalAmount = false,
+    bool? allowNegative,
   }) async {
     final snap = await _categories.doc(id).get();
     if (!snap.exists) throw StateError('category not found');
@@ -168,7 +202,25 @@ class FirestoreService {
           clearMonthlyBudget ? null : (monthlyBudget ?? current.monthlyBudget),
       kind: kind ?? current.kind,
       goalAmount: clearGoalAmount ? null : (goalAmount ?? current.goalAmount),
+      allowNegative: allowNegative ?? current.allowNegative,
     );
+    // Guard (mirrors `catDebtFree` + `convertsSpendToSave` in firestore.rules):
+    // converting a spend envelope that currently holds a debt into a 'save' box
+    // would strand that debt — a 'save' caixinha may never be negative, and
+    // restore/backfill treat "save with a negative balance" as corruption. Block
+    // it until the debt is settled to >= 0. Only reads the balance doc when the
+    // conversion is actually happening, so ordinary edits pay no extra read. The
+    // server rule is the non-bypassable guarantee; this just surfaces it early.
+    if (current.effectiveKind == CategoryKind.spend &&
+        updated.effectiveKind == CategoryKind.save) {
+      final balance = await _readBalanceOnce(_balance(id));
+      if (balance < -_eps) {
+        throw StateError(
+          'cannot convert a caixinha with a negative balance to a savings box; '
+          'settle the debt first',
+        );
+      }
+    }
     await _categories.doc(id).set(updated.toMap());
   }
 
@@ -196,6 +248,19 @@ class FirestoreService {
     }
 
     await _db.runTransaction((tx) async {
+      // Guard (mirrors `catDebtFree` on the categories delete rule): deleting a
+      // caixinha while it holds a debt (negative balance) would destroy that
+      // debt and break money conservation — the debt must be paid back to >= 0
+      // first. Read inside the transaction so the check and the cascade commit
+      // atomically. This is the same commit the server rule inspects via the
+      // pre-commit balance, so the two agree.
+      final catBal = await _readBalance(tx, _balance(id));
+      if (catBal < -_eps) {
+        throw StateError(
+          'cannot delete a caixinha with a negative balance; settle the debt '
+          'first',
+        );
+      }
       final acct = await _readBalance(tx, _account);
       final newAcct = acct + allocSum;
       tx.delete(_categories.doc(id));
@@ -340,6 +405,7 @@ class FirestoreService {
       }
       final catSnap = await tx.get(_categories.doc(categoryId));
       if (!catSnap.exists) throw StateError('category not found');
+      final category = Category.fromMap(categoryId, catSnap.data()!);
       final old = (data['amount'] as num).toDouble();
       final acct = await _readBalance(tx, _account);
       final catBal = await _readBalance(tx, _balance(categoryId));
@@ -348,7 +414,7 @@ class FirestoreService {
         throw StateError('amount exceeds account balance');
       }
       final newCat = catBal + amount - old;
-      if (newCat < -_eps) {
+      if (!_catDeltaOk(category, catBal, newCat)) {
         throw StateError('reducing this allocation would overdraw the caixinha');
       }
       tx.set(_allocations.doc(id), allocation.toMap());
@@ -373,10 +439,18 @@ class FirestoreService {
       final data = s.data()!;
       final cat = data['categoryId'] as String;
       final amt = (data['amount'] as num).toDouble();
+      // Unlike `updateAllocation`, a missing category here isn't fatal (the
+      // category may have been deleted, orphaning this allocation) — fall
+      // back to a category that doesn't allow negative, i.e. the pre-existing
+      // strict behavior, rather than introducing a new failure mode on delete.
+      final catSnap = await tx.get(_categories.doc(cat));
+      final category = catSnap.exists
+          ? Category.fromMap(cat, catSnap.data()!)
+          : Category(id: cat, name: '', recurring: false, createdAt: '');
       final acct = await _readBalance(tx, _account);
       final catBal = await _readBalance(tx, _balance(cat));
       final newCat = catBal - amt;
-      if (newCat < -_eps) {
+      if (!_catDeltaOk(category, catBal, newCat)) {
         throw StateError('removing this allocation would overdraw the caixinha');
       }
       tx.delete(_allocations.doc(id));
@@ -405,11 +479,12 @@ class FirestoreService {
     await _db.runTransaction((tx) async {
       final fromSnap = await tx.get(_categories.doc(fromCategoryId));
       if (!fromSnap.exists) throw StateError('source category not found');
+      final fromCategory = Category.fromMap(fromCategoryId, fromSnap.data()!);
       final toSnap = await tx.get(_categories.doc(toCategoryId));
       if (!toSnap.exists) throw StateError('destination category not found');
       final fromBal = await _readBalance(tx, _balance(fromCategoryId));
       final toBal = await _readBalance(tx, _balance(toCategoryId));
-      if (amount > fromBal + _eps) {
+      if (!_catDeltaOk(fromCategory, fromBal, fromBal - amount)) {
         throw StateError('amount exceeds source caixinha balance');
       }
       tx.set(
@@ -454,22 +529,30 @@ class FirestoreService {
         .toList();
     await _db.runTransaction((tx) async {
       final cats = {for (final l in legInfos) l.cat};
-      final balances = <String, double>{};
+      final before = <String, double>{};
+      final categories = <String, Category>{};
       for (final c in cats) {
-        balances[c] = await _readBalance(tx, _balance(c));
+        before[c] = await _readBalance(tx, _balance(c));
+        // A missing category (orphaned by a since-deleted category, matching
+        // deleteAllocation's fallback) doesn't allow negative.
+        final catSnap = await tx.get(_categories.doc(c));
+        categories[c] = catSnap.exists
+            ? Category.fromMap(c, catSnap.data()!)
+            : Category(id: c, name: '', recurring: false, createdAt: '');
       }
+      final after = Map<String, double>.from(before);
       for (final l in legInfos) {
-        balances[l.cat] = balances[l.cat]! - l.amt; // reverse the leg
+        after[l.cat] = after[l.cat]! - l.amt; // reverse the leg
       }
-      for (final e in balances.entries) {
-        if (e.value < -_eps) {
+      for (final c in cats) {
+        if (!_catDeltaOk(categories[c]!, before[c]!, after[c]!)) {
           throw StateError('undoing this transfer would overdraw a caixinha');
         }
       }
       for (final l in legInfos) {
         tx.delete(l.ref);
       }
-      for (final e in balances.entries) {
+      for (final e in after.entries) {
         tx.set(_balance(e.key), {'balance': e.value});
       }
     });
@@ -504,12 +587,19 @@ class FirestoreService {
       } else {
         final catSnap = await tx.get(_categories.doc(categoryId));
         if (!catSnap.exists) throw StateError('category not found');
+        final category = Category.fromMap(categoryId, catSnap.data()!);
         final catBal = await _readBalance(tx, _balance(categoryId));
-        if (amount > catBal + _eps) {
+        final newCat = catBal - amount;
+        // A caixinha that already sits at/below 0 and doesn't allow negative
+        // is naturally caught here too (any positive `amount` fails
+        // `_catDeltaOk`), which is what makes the "toggle off + already
+        // negative -> block further gastos" rule (decision #3) fall out of
+        // this same check rather than needing a separate one.
+        if (!_catDeltaOk(category, catBal, newCat)) {
           throw StateError('amount exceeds available balance');
         }
         tx.set(doc, expense.toMap());
-        tx.set(_balance(categoryId), {'balance': catBal - amount});
+        tx.set(_balance(categoryId), {'balance': newCat});
       }
     });
     return expense;
@@ -550,9 +640,12 @@ class FirestoreService {
         tx.set(_expenses.doc(id), expense.toMap());
         tx.set(_account, {'balance': newAcct});
       } else {
+        final catSnap = await tx.get(_categories.doc(categoryId));
+        if (!catSnap.exists) throw StateError('category not found');
+        final category = Category.fromMap(categoryId, catSnap.data()!);
         final catBal = await _readBalance(tx, _balance(categoryId));
         final newCat = catBal + old - amount;
-        if (newCat < -_eps) {
+        if (!_catDeltaOk(category, catBal, newCat)) {
           throw StateError('amount exceeds available balance');
         }
         tx.set(_expenses.doc(id), expense.toMap());
@@ -592,6 +685,37 @@ class FirestoreService {
   // here from the imported ledger via `aggregation_service`.
   // -------------------------------------------------------------------------
   Future<void> replaceAll(AppDb db) async {
+    // 0. Validate BEFORE mutating anything, so a bad backup can never leave the
+    //    database half-restored (the "trava no meio" failure). A recomputed
+    //    negative balance is only legitimate — and only re-materializable by the
+    //    rules (catMayHoldNeg on the genesis path) — for an EXISTING spend
+    //    caixinha (a frozen/open debt). The account may never be negative, and a
+    //    'save' caixinha may never hold a debt; those are corruption, so we
+    //    refuse loudly here instead of letting a mid-restore rule denial abort a
+    //    partial write. Orphan ids (referenced by the ledger but absent from
+    //    db.categories) are NOT written as balance docs at all (see step 4), so
+    //    an orphan negative can't reach the rules and isn't checked here.
+    final knownKind = {for (final c in db.categories) c.id: c.effectiveKind};
+    final catBalances = agg.categoryBalances(db);
+    if (agg.accountBalance(db) < 0) {
+      throw StateError(
+        'cannot restore: the general account balance would be negative — the '
+        'backup is inconsistent (reconcile it before importing).',
+      );
+    }
+    for (final entry in catBalances.entries) {
+      if (entry.value >= 0) continue;
+      final kind = knownKind[entry.key];
+      if (kind == null) continue; // orphan: not materialized as a balance doc.
+      if (kind != CategoryKind.spend) {
+        throw StateError(
+          'cannot restore: caixinha "${entry.key}" would have a negative '
+          'balance (${entry.value}) but is not a spend caixinha — only spend '
+          'caixinhas may hold a debt. The backup is inconsistent.',
+        );
+      }
+    }
+
     // 1. Remove the derived balance docs (account + every caixinha) first.
     final existingBalances = await _balances.get();
     await _deleteRefs([
@@ -613,12 +737,17 @@ class FirestoreService {
       for (final e in db.expenses) (_expenses.doc(e.id), e.toMap()),
     ]);
 
-    // 4. Recompute and write the derived balance docs last.
-    final catBalances = agg.categoryBalances(db);
+    // 4. Write the derived balance docs last (recomputed in step 0). Only
+    //    caixinhas that still exist get a balance doc — an orphan id left in the
+    //    ledger by an incomplete delete would otherwise produce a junk balance
+    //    doc the rules can't police (no category to read), and would fail the
+    //    genesis floor if negative. Dropping it keeps the ledger intact while
+    //    the display still recomputes correctly by summing that ledger.
     await _setDocs([
       (_account, {'balance': agg.accountBalance(db)}),
       for (final entry in catBalances.entries)
-        (_balance(entry.key), {'balance': entry.value}),
+        if (knownKind.containsKey(entry.key))
+          (_balance(entry.key), {'balance': entry.value}),
     ]);
   }
 

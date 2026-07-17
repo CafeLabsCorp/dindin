@@ -18,8 +18,16 @@ class CaixinhaBudgetBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ratio = limit <= 0 ? 0.0 : spent / limit;
-    final over = spent - limit;
+    // `spent` is always a sum of non-negative expense amounts for the current
+    // month (see `MonthSummary.expenseByCategory`) — it tracks monthly
+    // consumption against the soft budget, which is a different number from
+    // the caixinha's all-time running balance (which CAN be negative now that
+    // "allow negative balance" exists; see [CaixinhaDebtIndicator] for that).
+    // Guarded defensively anyway so a future/unexpected negative input can't
+    // flip the ratio sign or blow past the bar's 0–100% width.
+    final safeSpent = spent < 0 ? 0.0 : spent;
+    final ratio = limit <= 0 ? 0.0 : safeSpent / limit;
+    final over = safeSpent - limit;
 
     final Color fill;
     if (ratio > 1) {
@@ -44,7 +52,7 @@ class CaixinhaBudgetBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Gasto: ${formatCurrency(spent)} de ${formatCurrency(limit)} este mês',
+          'Gasto: ${formatCurrency(safeSpent)} de ${formatCurrency(limit)} este mês',
           style: TextStyle(fontSize: 12, color: context.tokens.subtle),
         ),
         if (ratio > 1)
@@ -126,6 +134,34 @@ class CaixinhaSavedThisMonth extends StatelessWidget {
         fontSize: 12,
         color: positive ? context.tokens.statusGood : context.tokens.subtle,
       ),
+    );
+  }
+}
+
+/// Debt indicator for a "gastar" caixinha whose running balance has gone
+/// negative (only reachable when its "permitir saldo negativo" toggle is, or
+/// was, on — see `Category.allowsNegativeBalance`). Independent from
+/// [CaixinhaBudgetBar]: that widget tracks *this month's* spend against a
+/// soft monthly limit, while this tracks the caixinha's *all-time running
+/// balance* — a caixinha can be mid-month under budget and still be in debt
+/// (or vice versa), so both can render side by side. Renders nothing when
+/// [balance] is non-negative — a healthy caixinha needs no extra line, same
+/// convention as [CaixinhaSavedThisMonth].
+///
+/// Reuses the same visual language as [CaixinhaBudgetBar]'s "acima do
+/// limite" caption (plain bold `statusCritical` text, no bar/badge) rather
+/// than inventing a new pattern for "this number is bad".
+class CaixinhaDebtIndicator extends StatelessWidget {
+  final double balance;
+
+  const CaixinhaDebtIndicator({super.key, required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    if (balance >= 0) return const SizedBox.shrink();
+    return Text(
+      'Devendo ${formatCurrency(-balance)}',
+      style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
     );
   }
 }
