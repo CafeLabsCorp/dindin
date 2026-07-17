@@ -3,17 +3,26 @@ import '../models/db.dart';
 /// Ported 1:1 from the Next.js app's `src/lib/aggregations.ts`.
 String monthKey(String date) => date.substring(0, 7); // "YYYY-MM"
 
-double totalIncome(AppDb db) => db.incomes.fold(0.0, (sum, i) => sum + i.amount);
+/// Summing many docs' `amount` accumulates binary floating-point error (e.g.
+/// an account that is truly R$0 can sum to -1.7e-13). BRL only has cents, so
+/// round every aggregated total to the cent before it reaches a comparison or
+/// the screen — otherwise a mathematically-zero balance can display as
+/// "-R$ 0,00".
+double round2(double n) => (n * 100).round() / 100;
 
-double totalAllocated(AppDb db) => db.allocations.fold(0.0, (sum, a) => sum + a.amount);
+double totalIncome(AppDb db) => round2(db.incomes.fold(0.0, (sum, i) => sum + i.amount));
+
+double totalAllocated(AppDb db) => round2(db.allocations.fold(0.0, (sum, a) => sum + a.amount));
 
 /// Expenses charged straight against the account balance (no caixinha).
-double accountExpenses(AppDb db) =>
-    db.expenses.where((e) => e.categoryId == null).fold(0.0, (sum, e) => sum + e.amount);
+double accountExpenses(AppDb db) => round2(
+  db.expenses.where((e) => e.categoryId == null).fold(0.0, (sum, e) => sum + e.amount),
+);
 
 /// Money that came in but hasn't been allocated to a caixinha or spent
 /// directly — the general account balance.
-double accountBalance(AppDb db) => totalIncome(db) - totalAllocated(db) - accountExpenses(db);
+double accountBalance(AppDb db) =>
+    round2(totalIncome(db) - totalAllocated(db) - accountExpenses(db));
 
 Map<String, double> categoryBalances(AppDb db) {
   final balances = <String, double>{for (final c in db.categories) c.id: 0};
@@ -25,13 +34,13 @@ Map<String, double> categoryBalances(AppDb db) {
     if (categoryId == null) continue;
     balances[categoryId] = (balances[categoryId] ?? 0) - e.amount;
   }
-  return balances;
+  return balances.map((id, v) => MapEntry(id, round2(v)));
 }
 
 /// Account balance plus every caixinha's balance — equal to
 /// total income minus total expenses, however the money is split.
 double totalBalance(AppDb db) {
-  return accountBalance(db) + categoryBalances(db).values.fold(0.0, (sum, v) => sum + v);
+  return round2(accountBalance(db) + categoryBalances(db).values.fold(0.0, (sum, v) => sum + v));
 }
 
 class MonthSummary {
@@ -68,16 +77,16 @@ MonthSummary monthSummary(AppDb db, String month) {
     expenseByCategory[categoryId] = (expenseByCategory[categoryId] ?? 0) + e.amount;
   }
 
-  final totalIncome = incomes.fold(0.0, (sum, i) => sum + i.amount);
-  final totalExpense = expenses.fold(0.0, (sum, e) => sum + e.amount);
+  final totalIncome = round2(incomes.fold(0.0, (sum, i) => sum + i.amount));
+  final totalExpense = round2(expenses.fold(0.0, (sum, e) => sum + e.amount));
 
   return MonthSummary(
     month: month,
     totalIncome: totalIncome,
     totalExpense: totalExpense,
-    net: totalIncome - totalExpense,
-    incomeBySource: incomeBySource,
-    expenseByCategory: expenseByCategory,
+    net: round2(totalIncome - totalExpense),
+    incomeBySource: incomeBySource.map((k, v) => MapEntry(k, round2(v))),
+    expenseByCategory: expenseByCategory.map((k, v) => MapEntry(k, round2(v))),
   );
 }
 
