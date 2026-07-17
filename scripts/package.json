@@ -1,0 +1,15 @@
+{
+  "name": "dindin-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One-off maintenance scripts for the Dindin Firestore backend.",
+  "scripts": {
+    "backfill": "node backfill_balances.mjs",
+    "backfill:dry": "node backfill_balances.mjs --dry-run",
+    "backfill:verify": "node backfill_balances.mjs --verify"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
