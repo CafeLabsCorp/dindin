@@ -1,0 +1,57 @@
+name: CI
+
+# MVP-scale CI: analyze + test on every push to main. No deploy step here —
+# shipping to production stays a deliberate manual action via
+# `scripts/deploy.sh` (see docs/DEPLOY.md). Both jobs run on GitHub's free
+# Actions minutes for public/private repos at this volume (a handful of
+# pushes/day, each job a couple of minutes) — nowhere near the free-tier cap.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  flutter:
+    name: flutter analyze + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: "stable"
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      - run: flutter test
+
+  rules:
+    name: firestore rules test (emulator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The Firestore emulator runs on the JVM.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install rules test harness deps
+        working-directory: test/rules
+        run: npm ci
+
+      # `emulators:exec` starts the Firestore emulator, runs the given
+      # command, then tears the emulator down — no manual start/stop needed
+      # and no project credentials required (emulator-only, never touches
+      # production). Mirrors the local repro steps documented in
+      # test/rules/rules.test.mjs's header.
+      - name: Run rules tests against the Firestore emulator
+        run: npx --yes firebase-tools emulators:exec --only firestore --project dindin-rules-test "npm test --prefix test/rules"

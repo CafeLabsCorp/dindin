@@ -65,10 +65,21 @@ flutter run                # Android (emulador/dispositivo conectado)
 
 ## Build e deploy
 
+Para uma mudança só de UI (sem tocar `firestore.rules`, índices ou o schema
+das balances), o fluxo manual de sempre continua valendo:
+
 ```bash
 flutter build web
 firebase deploy --only hosting --project dindin-cafelabs
 ```
+
+Para qualquer mudança que toque regras/schema/balances, use
+`scripts/deploy.sh` em vez disso — ele encapsula o backup + backfill + verify
++ deploy de rules/hosting na ordem obrigatória. Ver `docs/DEPLOY.md` (rollback
+e detalhes) e `docs/BACKEND.md` (por que essa ordem é obrigatória).
+
+CI (`.github/workflows/ci.yml`) roda `flutter analyze`, `flutter test` e os
+testes de rules no emulador em todo push pra `main` — não faz deploy.
 
 Web publicado em https://dindin-cafelabs.web.app.
 
