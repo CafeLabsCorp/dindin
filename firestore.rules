@@ -118,7 +118,9 @@ service cloud.firestore {
       return d.name is string
           && d.recurring is bool
           && isIsoDate(d.createdAt)
-          && (!('monthlyBudget' in d.keys()) || isNonNegNumber(d.monthlyBudget));
+          && (!('monthlyBudget' in d.keys()) || isNonNegNumber(d.monthlyBudget))
+          && (!('kind' in d.keys()) || d.kind in ['spend', 'save'])
+          && (!('goalAmount' in d.keys()) || isNonNegNumber(d.goalAmount));
     }
 
     match /users/{uid}/categories/{categoryId} {

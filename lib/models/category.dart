@@ -1,3 +1,20 @@
+/// What a caixinha is for. Drives which visualization/fields the UI offers:
+/// a spending envelope gets a monthly budget bar; a savings box gets a goal
+/// progress bar (or the month's net inflow when no goal is set).
+enum CategoryKind {
+  spend('spend'),
+  save('save');
+
+  final String value;
+  const CategoryKind(this.value);
+
+  static CategoryKind? fromValue(String? v) => switch (v) {
+    'spend' => CategoryKind.spend,
+    'save' => CategoryKind.save,
+    _ => null,
+  };
+}
+
 /// Mirrors `CategorySchema` in the Next.js app's `src/lib/schemas.ts`.
 class Category {
   final String id;
@@ -17,13 +34,31 @@ class Category {
   /// information. `recurring` is left untouched.
   final double? monthlyBudget;
 
+  /// What this caixinha is for: [CategoryKind.spend] (envelope de gasto — the
+  /// monthly-budget bar applies) or [CategoryKind.save] (cofrinho de guardar —
+  /// the savings goal applies). Stored as the strings 'spend'/'save'. `null`
+  /// means the doc predates this field; legacy docs behave as [spend], which
+  /// is the only semantics that existed before.
+  final CategoryKind? kind;
+
+  /// Optional savings goal for a [CategoryKind.save] caixinha, in BRL: the
+  /// total amount the user wants to accumulate ("juntar R$ 5.000"). `null`
+  /// means no goal set. Ignored for spending caixinhas.
+  final double? goalAmount;
+
   const Category({
     required this.id,
     required this.name,
     required this.recurring,
     required this.createdAt,
     this.monthlyBudget,
+    this.kind,
+    this.goalAmount,
   });
+
+  /// Effective purpose: legacy docs (null [kind]) behave as spending
+  /// envelopes, preserving the only semantics that existed before the field.
+  CategoryKind get effectiveKind => kind ?? CategoryKind.spend;
 
   factory Category.fromMap(String id, Map<String, dynamic> map) {
     return Category(
@@ -32,6 +67,8 @@ class Category {
       recurring: map['recurring'] as bool,
       createdAt: map['createdAt'] as String,
       monthlyBudget: (map['monthlyBudget'] as num?)?.toDouble(),
+      kind: CategoryKind.fromValue(map['kind'] as String?),
+      goalAmount: (map['goalAmount'] as num?)?.toDouble(),
     );
   }
 
@@ -41,16 +78,26 @@ class Category {
       'recurring': recurring,
       'createdAt': createdAt,
       if (monthlyBudget != null) 'monthlyBudget': monthlyBudget,
+      if (kind != null) 'kind': kind!.value,
+      if (goalAmount != null) 'goalAmount': goalAmount,
     };
   }
 
-  Category copyWith({String? name, bool? recurring, double? monthlyBudget}) {
+  Category copyWith({
+    String? name,
+    bool? recurring,
+    double? monthlyBudget,
+    CategoryKind? kind,
+    double? goalAmount,
+  }) {
     return Category(
       id: id,
       name: name ?? this.name,
       recurring: recurring ?? this.recurring,
       createdAt: createdAt,
       monthlyBudget: monthlyBudget ?? this.monthlyBudget,
+      kind: kind ?? this.kind,
+      goalAmount: goalAmount ?? this.goalAmount,
     );
   }
 

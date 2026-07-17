@@ -253,4 +253,73 @@ void main() {
       expect(map.containsKey('monthlyBudget'), isFalse);
     });
   });
+
+  group('caixinhas com propósito (kind) e meta (goalAmount)', () {
+    test('kind e goalAmount sobrevivem ao round-trip toMap/fromMap', () {
+      const cofrinho = Category(
+        id: 'c1',
+        name: 'Viagem',
+        recurring: true,
+        createdAt: '2026-01-01',
+        kind: CategoryKind.save,
+        goalAmount: 5000,
+      );
+      final restored = Category.fromMap('c1', cofrinho.toMap());
+      expect(restored.kind, CategoryKind.save);
+      expect(restored.goalAmount, 5000);
+    });
+
+    test('doc legado (sem kind) se comporta como envelope de gasto', () {
+      final legado = Category.fromMap('c1', {
+        'name': 'Casa',
+        'recurring': true,
+        'createdAt': '2026-01-01',
+      });
+      expect(legado.kind, isNull);
+      expect(legado.effectiveKind, CategoryKind.spend);
+    });
+
+    test('toMap omite kind/goalAmount quando null (docs antigos não mudam de shape)', () {
+      const legado = Category(id: 'c1', name: 'Casa', recurring: true, createdAt: '2026-01-01');
+      final map = legado.toMap();
+      expect(map.containsKey('kind'), isFalse);
+      expect(map.containsKey('goalAmount'), isFalse);
+    });
+
+    test('savedThisMonthByCategory: alocações do mês menos gastos do mês, por caixinha', () {
+      final db = AppDb(
+        categories: const [
+          Category(id: 'c1', name: 'Viagem', recurring: true, createdAt: '2026-01-01'),
+        ],
+        incomes: const [],
+        allocations: const [
+          Allocation(id: 'a1', categoryId: 'c1', amount: 300, date: '2026-03-05'),
+          Allocation(id: 'a2', categoryId: 'c1', amount: 200, date: '2026-02-05'), // outro mês
+        ],
+        expenses: [
+          Expense(id: 'e1', date: '2026-03-10', amount: 100, categoryId: 'c1'),
+        ],
+      );
+      final saved = savedThisMonthByCategory(db, '2026-03');
+      expect(saved['c1'], 200); // 300 alocado - 100 gasto, ignora fevereiro
+    });
+
+    test('savedThisMonthByCategory inclui pernas de transferência (com sinal)', () {
+      final db = AppDb(
+        categories: const [
+          Category(id: 'origem', name: 'A', recurring: true, createdAt: '2026-01-01'),
+          Category(id: 'destino', name: 'B', recurring: true, createdAt: '2026-01-01'),
+        ],
+        incomes: const [],
+        allocations: const [
+          Allocation(id: 't1', categoryId: 'origem', amount: -50, date: '2026-03-05', transferId: 'tx'),
+          Allocation(id: 't2', categoryId: 'destino', amount: 50, date: '2026-03-05', transferId: 'tx'),
+        ],
+        expenses: const [],
+      );
+      final saved = savedThisMonthByCategory(db, '2026-03');
+      expect(saved['origem'], -50);
+      expect(saved['destino'], 50);
+    });
+  });
 }
