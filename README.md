@@ -2,10 +2,13 @@
 
 Um produto [Café Labs](https://cafelabs.net).
 
-App pessoal de controle financeiro por "caixinhas": receitas entram, são alocadas
-entre categorias, e os gastos saem de cada categoria.
+App pessoal de controle financeiro por "caixinhas": receitas entram e ficam
+como saldo da conta até serem alocadas numa caixinha; os gastos saem de uma
+caixinha (ou direto da conta). Cada caixinha tem um propósito — **gastar**
+(com limite mensal opcional) ou **guardar** (com meta de poupança opcional) —
+e dá pra transferir dinheiro entre caixinhas.
 
-Flutter multiplataforma (Web, Android, Windows) com Firebase como backend.
+Flutter multiplataforma (Web, Android, alvo Windows) com Firebase como backend.
 
 ## Stack
 
@@ -18,41 +21,22 @@ Flutter multiplataforma (Web, Android, Windows) com Firebase como backend.
 | Datas/moeda | `intl` (`pt_BR` / BRL) |
 | Backend | Firebase (Auth + Firestore), projeto `dindin-cafelabs` |
 
-## Modelo de dados
-
-Firestore, particionado por usuário:
-
-```
-users/{uid}
-  categories/{categoryId}    { name, recurring, createdAt }
-  incomes/{incomeId}         { date, amount, source, description }
-  allocations/{allocationId} { incomeId, categoryId, amount, date }
-  expenses/{expenseId}       { date, amount, categoryId, description }
-```
-
-## Estrutura
+## Estrutura (visão geral)
 
 ```
 lib/
-  main.dart
-  app.dart                    # MaterialApp.router + tema
-  theme/                      # cores e ThemeData
-  models/                     # Category, Income, Allocation, Expense
-  providers/                  # providers Riverpod
-  services/
-    auth_service.dart         # login email/senha + Google
-    firestore_service.dart    # CRUD por coleção, sob users/{uid}/...
-    aggregation_service.dart  # saldo por caixinha, resumo mensal
-    import_export_service.dart# backup/restore em JSON
-  features/
-    auth/login_page.dart
-    dashboard/dashboard_page.dart
-    categorias/categorias_page.dart
-    receitas/receitas_page.dart
-    gastos/gastos_page.dart
-    settings/settings_page.dart
-  widgets/
+  main.dart / app.dart   # bootstrap, tema, rotas (go_router)
+  theme/                 # identidade visual "Envelope caloroso" — ver docs/DESIGN.md
+  models/                # Category, Income, Allocation, Expense
+  providers/             # providers Riverpod
+  services/              # auth, CRUD no Firestore, agregações, import/export
+  features/              # uma pasta por tela (dashboard, receitas, gastos, categorias, ajustes, auth)
+  widgets/                # componentes compartilhados
+functions/               # Cloud Functions — INATIVO, ver functions/README.md
 ```
+
+Detalhamento por arquivo, o fluxo de dados (Riverpod → agregação → UI) e o
+schema completo do Firestore estão em `docs/ARQUITETURA.md`.
 
 ## Rodando localmente
 
@@ -88,3 +72,13 @@ Web publicado em https://dindin-cafelabs.web.app.
 Em Ajustes, dá pra exportar todos os dados do usuário pra um `.json` e importar de
 volta (substitui os dados atuais) — útil tanto como backup manual quanto para migrar
 dados entre contas/ambientes.
+
+## Documentação
+
+- `docs/ARQUITETURA.md` — camadas, fluxo de dados/estado, schema completo do
+  Firestore, decisões técnicas e por quê.
+- `docs/DESIGN.md` — identidade visual "Envelope caloroso": paleta, tipografia,
+  espaçamento.
+- `docs/DEPLOY.md` — CI, deploy e rollback.
+- `docs/BACKEND.md` — modelo de integridade de dinheiro (saldos denormalizados,
+  Firestore Security Rules).
