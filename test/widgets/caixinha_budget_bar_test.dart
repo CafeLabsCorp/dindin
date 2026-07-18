@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/theme/theme.dart';
 import 'package:dindin/utils/format.dart';
 import 'package:dindin/widgets/caixinha_budget_bar.dart';
@@ -15,6 +16,9 @@ void main() {
     return tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
+        locale: const Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: CaixinhaBudgetBar(spent: spent, limit: limit)),
       ),
     );
@@ -52,6 +56,9 @@ void main() {
       return tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: CaixinhaDebtIndicator(balance: balance)),
         ),
       );

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:dindin/features/gastos/gastos_page.dart';
+import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/models/allocation.dart';
 import 'package:dindin/models/category.dart';
 import 'package:dindin/models/expense.dart';
@@ -27,7 +28,13 @@ void main() {
           categoriesProvider.overrideWith((ref) => Stream.value([casa])),
           expensesProvider.overrideWith((ref) => Stream.value(expenses)),
         ],
-        child: MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: GastosPage())),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: GastosPage()),
+        ),
       ),
     );
   }
@@ -63,7 +70,13 @@ void main() {
             ]),
           ),
         ],
-        child: MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: GastosPage())),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: GastosPage()),
+        ),
       ),
     );
   }

@@ -3,13 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dindin/features/auth/login_page.dart';
+import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/theme/theme.dart';
 
 void main() {
   testWidgets('LoginPage shows the email/password form', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        child: MaterialApp(theme: AppTheme.light(), home: const LoginPage()),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const LoginPage(),
+        ),
       ),
     );
 
