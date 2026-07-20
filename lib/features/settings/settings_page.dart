@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../widgets/app_card.dart';
@@ -94,6 +95,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               OutlinedButton(
                 onPressed: () => ref.read(authServiceProvider).signOut(),
                 child: Text(l10n.signOutButton),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.languageSectionLabel, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              // localeProvider is null by default ("follow system") — see
+              // lib/providers/locale_provider.dart. 'Português'/'English' are
+              // language endonyms, kept as literal labels (not routed through
+              // AppLocalizations) same as Domo's precedent for this control.
+              SegmentedButton<Locale?>(
+                segments: [
+                  ButtonSegment(value: null, label: Text(l10n.languageSystemOption)),
+                  const ButtonSegment(value: Locale('pt'), label: Text('Português')),
+                  const ButtonSegment(value: Locale('en'), label: Text('English')),
+                ],
+                selected: {ref.watch(localeProvider)},
+                onSelectionChanged: (set) => ref.read(localeProvider.notifier).state = set.first,
               ),
             ],
           ),

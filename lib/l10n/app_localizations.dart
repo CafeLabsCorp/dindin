@@ -800,6 +800,18 @@ abstract class AppLocalizations {
   /// **'Dindin — um produto Café Labs'**
   String get footerBrand;
 
+  /// No description provided for @languageSectionLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Idioma'**
+  String get languageSectionLabel;
+
+  /// No description provided for @languageSystemOption.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sistema'**
+  String get languageSystemOption;
+
   /// No description provided for @editIncomeTitle.
   ///
   /// In pt, this message translates to:

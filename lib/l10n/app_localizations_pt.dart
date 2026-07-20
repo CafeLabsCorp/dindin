@@ -406,6 +406,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get footerBrand => 'Dindin — um produto Café Labs';
 
   @override
+  String get languageSectionLabel => 'Idioma';
+
+  @override
+  String get languageSystemOption => 'Sistema';
+
+  @override
   String get editIncomeTitle => 'Editar receita';
 
   @override
