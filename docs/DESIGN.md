@@ -1,5 +1,7 @@
 # Dindin — Design system: "Envelope caloroso"
 
+**[Leia em Português](DESIGN.pt-br.md)**
+
 Status: **implemented**. This is the reference for the app's visual identity
 — color tokens, typography, shape/spacing/elevation, component styling —
 matching what actually ships in `lib/theme/colors.dart` and
