@@ -66,6 +66,8 @@ users/{uid}
     monthlyBudget: number?     # limite mensal de gasto (caixinha "gastar")
     kind: 'spend' | 'save'?    # null/ausente = legado, tratado como 'spend'
     goalAmount: number?        # meta de poupança (caixinha "guardar")
+    allowNegative: bool?       # só relevante p/ kind == 'spend'; permite a
+                                # caixinha ficar com saldo negativo ("dívida")
 
   incomes/{incomeId}
     date: string (ISO), amount: number, source: string, description: string?
@@ -94,9 +96,10 @@ Security Rules consigam validar em O(1) (rules não conseguem somar uma
 coleção inteira). Ver `docs/BACKEND.md` para o racional completo, os
 invariantes garantidos e as limitações conhecidas desse desenho.
 
-`Category.kind`, `monthlyBudget`, `goalAmount` e `Allocation.transferId` são
-todos campos opcionais adicionados depois do schema original — um backup
-JSON antigo, sem eles, continua importável sem alterações.
+`Category.kind`, `monthlyBudget`, `goalAmount`, `allowNegative` e
+`Allocation.transferId` são todos campos opcionais adicionados depois do
+schema original — um backup JSON antigo, sem eles, continua importável sem
+alterações.
 
 ## Decisões técnicas e por quê
 
@@ -124,6 +127,20 @@ JSON antigo, sem eles, continua importável sem alterações.
   `lib/widgets/caixinha_budget_bar.dart`. `kind` nulo (documento anterior a
   este campo) se comporta como `spend`, preservando a única semântica que
   existia antes.
+
+- **`allowNegative` afrouxa de propósito, e só num escopo estreito, um
+  invariante que antes era absoluto ("nenhum saldo fica negativo").** Uma
+  caixinha `spend` pode ligar o toggle "Permitir saldo negativo" e passar a
+  aceitar gastos que deixam seu saldo negativo (uma "dívida"). A quitação é a
+  aritmética normal do saldo — a próxima alocação/transferência que entra
+  nessa caixinha simplesmente soma e abate a dívida, sem uma ação separada de
+  "quitar". Uma caixinha `save` nunca fica negativa, e a conta geral
+  (`meta/account`) também não — o afrouxamento é só para `balances/{catId}`
+  de uma caixinha `spend` com o flag ligado. Ver `docs/BACKEND.md`,
+  "allowNegative (dívida por caixinha)", para o mecanismo completo (rules +
+  client), o restore de backup com dívida congelada (**F1**, corrigido) e a
+  pendência conhecida: não há hoje guard no app contra converter uma
+  caixinha `spend` negativa em `save`, ou apagá-la, com a dívida ainda aberta.
 
 - **Um único breakpoint (720px) reaproveitado em toda a navegação/formulários
   responsivos**, em vez de um valor por tela: `AppShell` (rail lateral vs.
@@ -164,6 +181,41 @@ JSON antigo, sem eles, continua importável sem alterações.
   pareada em outra caixinha órfã e desalinharia aquele saldo. Não é
   alcançável pela UI hoje (nenhuma categoria de produção tem pernas de
   transferência) — ver `docs/BACKEND.md`, "Option B residual limitations".
+
+- **Restaurar um backup com uma "dívida congelada" — CORRIGIDO (F1), testado
+  contra o emulador.** Uma dívida congelada é uma caixinha `spend` que ficou
+  negativa e depois teve o `allowNegative` desligado, a categoria apagada, ou
+  o `kind` trocado para `save` — o número negativo continua na matemática do
+  ledger, só a permissão de mantê-lo daqui pra frente que muda. A correção
+  tem duas partes: (1) `firestore.rules` ganhou um helper `catMayHoldNeg`,
+  agnóstico ao toggle, que permite recriar esse negativo SÓ no momento de
+  criação do balance doc (restore/teardown — `resource == null`), nunca numa
+  atualização de doc já existente — então o "freeze" ao vivo continua valendo
+  como antes; (2) `FirestoreService.replaceAll` agora valida TODOS os saldos
+  recalculados antes de mutar qualquer coisa (passo 0) — um backup
+  genuinamente inconsistente (conta negativa, ou caixinha `save`/órfã
+  negativa) falha atomicamente, sem gravar nada, em vez de travar o restore
+  no meio. **Trade-off residual aceito, não é bug:** como `catMayHoldNeg` só
+  olha `kind` (ignora o toggle), um cliente pode, nos SEUS PRÓPRIOS dados,
+  apagar o balance doc de uma caixinha `spend` e recriá-lo negativo mesmo com
+  o toggle desligado ("descongelar via teardown") — não é brecha de
+  integridade nem cross-user (dado é single-tenant, os saldos exibidos são
+  sempre recalculados do ledger, e um saldo errado auto-infligido só
+  restringe mais as próprias escritas futuras daquele usuário). Ver `docs/
+  BACKEND.md`, "Option B residual limitations" (item F1), para o mecanismo
+  completo.
+
+- **Não há guard no app contra converter uma caixinha `spend` negativa em
+  `save`, ou apagá-la, enquanto a dívida está aberta.** `categorias_page.dart`
+  deixa trocar o `kind` ou chamar `deleteCategory` sem checar o saldo atual —
+  é essa a origem real do estado "`save` com dívida" / "órfã com dívida" que
+  o restore (`replaceAll` passo 0) e o backfill hoje recusam de propósito
+  como `BALANCE CORRUPTION`, pra não destruir a conservação de dinheiro.
+  Recomendação (ainda não implementada): bloquear ou exigir confirmação
+  explícita antes de trocar o `kind` de uma caixinha `spend` negativa, e
+  bloquear apagar uma caixinha com saldo negativo. Ver `docs/BACKEND.md`,
+  "Option B residual limitations", último item. TODO: confirmar quando essa
+  correção entra no roadmap.
 
 - **`lib/widgets/app_shell.dart` cita `FLUTTER_MIGRATION.md` num comentário**
   ("per §4 of FLUTTER_MIGRATION.md") — esse arquivo não existe mais no repo

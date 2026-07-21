@@ -52,11 +52,32 @@ const num = (v) => (typeof v === "number" && !Number.isNaN(v) ? v : 0);
 // stored as a hair negative, which fails the rules' `>= 0` check for real.
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Legacy data predating the client-side invariants can legitimately sum
-// negative. A negative balance doc under Phase-2 rules blocks that user's
-// future spending writes, so negatives must be reconciled in the ledger BEFORE
-// the real run — never auto-clamped, which would hide the inconsistency.
-const negatives = [];
+// A negative recomputed balance splits into two kinds, aligned EXACTLY with
+// what `firestore.rules` will and won't re-materialize (catMayHoldNeg on the
+// genesis path), so the deploy gate never diverges from the rules:
+//
+//   * LEGITIMATE DEBT — an EXISTING spend caixinha (kind 'spend' or legacy
+//     null-kind) summing negative. This is a supported state: the debt was
+//     incurred while allowNegative was on and may still be open (toggle on) or
+//     FROZEN (toggle later turned off). The rules re-materialize it on restore,
+//     and the backfill writes the negative balance doc as-is. NOT a gate
+//     failure — reported as an informational warning only. A toggle-off spend
+//     negative is indistinguishable, from the ledger alone, from an old
+//     overspend bug; because the rules permit it either way, blocking here would
+//     just recreate the "one open debt freezes every future deploy" defect this
+//     change fixes. It's surfaced in the log for a human to eyeball.
+//
+//   * BALANCE CORRUPTION — a negative the rules will NOT re-materialize and that
+//     should never exist: the general account (never allowed negative), a 'save'
+//     caixinha (a savings box can't hold a debt), or an ORPHAN id referenced by
+//     the ledger with no category doc (a cascade delete that left ledger behind
+//     — unrecoverable by the rules, needs manual reconciliation). This DOES fail
+//     the gate. Never auto-clamped, which would hide the inconsistency.
+//
+// The deploy gate (scripts/deploy.sh) aborts on the marker "BALANCE CORRUPTION"
+// only; legitimate debts print without it and pass.
+const debts = [];
+const corruptions = [];
 
 async function backfillUser(uid) {
   const base = db.collection("users").doc(uid);
@@ -75,9 +96,17 @@ async function backfillUser(uid) {
   const account = round2(totalIncome - totalAllocated - accountExpenses);
 
   // One balance per existing category, plus any category id referenced by the
-  // ledger (defensive — should match the category set).
+  // ledger (defensive — should match the category set). catMeta only has an
+  // entry for categories that STILL EXIST; a ledger-only id is an orphan.
   const catBalances = new Map();
-  for (const c of categories.docs) catBalances.set(c.id, 0);
+  const catMeta = new Map();
+  for (const c of categories.docs) {
+    catBalances.set(c.id, 0);
+    catMeta.set(c.id, {
+      kind: c.get("kind") ?? "spend", // legacy null-kind behaves as spend
+      allowNegative: c.get("allowNegative") === true,
+    });
+  }
   for (const a of allocations.docs) {
     const cat = a.get("categoryId");
     if (cat == null) continue;
@@ -92,14 +121,31 @@ async function backfillUser(uid) {
 
   console.log(`user ${uid}: account=${account.toFixed(2)}`);
   if (account < 0) {
-    negatives.push(`user ${uid}: account=${account.toFixed(2)}`);
-    console.warn(`  *** NEGATIVE BALANCE: account=${account.toFixed(2)} ***`);
+    // The general account may never legitimately be negative (no allowNegative
+    // for it anywhere in the rules) -> always corruption.
+    corruptions.push(`user ${uid}: account=${account.toFixed(2)}`);
+    console.error(`  *** BALANCE CORRUPTION: account=${account.toFixed(2)} (the general account may never go negative) ***`);
   }
   for (const [cat, bal] of catBalances) {
     console.log(`  caixinha ${cat}: ${bal.toFixed(2)}`);
-    if (bal < 0) {
-      negatives.push(`user ${uid} / caixinha ${cat}: ${bal.toFixed(2)}`);
-      console.warn(`  *** NEGATIVE BALANCE: caixinha ${cat}=${bal.toFixed(2)} ***`);
+    if (bal >= 0) continue;
+    const meta = catMeta.get(cat);
+    if (meta === undefined) {
+      // Ledger references a category that no longer exists. A cascade delete
+      // should have removed this ledger too; it didn't. The rules can't
+      // re-materialize it (no category doc to read) -> corruption.
+      corruptions.push(`user ${uid} / caixinha ${cat} (no category doc): ${bal.toFixed(2)}`);
+      console.error(`  *** BALANCE CORRUPTION: orphan caixinha ${cat}=${bal.toFixed(2)} (category was deleted but ledger remains) ***`);
+    } else if (meta.kind !== "spend") {
+      // A 'save' caixinha can never hold a debt.
+      corruptions.push(`user ${uid} / caixinha ${cat} (kind=${meta.kind}): ${bal.toFixed(2)}`);
+      console.error(`  *** BALANCE CORRUPTION: ${meta.kind} caixinha ${cat}=${bal.toFixed(2)} (only spend caixinhas may hold a debt) ***`);
+    } else {
+      // Existing spend caixinha: a legitimate debt the rules re-materialize.
+      // The toggle only tells us whether it is still OPEN or FROZEN.
+      const state = meta.allowNegative ? "open, allowNegative on" : "FROZEN, allowNegative off";
+      debts.push(`user ${uid} / caixinha ${cat} (${state}): ${bal.toFixed(2)}`);
+      console.warn(`  open debt (${state}) caixinha ${cat}=${bal.toFixed(2)} — legitimate, not blocking deploy`);
     }
   }
 
@@ -152,9 +198,13 @@ async function main() {
   for (const u of users) {
     await backfillUser(u.id);
   }
-  if (negatives.length > 0) {
-    console.warn(`\n*** ${negatives.length} NEGATIVE BALANCE(S) FOUND — reconcile the ledger before the real run: ***`);
-    for (const n of negatives) console.warn(`  ${n}`);
+  if (debts.length > 0) {
+    console.warn(`\n*** ${debts.length} open caixinha debt(s) — LEGITIMATE (spend caixinha with allowNegative), NOT blocking deploy: ***`);
+    for (const d of debts) console.warn(`  ${d}`);
+  }
+  if (corruptions.length > 0) {
+    console.error(`\n*** ${corruptions.length} BALANCE CORRUPTION(S) — a negative that should not exist. Reconcile the ledger before the real run: ***`);
+    for (const c of corruptions) console.error(`  ${c}`);
   }
   console.log(DRY_RUN ? "Dry run complete — nothing written." : "Backfill complete.");
 }

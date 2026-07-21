@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,10 +42,29 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  /// Whether the currently-selected caixinha refuses a new gasto right now:
+  /// its balance is already negative and it doesn't (or no longer) allow
+  /// that — decision #3, "toggle off + already negative -> block further
+  /// gastos". Checked proactively here so the form disables itself with a
+  /// clear reason instead of letting the user submit and hit the
+  /// `FirestoreService`/`firestore.rules` rejection cold. Always `false` for
+  /// the "Conta" option (the account has no such toggle) and while the
+  /// summary hasn't loaded yet (nothing to block against).
+  bool _blockedByFrozenDebt(List<Category> categories, num? availableBalance) {
+    if (_selection == _accountOption || availableBalance == null) return false;
+    final category = categories.firstWhereOrNull((c) => c.id == _selection);
+    if (category == null) return false;
+    return availableBalance < 0 && !category.allowsNegativeBalance;
+  }
+
+  Future<void> _submit(List<Category> categories, num? availableBalance) async {
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
       setState(() => _error = 'Informe um valor válido.');
+      return;
+    }
+    if (_blockedByFrozenDebt(categories, availableBalance)) {
+      setState(() => _error = 'Essa caixinha está devendo e não permite saldo negativo. Aloque para ela antes de lançar novos gastos.');
       return;
     }
     final firestore = ref.read(firestoreServiceProvider);
@@ -110,6 +130,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final availableBalance = _selection == _accountOption
         ? (summary?.accountBalance ?? 0)
         : (summary?.balancesByCategory[_selection] ?? 0);
+    final blocked = _blockedByFrozenDebt(categories, availableBalance);
     final filterActive = _filterFrom != null || _filterTo != null;
 
     return ListView(
@@ -146,6 +167,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                     width: 140.0,
                     child: TextField(
                       controller: _amountController,
+                      enabled: !blocked,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
                     ),
@@ -160,22 +182,44 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                         const DropdownMenuItem(value: _accountOption, child: Text('Conta')),
                         for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
                       ],
-                      onChanged: (v) => setState(() => _selection = v ?? _accountOption),
+                      onChanged: (v) => setState(() {
+                        _selection = v ?? _accountOption;
+                        _error = null;
+                      }),
                     ),
                   ),
                   (
                     width: 220.0,
                     child: TextField(
                       controller: _descriptionController,
+                      enabled: !blocked,
                       decoration: const InputDecoration(labelText: 'Descrição (opcional)', hintText: 'Ex: supermercado'),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-              Text('Disponível: ${formatCurrency(availableBalance)}', style: TextStyle(fontSize: 12, color: context.tokens.subtle)),
+              Text(
+                'Disponível: ${formatCurrency(availableBalance)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: availableBalance < 0 ? context.tokens.statusCritical : context.tokens.subtle,
+                  fontWeight: availableBalance < 0 ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+              if (blocked)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Essa caixinha está devendo e não permite saldo negativo. Aloque para ela antes de lançar novos gastos, ou ligue "Permitir saldo negativo" na categoria.',
+                    style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
+                  ),
+                ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _submitting ? null : _submit, child: const Text('Lançar gasto')),
+              FilledButton(
+                onPressed: _submitting || blocked ? null : () => _submit(categories, availableBalance),
+                child: const Text('Lançar gasto'),
+              ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),

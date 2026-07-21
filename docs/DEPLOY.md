@@ -36,7 +36,12 @@ hard gates, so a step can't be skipped or reordered by accident:
 1. Interactive confirmation that the manual data backup (Ajustes -> Exportar
    JSON, per real user) was taken. Aborts if not confirmed.
 2. Dry-run backfill (`backfill_balances.mjs --dry-run`); aborts if the output
-   contains `NEGATIVE BALANCE` (must be reconciled in the ledger first).
+   contains the marker `BALANCE CORRUPTION` — a negative balance that should
+   never exist (the general account, a `save` caixinha, or an orphan id). A
+   legitimate open/frozen debt on a `spend` caixinha (the `allowNegative`
+   feature) prints as an "open debt" warning WITHOUT that marker and does
+   NOT block the deploy — see `docs/BACKEND.md`, "Option B residual
+   limitations" for how the script tells the two apart.
 3. Final interactive confirmation before any real writes/deploys.
 4. Real backfill run (idempotent).
 5. Preflight: `backfill_balances.mjs --verify` — confirms every

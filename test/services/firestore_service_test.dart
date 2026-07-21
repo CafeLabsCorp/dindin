@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dindin/models/allocation.dart';
 import 'package:dindin/models/category.dart';
 import 'package:dindin/models/db.dart';
+import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
 import 'package:dindin/services/firestore_service.dart';
@@ -383,6 +384,262 @@ void main() {
     });
   });
 
+  group('allowNegative (caixinha debt) — client-side pre-check parity with catDeltaOk', () {
+    // These exercise `_catDeltaOk` (the client's mirror of `firestore.rules`'
+    // `catDeltaOk`/`catAllowsNeg`) through the public API. They do NOT touch
+    // firestore.rules itself (fake_cloud_firestore doesn't evaluate rules) —
+    // that half of the invariant is covered by test/rules/rules.test.mjs
+    // against the real emulator. Kept here because it's the same real
+    // production code path (`FirestoreService`) and is cheap/fast to run.
+
+    test('createExpense deepens an existing debt when allowNegative is ON', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final cat = await svc.createCategory(
+        name: 'Lazer',
+        recurring: false,
+        kind: CategoryKind.spend,
+        allowNegative: true,
+      );
+      await svc.createAllocation(categoryId: cat.id, amount: 20, date: '2026-01-02');
+      await svc.createExpense(date: '2026-01-03', amount: 50, categoryId: cat.id);
+      expect(await categoryBalance(cat.id), -30); // 20 - 50
+    });
+
+    test('createExpense is refused when allowNegative is OFF and the caixinha is already negative', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final onCat = await svc.createCategory(
+        name: 'Lazer',
+        recurring: false,
+        kind: CategoryKind.spend,
+        allowNegative: true,
+      );
+      await svc.createAllocation(categoryId: onCat.id, amount: 20, date: '2026-01-02');
+      await svc.createExpense(date: '2026-01-03', amount: 50, categoryId: onCat.id); // -> -30
+      // Freeze the debt: toggle allowNegative back off (allowed per the docs
+      // even while negative — it just refuses to deepen further from here).
+      await svc.updateCategory(onCat.id, allowNegative: false);
+
+      expect(
+        () => svc.createExpense(date: '2026-01-04', amount: 1, categoryId: onCat.id),
+        throwsA(isA<StateError>()),
+      );
+      expect(await categoryBalance(onCat.id), -30); // unchanged by the rejected attempt
+    });
+
+    test('allocation that only partially pays down a frozen debt (still negative) is allowed', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 200, source: IncomeSource.freela);
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      // Manufacture a debt directly on the balance doc, mirroring a caixinha
+      // that was allowNegative:true, went negative, then got toggled off.
+      await fake.doc('users/u1/balances/${cat.id}').set({'balance': -50.0});
+
+      await svc.createAllocation(categoryId: cat.id, amount: 20, date: '2026-01-02');
+      expect(await categoryBalance(cat.id), -30); // -50 + 20, delta >= 0 -> allowed even off+negative
+    });
+
+    test('paying a frozen debt back to >= 0 unblocks normal expenses again', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 200, source: IncomeSource.freela);
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      await fake.doc('users/u1/balances/${cat.id}').set({'balance': -30.0});
+
+      await svc.createAllocation(categoryId: cat.id, amount: 40, date: '2026-01-02');
+      expect(await categoryBalance(cat.id), 10);
+
+      await svc.createExpense(date: '2026-01-03', amount: 5, categoryId: cat.id);
+      expect(await categoryBalance(cat.id), 5); // back to ordinary non-negative gating
+    });
+
+    test('a `save` caixinha cannot go negative even with allowNegative:true stored on it', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final cat = await svc.createCategory(
+        name: 'Reserva',
+        recurring: false,
+        kind: CategoryKind.save,
+        allowNegative: true, // meaningless for `save`, per Category.allowsNegativeBalance
+      );
+      await svc.createAllocation(categoryId: cat.id, amount: 10, date: '2026-01-02');
+      expect(
+        () => svc.createExpense(date: '2026-01-03', amount: 20, categoryId: cat.id),
+        throwsA(isA<StateError>()),
+      );
+      expect(await categoryBalance(cat.id), 10); // unchanged
+    });
+
+    test('createTransfer out of an allowNegative source can deepen its debt', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final origem = await svc.createCategory(
+        name: 'Casa',
+        recurring: true,
+        kind: CategoryKind.spend,
+        allowNegative: true,
+      );
+      final destino = await svc.createCategory(name: 'Lazer', recurring: false);
+      await svc.createAllocation(categoryId: origem.id, amount: 10, date: '2026-01-02');
+
+      await svc.createTransfer(
+        fromCategoryId: origem.id,
+        toCategoryId: destino.id,
+        amount: 25,
+        date: '2026-01-03',
+      );
+      expect(await categoryBalance(origem.id), -15); // 10 - 25
+      expect(await categoryBalance(destino.id), 25);
+    });
+
+    test('createTransfer out of a NON-eligible source that would go negative is refused', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final origem = await svc.createCategory(name: 'Casa', recurring: true); // allowNegative unset -> off
+      final destino = await svc.createCategory(name: 'Lazer', recurring: false);
+      await svc.createAllocation(categoryId: origem.id, amount: 10, date: '2026-01-02');
+
+      expect(
+        () => svc.createTransfer(
+          fromCategoryId: origem.id,
+          toCategoryId: destino.id,
+          amount: 25,
+          date: '2026-01-03',
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(await categoryBalance(origem.id), 10); // unchanged
+    });
+  });
+
+  group('updateCategory / deleteCategory: catDebtFree guard (spend->save conversion & delete)', () {
+    // Mirrors firestore.rules' `catDebtFree` + `convertsSpendToSave`,
+    // exercised at the client/service layer (see test/rules/rules.test.mjs
+    // for the server-side half of this same invariant).
+
+    test('updateCategory throws a StateError with "settle the debt" converting spend->save while the balance is negative', () async {
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      await fake.doc('users/u1/balances/${cat.id}').set({'balance': -10.0});
+
+      await expectLater(
+        () => svc.updateCategory(cat.id, kind: CategoryKind.save),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('settle the debt'),
+          ),
+        ),
+      );
+      // The category is left untouched (still spend) by the rejected attempt.
+      final snap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(Category.fromMap(cat.id, snap.data()!).effectiveKind, CategoryKind.spend);
+    });
+
+    test('updateCategory allows converting spend->save when the balance is exactly 0', () async {
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      // balance doc is already 0 from createCategory.
+      await svc.updateCategory(cat.id, kind: CategoryKind.save);
+      final snap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(Category.fromMap(cat.id, snap.data()!).effectiveKind, CategoryKind.save);
+    });
+
+    test('updateCategory allows converting spend->save when the balance is positive', () async {
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      await fake.doc('users/u1/balances/${cat.id}').set({'balance': 30.0});
+      await svc.updateCategory(cat.id, kind: CategoryKind.save);
+      final snap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(Category.fromMap(cat.id, snap.data()!).effectiveKind, CategoryKind.save);
+    });
+
+    test('updateCategory allows non-conversion edits on an indebted spend caixinha (rename, budget, allowNegative toggle)', () async {
+      final cat = await svc.createCategory(
+        name: 'Lazer',
+        recurring: false,
+        kind: CategoryKind.spend,
+        allowNegative: true,
+      );
+      await fake.doc('users/u1/balances/${cat.id}').set({'balance': -20.0});
+
+      // None of these are a spend->save conversion, so the debt never blocks them.
+      await svc.updateCategory(cat.id, name: 'Novo nome');
+      await svc.updateCategory(cat.id, monthlyBudget: 100);
+      await svc.updateCategory(cat.id, allowNegative: false); // freeze the debt
+      await svc.updateCategory(cat.id, allowNegative: true); // unfreeze it again
+
+      final snap = await fake.doc('users/u1/categories/${cat.id}').get();
+      final updated = Category.fromMap(cat.id, snap.data()!);
+      expect(updated.name, 'Novo nome');
+      expect(updated.monthlyBudget, 100);
+      expect(updated.allowNegative, isTrue);
+      expect(updated.effectiveKind, CategoryKind.spend); // never converted
+    });
+
+    test('updateCategory allows save->spend conversion regardless of balance (the guard only applies to the other direction)', () async {
+      final cat = await svc.createCategory(name: 'Reserva', recurring: false, kind: CategoryKind.save);
+      // A 'save' caixinha's balance is never negative in practice, but the
+      // guard's short-circuit (before.kind == 'spend') means it wouldn't
+      // matter even if it were.
+      await svc.updateCategory(cat.id, kind: CategoryKind.spend);
+      final snap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(Category.fromMap(cat.id, snap.data()!).effectiveKind, CategoryKind.spend);
+    });
+
+    test('deleteCategory throws a StateError with "settle the debt" when the balance is negative, leaving every doc untouched', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final cat = await svc.createCategory(
+        name: 'Lazer',
+        recurring: false,
+        kind: CategoryKind.spend,
+        allowNegative: true,
+      );
+      final alloc = await svc.createAllocation(categoryId: cat.id, amount: 20, date: '2026-01-02');
+      await svc.createExpense(date: '2026-01-03', amount: 50, categoryId: cat.id); // -> balance -30
+
+      await expectLater(
+        () => svc.deleteCategory(cat.id),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('settle the debt'),
+          ),
+        ),
+      );
+
+      // Nothing was mutated: the transaction aborted atomically.
+      final catSnap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(catSnap.exists, isTrue);
+      final balSnap = await fake.doc('users/u1/balances/${cat.id}').get();
+      expect((balSnap.data()!['balance'] as num).toDouble(), -30);
+      final allocSnap = await fake.doc('users/u1/allocations/${alloc.id}').get();
+      expect(allocSnap.exists, isTrue);
+      final expsSnap = await fake
+          .collection('users/u1/expenses')
+          .where('categoryId', isEqualTo: cat.id)
+          .get();
+      expect(expsSnap.docs, hasLength(1));
+      expect(await accountBalance(), 80); // 100 - 20, untouched by the rejected delete
+    });
+
+    test('deleteCategory succeeds and cascades normally when the balance is exactly 0', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      await svc.createAllocation(categoryId: cat.id, amount: 30, date: '2026-01-02');
+      await svc.createExpense(date: '2026-01-03', amount: 30, categoryId: cat.id); // balance exactly 0
+
+      await svc.deleteCategory(cat.id);
+
+      final catSnap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(catSnap.exists, isFalse);
+    });
+
+    test('deleteCategory succeeds when the balance doc was never created (a missing doc reads as debt-free)', () async {
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false, kind: CategoryKind.spend);
+      // createCategory creates a zeroed balance doc alongside it; delete it
+      // directly to simulate the doc being genuinely absent.
+      await fake.doc('users/u1/balances/${cat.id}').delete();
+
+      await svc.deleteCategory(cat.id);
+
+      final catSnap = await fake.doc('users/u1/categories/${cat.id}').get();
+      expect(catSnap.exists, isFalse);
+    });
+  });
+
   group('replaceAll (JSON restore)', () {
     test('wipes existing data and rebuilds balance docs from the imported ledger', () async {
       // Pre-existing data that must be fully wiped by the restore.
@@ -440,5 +697,188 @@ void main() {
       expect(db.allocations, isEmpty);
       expect(await accountBalance(), 0);
     });
+
+    // -- F1 fix: step-0 pre-validation + frozen-debt genesis re-materialization --
+
+    test(
+      'restoring a backup where a spend caixinha has a frozen (allowNegative '
+      'OFF) debt completes fully and materializes the negative balance doc',
+      () async {
+        const debtCategory = Category(
+          id: 'c1',
+          name: 'Lazer',
+          recurring: false,
+          createdAt: '2026-01-01',
+          kind: CategoryKind.spend,
+          allowNegative: false, // frozen: toggle off, but the debt survives restore
+        );
+        const income = Income(
+          id: 'i1',
+          date: '2026-01-01',
+          amount: 100,
+          source: IncomeSource.freela,
+        );
+        const allocation = Allocation(
+          id: 'a1',
+          categoryId: 'c1',
+          amount: 30,
+          date: '2026-01-02',
+        );
+        const expense = Expense(
+          id: 'e1',
+          date: '2026-01-03',
+          amount: 80, // 30 allocated - 80 spent = -50 (the frozen debt)
+          categoryId: 'c1',
+        );
+        final backup = AppDb(
+          categories: const [debtCategory],
+          incomes: const [income],
+          allocations: const [allocation],
+          expenses: const [expense],
+        );
+
+        await svc.replaceAll(backup);
+
+        // Nothing partial: the full ledger is present...
+        final db = await svc.fetchAll();
+        expect(db.categories.map((c) => c.id), ['c1']);
+        expect(db.incomes.single.id, 'i1');
+        expect(db.allocations.single.id, 'a1');
+        expect(db.expenses.single.id, 'e1');
+        // ...and the frozen debt is materialized as a negative balance doc.
+        expect(await categoryBalance('c1'), -50);
+        expect(await accountBalance(), 100 - 30); // 70, untouched by the debt
+      },
+    );
+
+    test(
+      "restoring a backup where a 'save' caixinha sums negative throws at "
+      'step 0 and leaves the database completely untouched (no partial restore)',
+      () async {
+        // Pre-existing data that must survive intact if the restore is refused.
+        await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
+        final existingCat = await svc.createCategory(name: 'old', recurring: false);
+
+        const saveCategory = Category(
+          id: 'c1',
+          name: 'Reserva',
+          recurring: false,
+          createdAt: '2026-01-01',
+          kind: CategoryKind.save,
+        );
+        const allocation = Allocation(
+          id: 'a1',
+          categoryId: 'c1',
+          amount: 30,
+          date: '2026-01-02',
+        );
+        const expense = Expense(
+          id: 'e1',
+          date: '2026-01-03',
+          amount: 80, // 30 - 80 = -50: a 'save' caixinha may never hold a debt
+          categoryId: 'c1',
+        );
+        final badBackup = AppDb(
+          categories: const [saveCategory],
+          incomes: const [],
+          allocations: const [allocation],
+          expenses: const [expense],
+        );
+
+        await expectLater(
+          () => svc.replaceAll(badBackup),
+          throwsA(isA<StateError>()),
+        );
+
+        // Nothing was mutated: the pre-existing data is exactly as it was.
+        final db = await svc.fetchAll();
+        expect(db.categories.map((c) => c.id), [existingCat.id]);
+        expect(db.incomes.single.amount, 500);
+        expect(await accountBalance(), 500);
+      },
+    );
+
+    test(
+      'restoring a backup where the account itself would be negative throws '
+      'at step 0 and leaves the database completely untouched',
+      () async {
+        await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
+
+        const income = Income(
+          id: 'i1',
+          date: '2026-01-01',
+          amount: 100,
+          source: IncomeSource.freela,
+        );
+        const expense = Expense(
+          id: 'e1',
+          date: '2026-01-02',
+          amount: 300, // 100 - 300 = -200: the account may never go negative
+        );
+        final badBackup = AppDb(
+          categories: const [],
+          incomes: const [income],
+          allocations: const [],
+          expenses: const [expense],
+        );
+
+        await expectLater(
+          () => svc.replaceAll(badBackup),
+          throwsA(isA<StateError>()),
+        );
+
+        final db = await svc.fetchAll();
+        expect(db.incomes.single.amount, 500); // untouched pre-existing data
+      },
+    );
+
+    test(
+      'restoring a backup with an orphan negative in the ledger (an '
+      'allocation/expense referencing a categoryId absent from db.categories) '
+      'succeeds, writes no balance doc for the orphan, and keeps the ledger intact',
+      () async {
+        const income = Income(
+          id: 'i1',
+          date: '2026-01-01',
+          amount: 100,
+          source: IncomeSource.freela,
+        );
+        // 'ghost' is never listed in db.categories — an orphan id, as if a
+        // category delete had left ledger docs behind (defect 2's scenario).
+        const orphanAllocation = Allocation(
+          id: 'a1',
+          categoryId: 'ghost',
+          amount: 30,
+          date: '2026-01-02',
+        );
+        const orphanExpense = Expense(
+          id: 'e1',
+          date: '2026-01-03',
+          amount: 80, // 30 - 80 = -50, negative, but 'ghost' has no category doc
+          categoryId: 'ghost',
+        );
+        final backup = AppDb(
+          categories: const [], // no category for 'ghost'
+          incomes: const [income],
+          allocations: const [orphanAllocation],
+          expenses: const [orphanExpense],
+        );
+
+        await svc.replaceAll(backup);
+
+        // Ledger is written intact (the orphan docs themselves are restored)...
+        final db = await svc.fetchAll();
+        expect(db.allocations.single.categoryId, 'ghost');
+        expect(db.expenses.single.categoryId, 'ghost');
+        // ...but no balances/ghost doc was written for the orphan (step 4 skips
+        // any categoryId not in db.categories) — reading it must find nothing.
+        final orphanBalanceSnap = await fake.doc('users/u1/balances/ghost').get();
+        expect(orphanBalanceSnap.exists, isFalse);
+        // The account balance still subtracts the allocation (accountBalance
+        // sums ALL allocations regardless of whether the category still
+        // exists — only the CAIXINHA balance doc is skipped for the orphan).
+        expect(await accountBalance(), 100 - 30); // 70
+      },
+    );
   });
 }

@@ -368,6 +368,15 @@ current source of truth for exact behavior):
 - **A caixinha's purpose (`kind`) changes which meter it gets, not its
   underlying money model** — see `docs/ARQUITETURA.md` for how `spend`/`save`
   map to `monthlyBudget`/`goalAmount`.
+- **Debt ("dívida") gets no new visual language, on purpose.**
+  `CaixinhaDebtIndicator` (a `spend` caixinha's negative running balance, only
+  reachable via the "Permitir saldo negativo" toggle — see `docs/BACKEND.md`,
+  "allowNegative") reuses `CaixinhaBudgetBar`'s existing "acima do limite"
+  treatment: plain bold `statusCritical` text ("Devendo R$ X"), no bar or
+  badge, no new color token. It renders independently of, and alongside, the
+  monthly-budget bar — one tracks this month's spend against a soft limit,
+  the other tracks the all-time running balance, and a caixinha can be in
+  either state (or both) regardless of the other.
 
 The exact per-screen entry points, dialogs, and empty/loading/error states
 are implemented in `lib/features/**` and `lib/widgets/edit_transaction_sheet.dart`,

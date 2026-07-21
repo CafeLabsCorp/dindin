@@ -18,6 +18,10 @@ String friendlyErrorMessage(Object error) {
       message.contains('moving')) {
     return 'Essa alteração não é suportada — remova e lance de novo.';
   }
+  if (message.contains('settle the debt')) {
+    return 'Quite a dívida dessa caixinha (saldo de volta a zero) antes de '
+        'convertê-la em cofrinho ou removê-la.';
+  }
   if (message.contains('exceeds') || message.contains('overdraw')) {
     return 'Esse valor ultrapassa o saldo disponível.';
   }

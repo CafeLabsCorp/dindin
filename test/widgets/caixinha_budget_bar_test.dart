@@ -46,4 +46,28 @@ void main() {
     final indicator = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
     expect(indicator.value, 1.0); // nunca passa de 100% de largura
   });
+
+  group('CaixinhaDebtIndicator', () {
+    Future<void> pumpDebt(WidgetTester tester, {required double balance}) {
+      return tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: CaixinhaDebtIndicator(balance: balance)),
+        ),
+      );
+    }
+
+    testWidgets('saldo negativo: mostra "Devendo" com o valor em módulo', (tester) async {
+      await pumpDebt(tester, balance: -42.5);
+      expect(find.text('Devendo ${formatCurrency(42.5)}'), findsOneWidget);
+    });
+
+    testWidgets('saldo zero ou positivo: não renderiza nada', (tester) async {
+      await pumpDebt(tester, balance: 0);
+      expect(find.textContaining('Devendo'), findsNothing);
+
+      await pumpDebt(tester, balance: 10);
+      expect(find.textContaining('Devendo'), findsNothing);
+    });
+  });
 }

@@ -177,7 +177,8 @@ class DashboardPage extends ConsumerWidget {
                             Text(
                               formatCurrency(caixinhas[i].value),
                               style: TextStyle(
-                                color: context.tokens.muted,
+                                color: caixinhas[i].value < 0 ? context.tokens.statusCritical : context.tokens.muted,
+                                fontWeight: caixinhas[i].value < 0 ? FontWeight.w600 : FontWeight.w400,
                                 fontFeatures: const [FontFeature.tabularFigures()],
                               ),
                             ),
@@ -189,9 +190,19 @@ class DashboardPage extends ConsumerWidget {
                         ] else if (caixinhas[i].kind == CategoryKind.save) ...[
                           const SizedBox(height: 4),
                           CaixinhaSavedThisMonth(savedThisMonth: caixinhas[i].savedThisMonth),
-                        ] else if (caixinhas[i].monthlyBudget != null) ...[
-                          const SizedBox(height: 8),
-                          CaixinhaBudgetBar(spent: caixinhas[i].spentThisMonth, limit: caixinhas[i].monthlyBudget!),
+                        ] else ...[
+                          // Spend caixinha: budget bar (month vs. limit) and
+                          // debt indicator (all-time balance) are independent
+                          // facts and can both show at once — see the
+                          // Categorias list for the same pairing.
+                          if (caixinhas[i].monthlyBudget != null) ...[
+                            const SizedBox(height: 8),
+                            CaixinhaBudgetBar(spent: caixinhas[i].spentThisMonth, limit: caixinhas[i].monthlyBudget!),
+                          ],
+                          if (caixinhas[i].value < 0) ...[
+                            const SizedBox(height: 4),
+                            CaixinhaDebtIndicator(balance: caixinhas[i].value),
+                          ],
                         ],
                       ],
                     ),

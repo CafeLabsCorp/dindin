@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +8,7 @@ import '../models/expense.dart';
 import '../models/income.dart';
 import '../models/income_source.dart';
 import '../providers/providers.dart';
+import '../theme/theme.dart';
 import '../utils/errors.dart';
 import '../utils/format.dart';
 import '../utils/income_source_labels.dart';
@@ -168,6 +170,21 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
     EditableAllocation() => 'Editar alocação',
   };
 
+  /// Non-null when [categoryId] is a spend caixinha that's currently in debt
+  /// and doesn't allow it — the same "toggle off + already negative" state
+  /// `GastosPage` blocks new gastos for (decision #3). Editing here can only
+  /// ever REDUCE the amount in that case (which pays the debt down, always
+  /// allowed); increasing it hits the same `FirestoreService`/rules check a
+  /// new gasto would. `ref.read` (not `.watch`): a one-off snapshot read is
+  /// enough for a short-lived edit sheet and avoids reading through the
+  /// `WidgetRef` captured from the caller's build outside its own build scope.
+  Category? _frozenDebtCategory(String categoryId) {
+    final category = widget.categories.firstWhereOrNull((c) => c.id == categoryId);
+    if (category == null || category.allowsNegativeBalance) return null;
+    final balance = widget.ref.read(summaryProvider)?.balancesByCategory[categoryId] ?? 0;
+    return balance < 0 ? category : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = widget.transaction;
@@ -258,6 +275,14 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
             child: Text(
               'Não é possível mudar a caixinha por aqui — remova e lance de novo.',
               style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline),
+            ),
+          ),
+        if (t is EditableExpense && t.expense.categoryId != null && _frozenDebtCategory(t.expense.categoryId!) != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Essa caixinha está devendo e não permite saldo negativo — só é possível reduzir o valor, não aumentá-lo.',
+              style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
             ),
           ),
         if (_error != null)

@@ -7,7 +7,9 @@
 #   1. Human confirms the manual data backup was taken (Ajustes -> Exportar
 #      JSON, for every real user) — this is the only rollback for user data.
 #   2. Dry-run the balance backfill and refuse to continue if it reports any
-#      NEGATIVE BALANCE (must be reconciled in the ledger first).
+#      BALANCE CORRUPTION — a negative that should never exist (the account, a
+#      'save' caixinha, or an orphan id). A legitimate open/frozen debt on an
+#      allowNegative spend caixinha is a supported state and does NOT block.
 #   3. Final human confirmation.
 #   4. Real backfill run (idempotent, safe to re-run).
 #   5. Preflight: verify every /users/{uid} has a meta/account doc — if the
@@ -76,14 +78,18 @@ confirm "Have you already done this backup for every real user?" \
 
 log "Step 2/6 — backfill dry run"
 DRY_RUN_LOG="$(mktemp)"
-( cd "$SCRIPTS_DIR" && node backfill_balances.mjs --dry-run ) | tee "$DRY_RUN_LOG"
+( cd "$SCRIPTS_DIR" && node backfill_balances.mjs --dry-run ) 2>&1 | tee "$DRY_RUN_LOG"
 
-if grep -q "NEGATIVE BALANCE" "$DRY_RUN_LOG"; then
+# Only BALANCE CORRUPTION aborts (a negative that should never exist: the
+# account, a 'save' caixinha, or an orphan). A legitimate open/frozen debt on a
+# spend caixinha with allowNegative is a supported state — the dry run prints it
+# as an "open debt" warning WITHOUT this marker, so it does not block the deploy.
+if grep -q "BALANCE CORRUPTION" "$DRY_RUN_LOG"; then
   rm -f "$DRY_RUN_LOG"
-  die "Dry run reported a NEGATIVE BALANCE (see output above). Reconcile the affected ledger(s) before deploying — do not proceed."
+  die "Dry run reported a BALANCE CORRUPTION (see output above). Reconcile the affected ledger(s) before deploying — do not proceed."
 fi
 rm -f "$DRY_RUN_LOG"
-log "Dry run clean — no negative balances."
+log "Dry run clean — no balance corruption (legitimate open debts, if any, are fine)."
 
 # --- 3. final confirmation ---------------------------------------------------
 
