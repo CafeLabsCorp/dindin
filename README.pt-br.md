@@ -33,7 +33,7 @@ seguindo o idioma do dispositivo).
 ```
 lib/
   main.dart / app.dart   # bootstrap, tema, rotas (go_router)
-  theme/                 # identidade visual "Envelope caloroso" — ver docs/DESIGN.md
+  theme/                 # identidade visual "Envelope caloroso" — ver docs/DESIGN.pt-br.md
   l10n/                   # ARB (app_pt.arb template, app_en.arb)
   models/                # Category, Income, Allocation, Expense
   providers/             # providers Riverpod (inclui localeProvider)
@@ -44,7 +44,7 @@ functions/               # Cloud Functions — INATIVO, ver functions/README.md
 ```
 
 Detalhamento por arquivo, o fluxo de dados (Riverpod → agregação → UI) e o
-schema completo do Firestore estão em `docs/ARQUITETURA.md`.
+schema completo do Firestore estão em `docs/ARQUITETURA.pt-br.md`.
 
 ## Rodando localmente
 
@@ -67,8 +67,8 @@ firebase deploy --only hosting --project dindin-cafelabs
 
 Para qualquer mudança que toque regras/schema/balances, use
 `scripts/deploy.sh` em vez disso — ele encapsula o backup + backfill + verify
-+ deploy de rules/hosting na ordem obrigatória. Ver `docs/DEPLOY.md` (rollback
-e detalhes) e `docs/BACKEND.md` (por que essa ordem é obrigatória).
++ deploy de rules/hosting na ordem obrigatória. Ver `docs/DEPLOY.pt-br.md` (rollback
+e detalhes) e `docs/BACKEND.pt-br.md` (por que essa ordem é obrigatória).
 
 CI (`.github/workflows/ci.yml`) roda `flutter analyze`, `flutter test` e os
 testes de rules no emulador em todo push pra `main` — não faz deploy.
@@ -83,10 +83,10 @@ dados entre contas/ambientes.
 
 ## Documentação
 
-- `docs/ARQUITETURA.md` — camadas, fluxo de dados/estado, schema completo do
+- `docs/ARQUITETURA.pt-br.md` — camadas, fluxo de dados/estado, schema completo do
   Firestore, decisões técnicas e por quê.
-- `docs/DESIGN.md` — identidade visual "Envelope caloroso": paleta, tipografia,
+- `docs/DESIGN.pt-br.md` — identidade visual "Envelope caloroso": paleta, tipografia,
   espaçamento.
-- `docs/DEPLOY.md` — CI, deploy e rollback.
-- `docs/BACKEND.md` — modelo de integridade de dinheiro (saldos denormalizados,
+- `docs/DEPLOY.pt-br.md` — CI, deploy e rollback.
+- `docs/BACKEND.pt-br.md` — modelo de integridade de dinheiro (saldos denormalizados,
   Firestore Security Rules).
