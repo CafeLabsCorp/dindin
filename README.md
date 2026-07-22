@@ -1,86 +1,92 @@
 # dindin
 
-Um produto [Café Labs](https://cafelabs.net).
+**[Leia em Português](README.pt-br.md)**
 
-App pessoal de controle financeiro por "caixinhas": receitas entram e ficam
-como saldo da conta até serem alocadas numa caixinha; os gastos saem de uma
-caixinha (ou direto da conta). Cada caixinha tem um propósito — **gastar**
-(com limite mensal opcional) ou **guardar** (com meta de poupança opcional) —
-e dá pra transferir dinheiro entre caixinhas. Uma caixinha de gastar pode,
-opcionalmente, permitir saldo negativo (uma "dívida" que a próxima alocação
-quita automaticamente).
+A [Café Labs](https://cafelabs.net) product.
 
-Flutter multiplataforma (Web, Android, alvo Windows) com Firebase como backend.
+Personal finance app organized around "envelopes" (caixinhas): income comes
+in and sits as account balance until it's allocated to an envelope; expenses
+come out of an envelope (or straight from the account). Each envelope has a
+purpose — **spend** (with an optional monthly limit) or **save** (with an
+optional savings goal) — and money can be transferred between envelopes. A
+spending envelope can optionally allow a negative balance (a "debt" that the
+next allocation automatically settles).
+
+Cross-platform Flutter (Web, Android, Windows target) with Firebase as the
+backend. UI defaults to Portuguese, with English available (Settings →
+Language, or following the device's locale).
 
 ## Stack
 
-| Camada | Escolha |
+| Layer | Choice |
 |---|---|
 | Framework | Flutter (stable) |
-| Estado | Riverpod (`flutter_riverpod`) |
-| Roteamento | `go_router` |
-| Gráficos | `fl_chart` |
-| Datas/moeda | `intl` (`pt_BR` / BRL) |
-| Backend | Firebase (Auth + Firestore), projeto `dindin-cafelabs` |
+| State | Riverpod (`flutter_riverpod`) |
+| Routing | `go_router` |
+| Charts | `fl_chart` |
+| Dates/currency | `intl` (`pt_BR` / BRL) |
+| i18n | `flutter_localizations` + ARB (PT template, EN) |
+| Backend | Firebase (Auth + Firestore), project `dindin-cafelabs` |
 
-## Estrutura (visão geral)
+## Structure (overview)
 
 ```
 lib/
-  main.dart / app.dart   # bootstrap, tema, rotas (go_router)
-  theme/                 # identidade visual "Envelope caloroso" — ver docs/DESIGN.md
+  main.dart / app.dart   # bootstrap, theme, routes (go_router)
+  theme/                 # "Warm Envelope" visual identity — see docs/DESIGN.md
+  l10n/                   # ARB (app_pt.arb template, app_en.arb)
   models/                # Category, Income, Allocation, Expense
-  providers/             # providers Riverpod
-  services/              # auth, CRUD no Firestore, agregações, import/export
-  features/              # uma pasta por tela (dashboard, receitas, gastos, categorias, ajustes, auth)
-  widgets/                # componentes compartilhados
-functions/               # Cloud Functions — INATIVO, ver functions/README.md
+  providers/             # Riverpod providers (includes localeProvider)
+  services/              # auth, Firestore CRUD, aggregations, import/export
+  features/              # one folder per screen (dashboard, income, expenses, categories, settings, auth)
+  widgets/                # shared components
+functions/               # Cloud Functions — INACTIVE, see functions/README.md
 ```
 
-Detalhamento por arquivo, o fluxo de dados (Riverpod → agregação → UI) e o
-schema completo do Firestore estão em `docs/ARQUITETURA.md`.
+Per-file breakdown, the data flow (Riverpod → aggregation → UI), and the
+full Firestore schema are in `docs/ARQUITETURA.md`.
 
-## Rodando localmente
+## Running locally
 
 ```bash
 flutter pub get
 flutter run -d chrome      # Web
 flutter run -d windows     # Windows desktop
-flutter run                # Android (emulador/dispositivo conectado)
+flutter run                # Android (connected emulator/device)
 ```
 
-## Build e deploy
+## Build and deploy
 
-Para uma mudança só de UI (sem tocar `firestore.rules`, índices ou o schema
-das balances), o fluxo manual de sempre continua valendo:
+For a UI-only change (not touching `firestore.rules`, indexes, or the
+balances schema), the usual manual flow still applies:
 
 ```bash
 flutter build web
 firebase deploy --only hosting --project dindin-cafelabs
 ```
 
-Para qualquer mudança que toque regras/schema/balances, use
-`scripts/deploy.sh` em vez disso — ele encapsula o backup + backfill + verify
-+ deploy de rules/hosting na ordem obrigatória. Ver `docs/DEPLOY.md` (rollback
-e detalhes) e `docs/BACKEND.md` (por que essa ordem é obrigatória).
+For any change touching rules/schema/balances, use `scripts/deploy.sh`
+instead — it wraps backup + backfill + verify + rules/hosting deploy in the
+required order. See `docs/DEPLOY.md` (rollback and details) and
+`docs/BACKEND.md` (why that order is required).
 
-CI (`.github/workflows/ci.yml`) roda `flutter analyze`, `flutter test` e os
-testes de rules no emulador em todo push pra `main` — não faz deploy.
+CI (`.github/workflows/ci.yml`) runs `flutter analyze`, `flutter test`, and
+the rules tests on the emulator on every push to `main` — it does not deploy.
 
-Web publicado em https://dindin-cafelabs.web.app.
+Web deployed at https://dindin-cafelabs.web.app.
 
 ## Backup/restore
 
-Em Ajustes, dá pra exportar todos os dados do usuário pra um `.json` e importar de
-volta (substitui os dados atuais) — útil tanto como backup manual quanto para migrar
-dados entre contas/ambientes.
+In Settings, all user data can be exported to a `.json` and imported back
+(replaces current data) — useful both as a manual backup and for migrating
+data between accounts/environments.
 
-## Documentação
+## Documentation
 
-- `docs/ARQUITETURA.md` — camadas, fluxo de dados/estado, schema completo do
-  Firestore, decisões técnicas e por quê.
-- `docs/DESIGN.md` — identidade visual "Envelope caloroso": paleta, tipografia,
-  espaçamento.
-- `docs/DEPLOY.md` — CI, deploy e rollback.
-- `docs/BACKEND.md` — modelo de integridade de dinheiro (saldos denormalizados,
+- `docs/ARQUITETURA.md` — layers, data/state flow, full Firestore schema,
+  technical decisions and why.
+- `docs/DESIGN.md` — "Warm Envelope" visual identity: palette, typography,
+  spacing.
+- `docs/DEPLOY.md` — CI, deploy, and rollback.
+- `docs/BACKEND.md` — money integrity model (denormalized balances,
   Firestore Security Rules).
