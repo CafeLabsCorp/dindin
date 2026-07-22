@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:dindin/features/categorias/categorias_page.dart';
+import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/models/allocation.dart';
 import 'package:dindin/models/category.dart';
 import 'package:dindin/models/expense.dart';
@@ -40,7 +41,13 @@ void main() {
           incomesProvider.overrideWith((ref) => Stream.value(<Income>[])),
           allocationsProvider.overrideWith((ref) => Stream.value(allocations)),
         ],
-        child: MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: CategoriasPage())),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: CategoriasPage()),
+        ),
       ),
     );
   }

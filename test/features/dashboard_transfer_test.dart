@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:dindin/features/dashboard/dashboard_page.dart';
+import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/models/allocation.dart';
 import 'package:dindin/models/category.dart';
 import 'package:dindin/models/expense.dart';
@@ -34,7 +35,13 @@ void main() {
           incomesProvider.overrideWith((ref) => Stream.value(<Income>[])),
           expensesProvider.overrideWith((ref) => Stream.value(<Expense>[])),
         ],
-        child: MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: DashboardPage())),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: DashboardPage()),
+        ),
       ),
     );
   }

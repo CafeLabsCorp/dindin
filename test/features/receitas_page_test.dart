@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:dindin/features/receitas/receitas_page.dart';
+import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
 import 'package:dindin/providers/providers.dart';
@@ -26,7 +27,13 @@ void main() {
     return tester.pumpWidget(
       ProviderScope(
         overrides: [incomesProvider.overrideWith((ref) => Stream.value(incomes))],
-        child: MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: ReceitasPage())),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: ReceitasPage()),
+        ),
       ),
     );
   }
