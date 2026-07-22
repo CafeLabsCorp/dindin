@@ -1,5 +1,7 @@
 # Deploy, CI, and rollback
 
+**[Leia em Português](DEPLOY.pt-br.md)**
+
 Operational guide for a solo maintainer running/debugging Dindin's deploy
 without rebuilding context. Read `docs/BACKEND.md` first for *why* the deploy
 order is what it is — this file is the *how*, plus CI and rollback.

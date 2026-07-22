@@ -1,5 +1,7 @@
 # Backend / data-integrity notes
 
+**[Leia em Português](BACKEND.pt-br.md)**
+
 Operational reference for Dindin's Firestore backend. Read this before any
 deploy that touches `firestore.rules`, `firestore.indexes.json`, or `functions/`.
 
