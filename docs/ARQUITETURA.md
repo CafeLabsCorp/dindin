@@ -233,7 +233,10 @@ schema — an old JSON backup without them still imports unchanged.
 per screen), `services/*_test.dart` (incl. `aggregation_service_test.dart`
 for the money math, which is pure and easy to test in isolation),
 `models/db_json_test.dart` (JSON backup round-trip), `utils/*_test.dart`,
-`widgets/*_test.dart`, and `test/rules/rules.test.mjs` (the Firestore rules
-against the emulator — the only way to exercise the `getAfter()`/
-genesis-teardown paths, which don't run from Dart). See `docs/DEPLOY.md` for
-how this runs in CI.
+`widgets/*_test.dart`, and `test/rules/` — a standalone Node harness (not
+part of the Flutter/pubspec tree) with two files run together via `npm test`:
+`rules.test.mjs` (the Firestore rules against the emulator — the only way to
+exercise the `getAfter()`/genesis-teardown paths, which don't run from Dart)
+and `backfill.test.mjs` (regression coverage for
+`scripts/backfill_balances.mjs`'s debt-vs-corruption classification, run as a
+real subprocess). See `docs/DEPLOY.md` for how this runs in CI.

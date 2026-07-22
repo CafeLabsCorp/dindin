@@ -16,11 +16,14 @@ free tier (public/private repo, this volume of pushes — nowhere near the
   Platform-agnostic (no Android/Windows packaging here — that's a separate
   backlog item).
 - **`rules`** — spins up the Firestore emulator (`firebase-tools
-  emulators:exec`) and runs `test/rules/rules.test.mjs` against it (13 tests
-  covering the Phase-2 money-integrity rules, including the
-  `getAfter()`/null-teardown paths that can't be exercised from Dart). Uses
-  the emulator only — never touches production, needs no project
-  credentials.
+  emulators:exec`) and runs `npm test` in `test/rules/`, which is
+  `rules.test.mjs` (Security Rules — Phase-2 money-integrity, including the
+  `getAfter()`/null-teardown paths that can't be exercised from Dart; dozens
+  of cases across 8 `describe` blocks) **and** `backfill.test.mjs`
+  (`scripts/backfill_balances.mjs`'s legitimate-debt-vs-corruption
+  classification, run as a real subprocess against the same emulator), both
+  in one pass. Uses the emulator only — never touches production, needs no
+  project credentials.
 
 CI does **not** deploy anything. It's a safety net for the code; shipping to
 production is still the deliberate manual action below.
