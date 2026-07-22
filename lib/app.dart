@@ -10,6 +10,7 @@ import 'features/gastos/gastos_page.dart';
 import 'features/receitas/receitas_page.dart';
 import 'features/settings/settings_page.dart';
 import 'l10n/app_localizations.dart';
+import 'providers/locale_provider.dart';
 import 'providers/providers.dart';
 import 'theme/theme.dart';
 import 'widgets/app_shell.dart';
@@ -57,9 +58,11 @@ class _DindinAppState extends ConsumerState<DindinApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      // No explicit `locale:` override — AppLocalizations resolves from the
-      // device's locale, falling back to pt (this product's Portuguese-first
-      // default) when unsupported. See l10n.yaml's preferred-supported-locales.
+      // localeProvider is null by default ("follow system") — pt is what
+      // AppLocalizations falls back to when the system locale isn't
+      // supported (see l10n.yaml), matching the product's Portuguese-first
+      // copy. An explicit choice from Ajustes overrides this.
+      locale: ref.watch(localeProvider),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

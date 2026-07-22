@@ -163,6 +163,8 @@
     "placeholders": { "error": { "type": "String" } }
   },
   "footerBrand": "Dindin — um produto Café Labs",
+  "languageSectionLabel": "Idioma",
+  "languageSystemOption": "Sistema",
 
   "editIncomeTitle": "Editar receita",
   "editExpenseTitle": "Editar gasto",
