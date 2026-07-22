@@ -19,6 +19,7 @@ import 'package:dindin/models/db.dart';
 import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
+import 'package:dindin/models/subscription.dart';
 import 'package:dindin/services/firestore_service.dart';
 
 void main() {
@@ -206,6 +207,158 @@ void main() {
       final expense = await svc.createExpense(date: '2026-01-02', amount: 100);
       await svc.deleteExpense(expense.id);
       expect(await accountBalance(), 500);
+    });
+  });
+
+  group('subscriptions', () {
+    Future<void> seed(Subscription subscription) =>
+        fake.doc('users/u1/subscriptions/${subscription.id}').set(subscription.toMap());
+
+    Future<List<Expense>> expenses() async {
+      final snap = await fake.collection('users/u1/expenses').get();
+      return snap.docs.map((d) => Expense.fromMap(d.id, d.data())).toList();
+    }
+
+    Future<Subscription?> subscription(String id) async {
+      final snap = await fake.doc('users/u1/subscriptions/$id').get();
+      final data = snap.data();
+      return data == null ? null : Subscription.fromMap(id, data);
+    }
+
+    test('createSubscription creates the doc with the given fields', () async {
+      final sub = await svc.createSubscription(name: 'Netflix', amount: 39.9, dueDay: 5);
+      expect(sub.name, 'Netflix');
+      expect(sub.amount, 39.9);
+      expect(sub.dueDay, 5);
+      expect(sub.lastChargedDate, isNull);
+      final stored = await subscription(sub.id);
+      expect(stored, isNotNull);
+    });
+
+    test('createSubscription rejects a non-positive amount', () {
+      expect(
+        () => svc.createSubscription(name: 'Netflix', amount: 0, dueDay: 5),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('createSubscription rejects a dueDay outside 1-31', () {
+      expect(
+        () => svc.createSubscription(name: 'Netflix', amount: 10, dueDay: 32),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        () => svc.createSubscription(name: 'Netflix', amount: 10, dueDay: 0),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('deleteSubscription removes the doc', () async {
+      final sub = await svc.createSubscription(name: 'Netflix', amount: 10, dueDay: 5);
+      await svc.deleteSubscription(sub.id);
+      expect(await subscription(sub.id), isNull);
+    });
+
+    group('catchUpSubscriptions', () {
+      test('charges once for a due date that has already passed', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        final exps = await expenses();
+        expect(exps, hasLength(1));
+        expect(exps.single.date, '2026-01-05');
+        expect(exps.single.amount, 40);
+        expect(exps.single.description, 'Netflix');
+        expect(exps.single.categoryId, isNull);
+        expect(await accountBalance(), 60); // 100 - 40
+        expect((await subscription('s1'))!.lastChargedDate, '2026-01-05');
+      });
+
+      test('does not double-charge a due date already caught up', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await svc.catchUpSubscriptions();
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), hasLength(1));
+        expect(await accountBalance(), 60);
+      });
+
+      test('catches up several missed months in order, oldest first', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 15));
+        await svc.createIncome(date: '2025-11-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 10, createdAt: '2025-11-01'),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
+        expect(exps.map((e) => e.date), ['2025-11-10', '2025-12-10', '2026-01-10']);
+        expect(await accountBalance(), 1000 - 3 * 40);
+        expect((await subscription('s1'))!.lastChargedDate, '2026-01-10');
+      });
+
+      test('does not backdate a charge to before the subscription was created', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 2, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          // Registered Jan 20th, due day 5th: January's occurrence (Jan 5) is
+          // before creation and must be skipped; only February's counts.
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-20'),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        final exps = await expenses();
+        expect(exps, hasLength(1));
+        expect(exps.single.date, '2026-02-05');
+      });
+
+      test('stops without overdrawing the account when balance is insufficient, and retries later', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 30, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), isEmpty);
+        expect(await accountBalance(), 30); // untouched by the failed attempt
+        expect((await subscription('s1'))!.lastChargedDate, isNull);
+
+        // Balance catches up -> the pending January charge goes through.
+        await svc.createIncome(date: '2026-01-11', amount: 20, source: IncomeSource.freela);
+        await svc.catchUpSubscriptions();
+
+        final exps = await expenses();
+        expect(exps, hasLength(1));
+        expect(exps.single.date, '2026-01-05');
+        expect(await accountBalance(), 10); // 50 - 40
+      });
+
+      test('clamps dueDay 31 to the last day of a shorter month (Feb 28 in a non-leap year)', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 1));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Aluguel', amount: 40, dueDay: 31, createdAt: '2026-01-01'),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
+        expect(exps.map((e) => e.date), ['2026-01-31', '2026-02-28']);
+      });
     });
   });
 
