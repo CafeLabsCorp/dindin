@@ -1,0 +1,217 @@
+{
+  "@@locale": "pt",
+
+  "cancel": "Cancelar",
+  "save": "Salvar",
+  "add": "Adicionar",
+  "remove": "Remover",
+  "confirm": "Confirmar",
+  "dateLabel": "Data",
+  "amountLabel": "Valor",
+  "amountHint": "0,00",
+  "descriptionOptionalLabel": "Descrição (opcional)",
+  "filterFromLabel": "De",
+  "filterToLabel": "Até",
+  "clearFilterButton": "Limpar filtro",
+  "accountLabel": "Conta",
+  "caixinhaLabel": "Caixinha",
+  "removedCategoryLabel": "categoria removida",
+  "invalidAmountError": "Informe um valor válido.",
+  "genericErrorPrefix": "Erro: {error}",
+  "@genericErrorPrefix": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "authCreateAccountTitle": "Criar conta",
+  "authSignInTitle": "Entrar",
+  "emailLabel": "E-mail",
+  "emailInvalidError": "E-mail inválido",
+  "passwordLabel": "Senha",
+  "passwordMinLengthError": "Mínimo 6 caracteres",
+  "haveAccountToggle": "Já tenho conta",
+  "createAccountToggle": "Criar uma conta",
+  "signInWithGoogle": "Entrar com Google",
+
+  "dashboardTitle": "Dashboard",
+  "dashboardSubtitle": "Visão geral da conta e do mês atual.",
+  "totalBalanceLabel": "Saldo total",
+  "accountBalanceDescription": "Dinheiro recebido e ainda não alocado em nenhuma caixinha.",
+  "allocateButton": "Alocar",
+  "receivedThisMonthLabel": "Recebido este mês",
+  "spentThisMonthLabel": "Gasto este mês",
+  "monthBalanceLabel": "Saldo do mês",
+  "caixinhasTitle": "Caixinhas",
+  "transferButton": "Transferir",
+  "caixinhasEmptyState": "Crie categorias e aloque receitas para ver suas caixinhas aqui.",
+  "sinceDatePrefix": "desde {date}",
+  "@sinceDatePrefix": {
+    "placeholders": { "date": { "type": "String" } }
+  },
+  "historyTitle": "Histórico mensal — recebido x gasto",
+  "historyEmptyState": "Lance receitas e gastos para ver o histórico por mês.",
+  "allocateDialogTitle": "Alocar pra caixinha",
+  "availableInAccountLabel": "Disponível na conta: {amount}",
+  "@availableInAccountLabel": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "transferDialogTitle": "Transferir entre caixinhas",
+  "availableAtOriginLabel": "Disponível na origem: {amount}",
+  "@availableAtOriginLabel": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "transferOriginLabel": "Origem",
+  "transferDestinationLabel": "Destino",
+  "originDestinationMustDifferError": "Origem e destino precisam ser diferentes.",
+  "receivedLegend": "Recebido",
+  "spentLegend": "Gasto",
+
+  "gastosTitle": "Gastos",
+  "gastosSubtitle": "Registre uma saída direto da conta ou de uma caixinha específica.",
+  "frozenDebtBlockShort": "Essa caixinha está devendo e não permite saldo negativo. Aloque para ela antes de lançar novos gastos.",
+  "frozenDebtBlockLong": "Essa caixinha está devendo e não permite saldo negativo. Aloque para ela antes de lançar novos gastos, ou ligue \"Permitir saldo negativo\" na categoria.",
+  "expenseSourceLabel": "De onde sai",
+  "expenseDescriptionHint": "Ex: supermercado",
+  "availableLabel": "Disponível: {amount}",
+  "@availableLabel": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "submitExpenseButton": "Lançar gasto",
+  "expensesListTitle": "Gastos lançados",
+  "expensesEmptyState": "Nenhum gasto lançado ainda.",
+  "expensesEmptyFilteredRange": "Nenhum gasto entre {from} e {to}.",
+  "@expensesEmptyFilteredRange": {
+    "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
+  },
+  "expensesEmptyFilteredFrom": "Nenhum gasto a partir de {from}.",
+  "@expensesEmptyFilteredFrom": {
+    "placeholders": { "from": { "type": "String" } }
+  },
+  "expensesEmptyFilteredTo": "Nenhum gasto até {to}.",
+  "@expensesEmptyFilteredTo": {
+    "placeholders": { "to": { "type": "String" } }
+  },
+  "removeExpenseConfirmTitle": "Remover esse gasto?",
+  "removeExpenseTooltip": "Remover gasto",
+
+  "receitasTitle": "Receitas",
+  "receitasSubtitle": "Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\naloque em caixinhas quando quiser, no Dashboard.",
+  "incomeSourceFieldLabel": "Origem",
+  "incomeDescriptionHint": "Ex: salário julho",
+  "submitIncomeButton": "Lançar receita",
+  "incomesListTitle": "Receitas lançadas",
+  "incomesEmptyState": "Nenhuma receita lançada ainda.",
+  "incomesEmptyFilteredRange": "Nenhuma receita entre {from} e {to}.",
+  "@incomesEmptyFilteredRange": {
+    "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
+  },
+  "incomesEmptyFilteredFrom": "Nenhuma receita a partir de {from}.",
+  "@incomesEmptyFilteredFrom": {
+    "placeholders": { "from": { "type": "String" } }
+  },
+  "incomesEmptyFilteredTo": "Nenhuma receita até {to}.",
+  "@incomesEmptyFilteredTo": {
+    "placeholders": { "to": { "type": "String" } }
+  },
+  "removeIncomeConfirmTitle": "Remover receita?",
+  "removeIncomeTooltip": "Remover receita",
+
+  "categoriasTitle": "Categorias",
+  "categoriasSubtitle": "Cada categoria vira uma caixinha onde você guarda dinheiro todo mês.",
+  "invalidBudgetOrBlankError": "Informe um limite válido ou deixe em branco.",
+  "invalidGoalOrBlankError": "Informe uma meta válida ou deixe em branco.",
+  "removeCategoryTitle": "Remover categoria?",
+  "removeCategoryBody": "Isso também apaga alocações e gastos ligados a ela.",
+  "categoryNameLabel": "Nome da categoria",
+  "categoryNameHint": "Ex: Aluguel, Mercado...",
+  "kindSaveOption": "Guardar",
+  "kindSpendOption": "Gastar",
+  "kindSaveDescription": "Cofrinho: dinheiro que você junta (viagem, reserva, projeto).",
+  "kindSpendDescription": "Envelope: dinheiro que você separa pra gastar no mês.",
+  "monthlyBudgetLabel": "Limite mensal de gasto (opcional)",
+  "goalAmountLabel": "Meta de valor (opcional)",
+  "goalAmountHint": "Ex: 5000,00",
+  "allowNegativeLabel": "Permitir saldo negativo",
+  "allowNegativeDescription": "Um gasto pode deixar essa caixinha devendo. A próxima alocação quita a dívida automaticamente.",
+  "recurringLabel": "Recorrente (repete todo mês)",
+  "categoriesEmptyState": "Nenhuma categoria ainda. Crie a primeira acima.",
+  "recurringChip": "Recorrente",
+  "oneTimeChip": "Pontual",
+  "deleteBlockedByDebtTooltip": "Quite a dívida dessa caixinha (saldo de volta a zero) antes de removê-la",
+  "removeCategoryTooltip": "Remover categoria",
+  "editCategoryTitle": "Editar categoria",
+  "nameRequiredError": "Informe um nome.",
+  "debtBlocksSaveConversion": "Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho.",
+
+  "settingsTitle": "Ajustes",
+  "settingsSubtitle": "Conta, backup e restauração de dados.",
+  "signOutButton": "Sair",
+  "backupSectionLabel": "Backup",
+  "backupDescription": "Exporte seus dados para um arquivo .json, ou importe um backup (substitui os dados atuais).",
+  "exportBackupButton": "Exportar backup",
+  "importBackupButton": "Importar backup",
+  "importConfirmTitle": "Importar backup?",
+  "importConfirmBody": "Isso substitui todos os dados atuais pelos dados do arquivo escolhido.",
+  "importAction": "Importar",
+  "exportSuccessMessage": "Backup exportado.",
+  "importSuccessMessage": "Backup importado.",
+  "exportErrorMessage": "Erro ao exportar: {error}",
+  "@exportErrorMessage": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "importErrorMessage": "Erro ao importar: {error}",
+  "@importErrorMessage": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "footerBrand": "Dindin — um produto Café Labs",
+
+  "editIncomeTitle": "Editar receita",
+  "editExpenseTitle": "Editar gasto",
+  "editAllocationTitle": "Editar alocação",
+  "cannotChangeCaixinhaNote": "Não é possível mudar a caixinha por aqui — remova e lance de novo.",
+  "frozenDebtEditNote": "Essa caixinha está devendo e não permite saldo negativo — só é possível reduzir o valor, não aumentá-lo.",
+
+  "budgetSpentOfLimit": "Gasto: {spent} de {limit} este mês",
+  "@budgetSpentOfLimit": {
+    "placeholders": { "spent": { "type": "String" }, "limit": { "type": "String" } }
+  },
+  "budgetOverLimit": "+{over} acima do limite",
+  "@budgetOverLimit": {
+    "placeholders": { "over": { "type": "String" } }
+  },
+  "goalReached": "Meta atingida: {saved} de {goal} guardados",
+  "@goalReached": {
+    "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" } }
+  },
+  "goalProgress": "{saved} de {goal} guardados ({pct}%)",
+  "@goalProgress": {
+    "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" }, "pct": { "type": "String" } }
+  },
+  "savedThisMonthPositive": "Guardou +{amount} este mês",
+  "@savedThisMonthPositive": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "savedThisMonthNegative": "Retirou {amount} este mês",
+  "@savedThisMonthNegative": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "debtIndicator": "Devendo {amount}",
+  "@debtIndicator": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+
+  "navDashboard": "Dashboard",
+  "navReceitas": "Receitas",
+  "navGastos": "Gastos",
+  "navCategorias": "Categorias",
+  "navAjustes": "Ajustes",
+
+  "errorNotFound": "Esse lançamento não existe mais.",
+  "errorUnsupportedEdit": "Essa alteração não é suportada — remova e lance de novo.",
+  "errorSettleDebt": "Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho ou removê-la.",
+  "errorExceedsBalance": "Esse valor ultrapassa o saldo disponível.",
+  "errorGenericSave": "Não foi possível salvar. Tente novamente.",
+
+  "incomeSourceEstagio": "Estágio",
+  "incomeSourceFreela": "Freela",
+  "incomeSourceOutro": "Outro"
+}

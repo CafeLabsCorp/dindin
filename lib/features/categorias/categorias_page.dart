@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
@@ -37,6 +38,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
     double? budget;
@@ -46,9 +48,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
       if (budgetText.isNotEmpty) {
         budget = double.tryParse(budgetText.replaceAll(',', '.'));
         if (budget == null || budget <= 0) {
-          setState(
-            () => _error = 'Informe um limite válido ou deixe em branco.',
-          );
+          setState(() => _error = l10n.invalidBudgetOrBlankError);
           return;
         }
       }
@@ -57,9 +57,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
       if (goalText.isNotEmpty) {
         goal = double.tryParse(goalText.replaceAll(',', '.'));
         if (goal == null || goal <= 0) {
-          setState(
-            () => _error = 'Informe uma meta válida ou deixe em branco.',
-          );
+          setState(() => _error = l10n.invalidGoalOrBlankError);
           return;
         }
       }
@@ -87,28 +85,28 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
         _allowNegative = false;
       });
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   Future<void> _delete(String id) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover categoria?'),
-        content: const Text(
-          'Isso também apaga alocações e gastos ligados a ela.',
-        ),
+        title: Text(l10n.removeCategoryTitle),
+        content: Text(l10n.removeCategoryBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remover'),
+            child: Text(l10n.remove),
           ),
         ],
       ),
@@ -126,7 +124,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e))));
+      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(l10n, e))));
     }
   }
 
@@ -139,6 +137,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final categoriesAsync = ref.watch(categoriesProvider);
     final summary = ref.watch(summaryProvider);
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -146,14 +145,14 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     return ListView(
       children: [
         Text(
-          'Categorias',
+          l10n.categoriasTitle,
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
         Text(
-          'Cada categoria vira uma caixinha onde você guarda dinheiro todo mês.',
+          l10n.categoriasSubtitle,
           style: TextStyle(color: context.tokens.muted),
         ),
         const SizedBox(height: 24),
@@ -167,31 +166,31 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                   Expanded(
                     child: TextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome da categoria',
-                        hintText: 'Ex: Aluguel, Mercado...',
+                      decoration: InputDecoration(
+                        labelText: l10n.categoryNameLabel,
+                        hintText: l10n.categoryNameHint,
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   FilledButton(
                     onPressed: _submitting ? null : _submit,
-                    child: const Text('Adicionar'),
+                    child: Text(l10n.add),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               SegmentedButton<CategoryKind>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: CategoryKind.save,
-                    label: Text('Guardar'),
-                    icon: Icon(Icons.savings_outlined),
+                    label: Text(l10n.kindSaveOption),
+                    icon: const Icon(Icons.savings_outlined),
                   ),
                   ButtonSegment(
                     value: CategoryKind.spend,
-                    label: Text('Gastar'),
-                    icon: Icon(Icons.shopping_bag_outlined),
+                    label: Text(l10n.kindSpendOption),
+                    icon: const Icon(Icons.shopping_bag_outlined),
                   ),
                 ],
                 selected: {_kind},
@@ -201,9 +200,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                _kind == CategoryKind.save
-                    ? 'Cofrinho: dinheiro que você junta (viagem, reserva, projeto).'
-                    : 'Envelope: dinheiro que você separa pra gastar no mês.',
+                _kind == CategoryKind.save ? l10n.kindSaveDescription : l10n.kindSpendDescription,
                 style: TextStyle(fontSize: 12, color: context.tokens.subtle),
               ),
               const SizedBox(height: 12),
@@ -213,9 +210,9 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Limite mensal de gasto (opcional)',
-                    hintText: '0,00',
+                  decoration: InputDecoration(
+                    labelText: l10n.monthlyBudgetLabel,
+                    hintText: l10n.amountHint,
                   ),
                 )
               else
@@ -224,9 +221,9 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Meta de valor (opcional)',
-                    hintText: 'Ex: 5000,00',
+                  decoration: InputDecoration(
+                    labelText: l10n.goalAmountLabel,
+                    hintText: l10n.goalAmountHint,
                   ),
                 ),
               if (_kind == CategoryKind.spend) ...[
@@ -235,10 +232,8 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                   onChanged: _submitting
                       ? null
                       : (v) => setState(() => _allowNegative = v),
-                  title: const Text('Permitir saldo negativo'),
-                  subtitle: const Text(
-                    'Um gasto pode deixar essa caixinha devendo. A próxima alocação quita a dívida automaticamente.',
-                  ),
+                  title: Text(l10n.allowNegativeLabel),
+                  subtitle: Text(l10n.allowNegativeDescription),
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -246,7 +241,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
               CheckboxListTile(
                 value: _recurring,
                 onChanged: (v) => setState(() => _recurring = v ?? true),
-                title: const Text('Recorrente (repete todo mês)'),
+                title: Text(l10n.recurringLabel),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -268,9 +263,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
           child: categoriesAsync.when(
             data: (categories) {
               if (categories.isEmpty) {
-                return const EmptyState(
-                  'Nenhuma categoria ainda. Crie a primeira acima.',
-                );
+                return EmptyState(l10n.categoriesEmptyState);
               }
               return Column(
                 children: [
@@ -323,7 +316,8 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                                             ),
                                           ),
                                           Text(
-                                            '${categories[i].recurring ? 'Recorrente' : 'Pontual'} · desde ${formatDate(categories[i].createdAt)}',
+                                            '${categories[i].recurring ? l10n.recurringChip : l10n.oneTimeChip} · '
+                                            '${l10n.sinceDatePrefix(formatDate(categories[i].createdAt))}',
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: context.tokens.subtle,
@@ -338,8 +332,8 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                                           : () => _delete(categories[i].id),
                                       icon: const Icon(Icons.delete_outline),
                                       tooltip: hasUnsettledDebt
-                                          ? 'Quite a dívida dessa caixinha (saldo de volta a zero) antes de removê-la'
-                                          : 'Remover categoria',
+                                          ? l10n.deleteBlockedByDebtTooltip
+                                          : l10n.removeCategoryTooltip,
                                       color: hasUnsettledDebt
                                           ? null
                                           : Theme.of(context).colorScheme.error,
@@ -411,7 +405,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Erro: $e'),
+            error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
           ),
         ),
       ],
@@ -477,9 +471,10 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Informe um nome.');
+      setState(() => _error = l10n.nameRequiredError);
       return;
     }
     double? budget;
@@ -489,9 +484,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
       if (budgetText.isNotEmpty) {
         budget = double.tryParse(budgetText.replaceAll(',', '.'));
         if (budget == null || budget <= 0) {
-          setState(
-            () => _error = 'Informe um limite válido ou deixe em branco.',
-          );
+          setState(() => _error = l10n.invalidBudgetOrBlankError);
           return;
         }
       }
@@ -500,9 +493,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
       if (goalText.isNotEmpty) {
         goal = double.tryParse(goalText.replaceAll(',', '.'));
         if (goal == null || goal <= 0) {
-          setState(
-            () => _error = 'Informe uma meta válida ou deixe em branco.',
-          );
+          setState(() => _error = l10n.invalidGoalOrBlankError);
           return;
         }
       }
@@ -527,7 +518,8 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _error = friendlyErrorMessage(e));
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -535,26 +527,28 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Editar categoria',
+          l10n.editCategoryTitle,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _nameController,
           enabled: !_submitting,
-          decoration: const InputDecoration(labelText: 'Nome da categoria'),
+          decoration: InputDecoration(labelText: l10n.categoryNameLabel),
         ),
         const SizedBox(height: 12),
         SegmentedButton<CategoryKind>(
           segments: [
             ButtonSegment(
               value: CategoryKind.save,
-              label: const Text('Guardar'),
+              label: Text(l10n.kindSaveOption),
               icon: const Icon(Icons.savings_outlined),
               // Proactive guard (mirrors `catDebtFree` in
               // `FirestoreService.updateCategory`): converting a caixinha
@@ -563,10 +557,10 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
               // instead of letting the user pick it and hit the error.
               enabled: !_hasUnsettledDebt,
             ),
-            const ButtonSegment(
+            ButtonSegment(
               value: CategoryKind.spend,
-              label: Text('Gastar'),
-              icon: Icon(Icons.shopping_bag_outlined),
+              label: Text(l10n.kindSpendOption),
+              icon: const Icon(Icons.shopping_bag_outlined),
             ),
           ],
           selected: {_kind},
@@ -578,7 +572,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              'Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho.',
+              l10n.debtBlocksSaveConversion,
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.error,
@@ -592,9 +586,9 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
             controller: _monthlyBudgetController,
             enabled: !_submitting,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Limite mensal de gasto (opcional)',
-              hintText: '0,00',
+            decoration: InputDecoration(
+              labelText: l10n.monthlyBudgetLabel,
+              hintText: l10n.amountHint,
             ),
           )
         else
@@ -602,9 +596,9 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
             controller: _goalController,
             enabled: !_submitting,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Meta de valor (opcional)',
-              hintText: 'Ex: 5000,00',
+            decoration: InputDecoration(
+              labelText: l10n.goalAmountLabel,
+              hintText: l10n.goalAmountHint,
             ),
           ),
         if (_kind == CategoryKind.spend)
@@ -613,10 +607,8 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
             onChanged: _submitting
                 ? null
                 : (v) => setState(() => _allowNegative = v),
-            title: const Text('Permitir saldo negativo'),
-            subtitle: const Text(
-              'Um gasto pode deixar essa caixinha devendo. A próxima alocação quita a dívida automaticamente.',
-            ),
+            title: Text(l10n.allowNegativeLabel),
+            subtitle: Text(l10n.allowNegativeDescription),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
           ),
@@ -625,7 +617,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           onChanged: _submitting
               ? null
               : (v) => setState(() => _recurring = v ?? true),
-          title: const Text('Recorrente (repete todo mês)'),
+          title: Text(l10n.recurringLabel),
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
         ),
@@ -643,7 +635,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           children: [
             TextButton(
               onPressed: _submitting ? null : () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+              child: Text(l10n.cancel),
             ),
             const SizedBox(width: 8),
             FilledButton(
@@ -657,7 +649,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
                         color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     )
-                  : const Text('Salvar'),
+                  : Text(l10n.save),
             ),
           ],
         ),

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
-const _destinations = [
-  (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: 'Dashboard'),
-  (icon: Icons.arrow_downward, selectedIcon: Icons.arrow_downward, label: 'Receitas'),
-  (icon: Icons.arrow_upward, selectedIcon: Icons.arrow_upward, label: 'Gastos'),
-  (icon: Icons.category_outlined, selectedIcon: Icons.category, label: 'Categorias'),
-  (icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: 'Ajustes'),
+import '../l10n/app_localizations.dart';
+
+List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLocalizations l10n) => [
+  (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: l10n.navDashboard),
+  (icon: Icons.arrow_downward, selectedIcon: Icons.arrow_downward, label: l10n.navReceitas),
+  (icon: Icons.arrow_upward, selectedIcon: Icons.arrow_upward, label: l10n.navGastos),
+  (icon: Icons.category_outlined, selectedIcon: Icons.category, label: l10n.navCategorias),
+  (icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: l10n.navAjustes),
 ];
 
 /// App-wide nav: bottom bar on narrow (mobile) screens, a side rail on wide
@@ -19,6 +21,8 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final destinations = _destinations(l10n);
     final wide = MediaQuery.sizeOf(context).width >= 720;
 
     if (wide) {
@@ -34,7 +38,7 @@ class AppShell extends StatelessWidget {
                 child: SvgPicture.asset('assets/logo.svg', height: 32),
               ),
               destinations: [
-                for (final d in _destinations)
+                for (final d in destinations)
                   NavigationRailDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: Text(d.label)),
               ],
             ),
@@ -58,7 +62,7 @@ class AppShell extends StatelessWidget {
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (i) => navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
         destinations: [
-          for (final d in _destinations)
+          for (final d in destinations)
             NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: d.label),
         ],
       ),

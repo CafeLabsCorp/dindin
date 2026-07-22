@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,6 +9,7 @@ import 'features/dashboard/dashboard_page.dart';
 import 'features/gastos/gastos_page.dart';
 import 'features/receitas/receitas_page.dart';
 import 'features/settings/settings_page.dart';
+import 'l10n/app_localizations.dart';
 import 'providers/providers.dart';
 import 'theme/theme.dart';
 import 'widgets/app_shell.dart';
@@ -55,6 +57,16 @@ class _DindinAppState extends ConsumerState<DindinApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      // No explicit `locale:` override — AppLocalizations resolves from the
+      // device's locale, falling back to pt (this product's Portuguese-first
+      // default) when unsupported. See l10n.yaml's preferred-supported-locales.
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: _router,
     );
   }

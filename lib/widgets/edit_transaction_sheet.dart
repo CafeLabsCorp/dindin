@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/allocation.dart';
 import '../models/category.dart';
 import '../models/expense.dart';
@@ -111,9 +112,10 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
-      setState(() => _error = 'Informe um valor válido.');
+      setState(() => _error = l10n.invalidAmountError);
       return;
     }
     final firestore = widget.ref.read(firestoreServiceProvider);
@@ -151,7 +153,8 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
       }
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      final friendly = friendlyErrorMessage(e);
+      if (!mounted) return;
+      final friendly = friendlyErrorMessage(l10n, e);
       setState(() => _error = friendly);
       if (isGoneError(e) && !_closing) {
         _closing = true;
@@ -164,10 +167,10 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
     }
   }
 
-  String _title(EditableTransaction t) => switch (t) {
-    EditableIncome() => 'Editar receita',
-    EditableExpense() => 'Editar gasto',
-    EditableAllocation() => 'Editar alocação',
+  String _title(AppLocalizations l10n, EditableTransaction t) => switch (t) {
+    EditableIncome() => l10n.editIncomeTitle,
+    EditableExpense() => l10n.editExpenseTitle,
+    EditableAllocation() => l10n.editAllocationTitle,
   };
 
   /// Non-null when [categoryId] is a spend caixinha that's currently in debt
@@ -187,6 +190,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final t = widget.transaction;
     final categoryName = {for (final c in widget.categories) c.id: c.name};
 
@@ -194,7 +198,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_title(t), style: Theme.of(context).textTheme.titleMedium),
+        Text(_title(l10n, t), style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 16),
         ResponsiveFormRow(
           fields: [
@@ -213,7 +217,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
                         if (picked != null) setState(() => _date = picked);
                       },
                 child: InputDecorator(
-                  decoration: const InputDecoration(labelText: 'Data'),
+                  decoration: InputDecoration(labelText: l10n.dateLabel),
                   child: Text(formatDate(isoDateFrom(_date))),
                 ),
               ),
@@ -224,7 +228,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
                 controller: _amountController,
                 enabled: !_submitting,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Valor', hintText: '0,00'),
+                decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
               ),
             ),
             if (t is EditableIncome)
@@ -233,9 +237,10 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
                 child: DropdownButtonFormField<IncomeSource>(
                   initialValue: _source,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Origem'),
+                  decoration: InputDecoration(labelText: l10n.incomeSourceFieldLabel),
                   items: [
-                    for (final s in incomeSourceOptions) DropdownMenuItem(value: s.value, child: Text(s.label)),
+                    for (final s in incomeSourceValues)
+                      DropdownMenuItem(value: s, child: Text(incomeSourceLabel(l10n, s))),
                   ],
                   onChanged: _submitting ? null : (v) => setState(() => _source = v ?? _source),
                 ),
@@ -244,18 +249,18 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
               (
                 width: 200.0,
                 child: _ReadOnlyField(
-                  label: 'De onde sai',
+                  label: l10n.expenseSourceLabel,
                   value: t.expense.categoryId == null
-                      ? 'Conta'
-                      : (categoryName[t.expense.categoryId] ?? 'categoria removida'),
+                      ? l10n.accountLabel
+                      : (categoryName[t.expense.categoryId] ?? l10n.removedCategoryLabel),
                 ),
               ),
             if (t is EditableAllocation)
               (
                 width: 200.0,
                 child: _ReadOnlyField(
-                  label: 'Caixinha',
-                  value: categoryName[t.allocation.categoryId] ?? 'categoria removida',
+                  label: l10n.caixinhaLabel,
+                  value: categoryName[t.allocation.categoryId] ?? l10n.removedCategoryLabel,
                 ),
               ),
             if (t is! EditableAllocation)
@@ -264,7 +269,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
                 child: TextField(
                   controller: _descriptionController,
                   enabled: !_submitting,
-                  decoration: const InputDecoration(labelText: 'Descrição (opcional)'),
+                  decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel),
                 ),
               ),
           ],
@@ -273,7 +278,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              'Não é possível mudar a caixinha por aqui — remova e lance de novo.',
+              l10n.cannotChangeCaixinhaNote,
               style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline),
             ),
           ),
@@ -281,7 +286,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              'Essa caixinha está devendo e não permite saldo negativo — só é possível reduzir o valor, não aumentá-lo.',
+              l10n.frozenDebtEditNote,
               style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
             ),
           ),
@@ -294,7 +299,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton(onPressed: _submitting ? null : () => Navigator.pop(context), child: const Text('Cancelar')),
+            TextButton(onPressed: _submitting ? null : () => Navigator.pop(context), child: Text(l10n.cancel)),
             const SizedBox(width: 8),
             FilledButton(
               onPressed: _submitting ? null : _submit,
@@ -307,7 +312,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
                         color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     )
-                  : const Text('Salvar'),
+                  : Text(l10n.save),
             ),
           ],
         ),

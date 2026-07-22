@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../theme/theme.dart';
 import '../utils/format.dart';
 
@@ -18,6 +19,7 @@ class CaixinhaBudgetBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // `spent` is always a sum of non-negative expense amounts for the current
     // month (see `MonthSummary.expenseByCategory`) — it tracks monthly
     // consumption against the soft budget, which is a different number from
@@ -52,14 +54,14 @@ class CaixinhaBudgetBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Gasto: ${formatCurrency(safeSpent)} de ${formatCurrency(limit)} este mês',
+          l10n.budgetSpentOfLimit(formatCurrency(safeSpent), formatCurrency(limit)),
           style: TextStyle(fontSize: 12, color: context.tokens.subtle),
         ),
         if (ratio > 1)
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              '+${formatCurrency(over)} acima do limite',
+              l10n.budgetOverLimit(formatCurrency(over)),
               style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
             ),
           ),
@@ -81,6 +83,7 @@ class CaixinhaGoalBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final ratio = goal <= 0 ? 0.0 : saved / goal;
     final reached = ratio >= 1;
     final pct = (ratio * 100).clamp(0, 999).toStringAsFixed(0);
@@ -101,8 +104,8 @@ class CaixinhaGoalBar extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           reached
-              ? 'Meta atingida: ${formatCurrency(saved)} de ${formatCurrency(goal)} guardados'
-              : '${formatCurrency(saved)} de ${formatCurrency(goal)} guardados ($pct%)',
+              ? l10n.goalReached(formatCurrency(saved), formatCurrency(goal))
+              : l10n.goalProgress(formatCurrency(saved), formatCurrency(goal), pct),
           style: TextStyle(
             fontSize: 12,
             color: reached ? context.tokens.statusGood : context.tokens.subtle,
@@ -125,11 +128,12 @@ class CaixinhaSavedThisMonth extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (savedThisMonth == 0) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     final positive = savedThisMonth > 0;
     return Text(
       positive
-          ? 'Guardou +${formatCurrency(savedThisMonth)} este mês'
-          : 'Retirou ${formatCurrency(-savedThisMonth)} este mês',
+          ? l10n.savedThisMonthPositive(formatCurrency(savedThisMonth))
+          : l10n.savedThisMonthNegative(formatCurrency(-savedThisMonth)),
       style: TextStyle(
         fontSize: 12,
         color: positive ? context.tokens.statusGood : context.tokens.subtle,
@@ -159,8 +163,9 @@ class CaixinhaDebtIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (balance >= 0) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     return Text(
-      'Devendo ${formatCurrency(-balance)}',
+      l10n.debtIndicator(formatCurrency(-balance)),
       style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
     );
   }
