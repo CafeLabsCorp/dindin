@@ -233,7 +233,10 @@ alterações.
 por tela), `services/*_test.dart` (incl. `aggregation_service_test.dart` para
 a matemática de dinheiro, que é pura e fácil de testar isoladamente),
 `models/db_json_test.dart` (round-trip do backup JSON), `utils/*_test.dart`,
-`widgets/*_test.dart`, e `test/rules/rules.test.mjs` (as regras do Firestore
-contra o emulador — o único jeito de exercitar os caminhos `getAfter()`/
-genesis-teardown, que não rodam a partir do Dart). Ver `docs/DEPLOY.pt-br.md` para
-como isso roda em CI.
+`widgets/*_test.dart`, e `test/rules/` — um harness Node standalone (fora da
+árvore Flutter/pubspec) com dois arquivos rodados juntos via `npm test`:
+`rules.test.mjs` (as regras do Firestore contra o emulador — o único jeito de
+exercitar os caminhos `getAfter()`/genesis-teardown, que não rodam a partir
+do Dart) e `backfill.test.mjs` (cobertura de regressão pra classificação de
+dívida-vs-corrupção do `scripts/backfill_balances.mjs`, rodado como
+subprocesso real). Ver `docs/DEPLOY.pt-br.md` para como isso roda em CI.

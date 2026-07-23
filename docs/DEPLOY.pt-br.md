@@ -16,11 +16,14 @@ longe dos 2.000 minutos grátis/mês):
   Agnóstico de plataforma (sem empacotamento Android/Windows aqui — isso é
   um item de backlog separado).
 - **`rules`** — sobe o emulador do Firestore (`firebase-tools
-  emulators:exec`) e roda `test/rules/rules.test.mjs` contra ele (13 testes
-  cobrindo as regras de integridade de dinheiro da Fase 2, incluindo os
-  caminhos `getAfter()`/null-teardown que não podem ser exercitados a
-  partir do Dart). Usa só o emulador — nunca toca produção, não precisa de
-  credenciais de projeto.
+  emulators:exec`) e roda `npm test` em `test/rules/`, que é
+  `rules.test.mjs` (regras de segurança — integridade de dinheiro da Fase 2,
+  incluindo os caminhos `getAfter()`/null-teardown que não podem ser
+  exercitados a partir do Dart; dezenas de casos em 8 blocos `describe`) **e**
+  `backfill.test.mjs` (classificação de dívida-legítima-vs-corrupção do
+  `scripts/backfill_balances.mjs`, rodado como subprocesso real contra o
+  mesmo emulador), os dois numa passada só. Usa só o emulador — nunca toca
+  produção, não precisa de credenciais de projeto.
 
 CI **não** faz deploy de nada. É uma rede de segurança pro código; publicar
 em produção continua sendo a ação manual deliberada abaixo.
