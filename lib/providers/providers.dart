@@ -6,6 +6,7 @@ import '../models/category.dart';
 import '../models/db.dart';
 import '../models/expense.dart';
 import '../models/income.dart';
+import '../models/subscription.dart';
 import '../services/aggregation_service.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
@@ -53,6 +54,28 @@ final expensesProvider = StreamProvider<List<Expense>>((ref) {
   final firestore = ref.watch(firestoreServiceProvider);
   if (firestore == null) return const Stream.empty();
   return firestore.watchExpenses();
+});
+
+final subscriptionsProvider = StreamProvider<List<Subscription>>((ref) {
+  final firestore = ref.watch(firestoreServiceProvider);
+  if (firestore == null) return const Stream.empty();
+  return firestore.watchSubscriptions();
+});
+
+/// Runs [FirestoreService.catchUpSubscriptions] once per signed-in session
+/// (re-runs only if [firestoreServiceProvider] itself changes, i.e. on
+/// sign-in/out) — watched from [AppShell] so it fires as soon as the user
+/// lands on any authenticated screen, not just Gastos. A failure here (e.g. a
+/// transient Firestore error) is swallowed: catch-up is a best-effort
+/// convenience, never something that should block the app from loading.
+final subscriptionCatchUpProvider = FutureProvider<void>((ref) async {
+  final firestore = ref.watch(firestoreServiceProvider);
+  if (firestore == null) return;
+  try {
+    await firestore.catchUpSubscriptions();
+  } catch (_) {
+    // Best-effort: the next app open (or manual gasto entry) isn't blocked.
+  }
 });
 
 /// Combines the 4 streams into the same summary shape as the Next.js

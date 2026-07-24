@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../l10n/app_localizations.dart';
+import '../providers/providers.dart';
 
 List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLocalizations l10n) => [
   (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: l10n.navDashboard),
@@ -14,13 +16,18 @@ List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLo
 
 /// App-wide nav: bottom bar on narrow (mobile) screens, a side rail on wide
 /// (web/desktop) screens — per §4 of FLUTTER_MIGRATION.md.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const AppShell({super.key, required this.navigationShell});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Fires subscription catch-up once per signed-in session — see
+    // subscriptionCatchUpProvider. Watched (not read) so it re-runs if the
+    // user signs out and back in as someone else; the result itself is
+    // unused here, the provider's side effect is the point.
+    ref.watch(subscriptionCatchUpProvider);
     final l10n = AppLocalizations.of(context)!;
     final destinations = _destinations(l10n);
     final wide = MediaQuery.sizeOf(context).width >= 720;
