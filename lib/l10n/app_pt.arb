@@ -93,6 +93,22 @@
   "removeExpenseConfirmTitle": "Remover esse gasto?",
   "removeExpenseTooltip": "Remover gasto",
 
+  "subscriptionsTitle": "Assinaturas",
+  "subscriptionsSubtitle": "Gastos fixos que se repetem todo mês — cadastre uma vez e o valor é lançado automaticamente da conta no dia certo.",
+  "subscriptionNameLabel": "Nome",
+  "subscriptionNameHint": "Ex: Netflix",
+  "subscriptionDueDayLabel": "Dia da cobrança",
+  "invalidDueDayError": "Informe um dia entre 1 e 31.",
+  "submitSubscriptionButton": "Adicionar assinatura",
+  "subscriptionsListTitle": "Assinaturas cadastradas",
+  "subscriptionsEmptyState": "Nenhuma assinatura cadastrada ainda.",
+  "subscriptionChargedOnLabel": "Cobra todo dia {day}",
+  "@subscriptionChargedOnLabel": {
+    "placeholders": { "day": { "type": "String" } }
+  },
+  "removeSubscriptionConfirmTitle": "Remover essa assinatura?",
+  "removeSubscriptionTooltip": "Remover assinatura",
+
   "receitasTitle": "Receitas",
   "receitasSubtitle": "Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\naloque em caixinhas quando quiser, no Dashboard.",
   "incomeSourceFieldLabel": "Origem",

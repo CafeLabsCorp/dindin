@@ -482,6 +482,78 @@ abstract class AppLocalizations {
   /// **'Remover gasto'**
   String get removeExpenseTooltip;
 
+  /// No description provided for @subscriptionsTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinaturas'**
+  String get subscriptionsTitle;
+
+  /// No description provided for @subscriptionsSubtitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Gastos fixos que se repetem todo mês — cadastre uma vez e o valor é lançado automaticamente da conta no dia certo.'**
+  String get subscriptionsSubtitle;
+
+  /// No description provided for @subscriptionNameLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nome'**
+  String get subscriptionNameLabel;
+
+  /// No description provided for @subscriptionNameHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ex: Netflix'**
+  String get subscriptionNameHint;
+
+  /// No description provided for @subscriptionDueDayLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Dia da cobrança'**
+  String get subscriptionDueDayLabel;
+
+  /// No description provided for @invalidDueDayError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Informe um dia entre 1 e 31.'**
+  String get invalidDueDayError;
+
+  /// No description provided for @submitSubscriptionButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Adicionar assinatura'**
+  String get submitSubscriptionButton;
+
+  /// No description provided for @subscriptionsListTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinaturas cadastradas'**
+  String get subscriptionsListTitle;
+
+  /// No description provided for @subscriptionsEmptyState.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhuma assinatura cadastrada ainda.'**
+  String get subscriptionsEmptyState;
+
+  /// No description provided for @subscriptionChargedOnLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobra todo dia {day}'**
+  String subscriptionChargedOnLabel(String day);
+
+  /// No description provided for @removeSubscriptionConfirmTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Remover essa assinatura?'**
+  String get removeSubscriptionConfirmTitle;
+
+  /// No description provided for @removeSubscriptionTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Remover assinatura'**
+  String get removeSubscriptionTooltip;
+
   /// No description provided for @receitasTitle.
   ///
   /// In pt, this message translates to:

@@ -10,6 +10,7 @@ import 'package:dindin/models/category.dart';
 import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
+import 'package:dindin/models/subscription.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/theme/theme.dart';
 
@@ -21,12 +22,17 @@ void main() {
   const casa = Category(id: 'c1', name: 'Casa', recurring: true, createdAt: '2026-01-01');
   const expense = Expense(id: 'e1', date: '2026-07-05', amount: 80, categoryId: 'c1', description: 'Mercado');
 
-  Future<void> pump(WidgetTester tester, {required List<Expense> expenses}) {
+  Future<void> pump(
+    WidgetTester tester, {
+    required List<Expense> expenses,
+    List<Subscription> subscriptions = const [],
+  }) {
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
           categoriesProvider.overrideWith((ref) => Stream.value([casa])),
           expensesProvider.overrideWith((ref) => Stream.value(expenses)),
+          subscriptionsProvider.overrideWith((ref) => Stream.value(subscriptions)),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -69,6 +75,7 @@ void main() {
               Expense(id: 'e1', date: '2026-01-03', amount: 50, categoryId: 'c1'),
             ]),
           ),
+          subscriptionsProvider.overrideWith((ref) => Stream.value(const [])),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -115,6 +122,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Nenhum gasto lançado ainda.'), findsOneWidget);
+  });
+
+  group('assinaturas', () {
+    testWidgets('sem nenhuma assinatura cadastrada mostra o estado vazio', (tester) async {
+      await pump(tester, expenses: []);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nenhuma assinatura cadastrada ainda.'), findsOneWidget);
+    });
+
+    testWidgets('assinatura cadastrada aparece na lista com o dia de cobrança e ícone de remover', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        subscriptions: const [
+          Subscription(id: 's1', name: 'Netflix', amount: 39.90, dueDay: 5, createdAt: '2026-01-01'),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nenhuma assinatura cadastrada ainda.'), findsNothing);
+      expect(find.text('Cobra todo dia 5'), findsOneWidget);
+      expect(find.byTooltip('Remover assinatura'), findsOneWidget);
+    });
+
+    testWidgets('adicionar assinatura sem nome mostra o erro de nome obrigatório', (tester) async {
+      await pump(tester, expenses: []);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Adicionar assinatura'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Informe um nome.'), findsOneWidget);
+    });
   });
 
   group('bloqueio de dívida congelada (decisão #3: toggle off + já negativo)', () {

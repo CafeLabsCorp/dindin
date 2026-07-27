@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
 import '../../models/expense.dart';
+import '../../models/subscription.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../utils/date_range.dart';
@@ -36,10 +37,18 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   DateTime? _filterFrom;
   DateTime? _filterTo;
 
+  final _subNameController = TextEditingController();
+  final _subAmountController = TextEditingController();
+  int _subDueDay = 5;
+  String? _subError;
+  bool _subSubmitting = false;
+
   @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _subNameController.dispose();
+    _subAmountController.dispose();
     super.dispose();
   }
 
@@ -108,6 +117,56 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     await ref.read(firestoreServiceProvider)!.deleteExpense(id);
   }
 
+  Future<void> _submitSubscription() async {
+    final l10n = AppLocalizations.of(context)!;
+    final name = _subNameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _subError = l10n.nameRequiredError);
+      return;
+    }
+    final value = double.tryParse(_subAmountController.text.replaceAll(',', '.'));
+    if (value == null || value <= 0) {
+      setState(() => _subError = l10n.invalidAmountError);
+      return;
+    }
+    if (_subDueDay < 1 || _subDueDay > 31) {
+      setState(() => _subError = l10n.invalidDueDayError);
+      return;
+    }
+    final firestore = ref.read(firestoreServiceProvider);
+    if (firestore == null) return;
+    setState(() {
+      _subSubmitting = true;
+      _subError = null;
+    });
+    try {
+      await firestore.createSubscription(name: name, amount: value, dueDay: _subDueDay);
+      _subNameController.clear();
+      _subAmountController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _subError = friendlyErrorMessage(l10n, e));
+    } finally {
+      if (mounted) setState(() => _subSubmitting = false);
+    }
+  }
+
+  Future<void> _deleteSubscription(String id) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.removeSubscriptionConfirmTitle),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(firestoreServiceProvider)!.deleteSubscription(id);
+  }
+
   void _editExpense(Expense expense, List<Category> categories) {
     showEditTransactionSheet(
       context,
@@ -128,6 +187,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final expensesAsync = ref.watch(expensesProvider);
+    final subscriptionsAsync = ref.watch(subscriptionsProvider);
     final categories = ref.watch(categoriesProvider).value ?? [];
     final summary = ref.watch(summaryProvider);
 
@@ -318,6 +378,88 @@ class _GastosPageState extends ConsumerState<GastosPage> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.subscriptionsTitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(l10n.subscriptionsSubtitle, style: TextStyle(color: context.tokens.muted)),
+              const SizedBox(height: 16),
+              ResponsiveFormRow(
+                fields: [
+                  (
+                    width: 200.0,
+                    child: TextField(
+                      controller: _subNameController,
+                      enabled: !_subSubmitting,
+                      decoration: InputDecoration(
+                        labelText: l10n.subscriptionNameLabel,
+                        hintText: l10n.subscriptionNameHint,
+                      ),
+                    ),
+                  ),
+                  (
+                    width: 140.0,
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _subDueDay,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: l10n.subscriptionDueDayLabel),
+                      items: [for (var d = 1; d <= 31; d++) DropdownMenuItem(value: d, child: Text('$d'))],
+                      onChanged: _subSubmitting ? null : (v) => setState(() => _subDueDay = v ?? _subDueDay),
+                    ),
+                  ),
+                  (
+                    width: 140.0,
+                    child: TextField(
+                      controller: _subAmountController,
+                      enabled: !_subSubmitting,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _subSubmitting ? null : _submitSubscription,
+                child: Text(l10n.submitSubscriptionButton),
+              ),
+              if (_subError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_subError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                l10n.subscriptionsListTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              subscriptionsAsync.when(
+                data: (subscriptions) {
+                  if (subscriptions.isEmpty) return EmptyState(l10n.subscriptionsEmptyState);
+                  return Column(
+                    children: [
+                      for (var i = 0; i < subscriptions.length; i++)
+                        _SubscriptionRow(
+                          subscription: subscriptions[i],
+                          onDelete: () => _deleteSubscription(subscriptions[i].id),
+                          divider: i > 0,
+                        ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -405,4 +547,61 @@ class _ExpenseRow extends StatelessWidget {
 String _originLabel(AppLocalizations l10n, String? categoryId, Map<String, String> categoryName) {
   if (categoryId == null) return l10n.accountLabel;
   return categoryName[categoryId] ?? l10n.removedCategoryLabel;
+}
+
+class _SubscriptionRow extends StatelessWidget {
+  final Subscription subscription;
+  final VoidCallback onDelete;
+  final bool divider;
+
+  const _SubscriptionRow({required this.subscription, required this.onDelete, required this.divider});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: formatCurrency(subscription.amount),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' · ${subscription.name}',
+                        style: TextStyle(color: context.tokens.subtle),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  l10n.subscriptionChargedOnLabel('${subscription.dueDay}'),
+                  style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: l10n.removeSubscriptionTooltip,
+            color: Theme.of(context).colorScheme.error,
+          ),
+        ],
+      ),
+    );
+  }
 }
