@@ -84,13 +84,19 @@ users/{uid}
     categoryId: string?        # null = expense straight from the account, not an envelope
     description: string?
 
+  subscriptions/{subscriptionId}
+    name: string, amount: number, dueDay: int (1-31)
+    createdAt: string (ISO date)
+    lastChargedDate: string?   # ISO date of the last due date already turned
+                                # into an expense by catchUpSubscriptions
+
   meta/account            { balance: number }   # overall account balance (derived)
   balances/{categoryId}   { balance: number }   # each envelope's balance (derived)
 ```
 
 `meta/account` and `balances/{categoryId}` are a **derived cache**, not
 source of truth: they are not part of the JSON backup and are recomputed from
-the ledger (the four collections above) both on restore
+the ledger (the five collections above) both on restore
 (`FirestoreService.replaceAll`) and by the backfill script. The balances
 shown on screen are always summed from the ledger by
 `aggregation_service.dart` — even if the cache ever drifted, the UI would
@@ -101,6 +107,8 @@ rationale, the guaranteed invariants, and this design's known limitations.
 `Category.kind`, `monthlyBudget`, `goalAmount`, `allowNegative`, and
 `Allocation.transferId` are all optional fields added after the original
 schema — an old JSON backup without them still imports unchanged.
+`subscriptions` is a whole new collection added the same way — an old backup
+with no `subscriptions` key imports as an empty list.
 
 ## Technical decisions and why
 
@@ -111,6 +119,15 @@ schema — an old JSON backup without them still imports unchanged.
   documented in `docs/BACKEND.md`, chosen to stay on Firebase's free tier
   (Spark) — the Cloud Functions alternative (`functions/`, paid Blaze tier)
   exists as inactive reference only, not deployed.
+
+- **A subscription only ever charges when the app is opened, never on a
+  server schedule.** `FirestoreService.catchUpSubscriptions` runs once per
+  signed-in session and backfills every due date a subscription has missed,
+  oldest first, straight from the account — but nothing runs while the app is
+  closed. The alternative (Cloud Scheduler + Cloud Function charging exactly
+  on the due day) would require the same paid Blaze plan declined for Option
+  A above, for the same reason. See `docs/BACKEND.md`, "Subscriptions
+  (recurring expenses)".
 
 - **A transfer between envelopes is two `Allocation`s paired by
   `transferId`, not a new collection.** A negative leg on the source
