@@ -110,7 +110,7 @@ rebuild:
 The **only** rollback for user data is the manual JSON export taken during
 the deploy-gate backup step (`scripts/deploy.sh` step 1 / `docs/BACKEND.md`).
 To restore: open the app, sign in as the affected user, Ajustes -> Importar
-JSON, pick the backup file. This replaces that user's five ledger
+JSON, pick the backup file. This replaces that user's six ledger
 collections and resets their balance docs from the imported ledger — there
 is no partial/selective restore, so use the most recent good export.
 

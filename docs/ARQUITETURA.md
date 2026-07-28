@@ -90,13 +90,22 @@ users/{uid}
     lastChargedDate: string?   # ISO date of the last due date already turned
                                 # into an expense by catchUpSubscriptions
 
+  installmentPurchases/{purchaseId}
+    name: string, totalAmount: number, installments: int (2-36)
+    purchaseDate: string (ISO date)     # informational only
+    firstChargeDate: string (ISO date)  # anchors every monthly occurrence
+    createdAt: string (ISO date)
+    chargedInstallments: int  # 0..installments; how many have already been
+                                # turned into an expense by
+                                # catchUpInstallmentPurchases
+
   meta/account            { balance: number }   # overall account balance (derived)
   balances/{categoryId}   { balance: number }   # each envelope's balance (derived)
 ```
 
 `meta/account` and `balances/{categoryId}` are a **derived cache**, not
 source of truth: they are not part of the JSON backup and are recomputed from
-the ledger (the five collections above) both on restore
+the ledger (the six collections above) both on restore
 (`FirestoreService.replaceAll`) and by the backfill script. The balances
 shown on screen are always summed from the ledger by
 `aggregation_service.dart` — even if the cache ever drifted, the UI would
@@ -108,7 +117,8 @@ rationale, the guaranteed invariants, and this design's known limitations.
 `Allocation.transferId` are all optional fields added after the original
 schema — an old JSON backup without them still imports unchanged.
 `subscriptions` is a whole new collection added the same way — an old backup
-with no `subscriptions` key imports as an empty list.
+with no `subscriptions` key imports as an empty list. `installmentPurchases`
+is a second such addition, right after it.
 
 ## Technical decisions and why
 
@@ -128,6 +138,17 @@ with no `subscriptions` key imports as an empty list.
   on the due day) would require the same paid Blaze plan declined for Option
   A above, for the same reason. See `docs/BACKEND.md`, "Subscriptions
   (recurring expenses)".
+
+- **An installment purchase reuses the exact same catch-up machinery as a
+  subscription, just bounded.** `catchUpInstallmentPurchases` shares
+  `_dueDateFor`'s month-clamping with `catchUpSubscriptions` and follows the
+  identical client-triggered-on-app-open model — the only structural
+  difference is that it stops once `chargedInstallments` reaches
+  `installments`, instead of running forever. The rounding remainder from
+  splitting `totalAmount` into equal slices always lands on the LAST
+  installment (matches a real card bill), computed once per purchase via
+  `_installmentAmounts`, never re-derived per charge (so a value never drifts
+  across catch-up runs).
 
 - **A transfer between envelopes is two `Allocation`s paired by
   `transferId`, not a new collection.** A negative leg on the source

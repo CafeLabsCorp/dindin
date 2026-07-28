@@ -29,7 +29,7 @@ Before onboarding real users there is a working path for both:
   portable, human-readable format.
 - **Deletion** — manual, documented process (acceptable at this stage):
   1. The user can wipe-and-replace their own data by importing an empty/edited
-     backup (`replaceAll` clears the five ledger collections and resets the
+     backup (`replaceAll` clears the six ledger collections and resets the
      balance docs).
   2. Full account deletion (auth user + the entire `users/{uid}` subtree) is a
      manual admin step: delete the Auth user in the Firebase console and delete
@@ -75,9 +75,19 @@ Before onboarding real users there is a working path for both:
   ordinary account-balance gate like any other expense. See "Subscriptions
   (recurring expenses)" below for the client-triggered catch-up model this
   implies. An old backup with no `subscriptions` key imports as an empty list.
+- `installmentPurchases/{id}` — another new collection, the BOUNDED
+  counterpart to `subscriptions`: a card purchase (name, totalAmount,
+  installments, purchaseDate, firstChargeDate, createdAt,
+  chargedInstallments) split into N fixed monthly charges instead of an
+  open-ended recurrence. Same no-invariant-of-its-own posture;
+  `FirestoreService.catchUpInstallmentPurchases` produces its `expenses` docs
+  and stops once `chargedInstallments` reaches `installments`. See
+  "Subscriptions (recurring expenses)" below — it shares that section's
+  client-triggered catch-up model verbatim.
 
 Old JSON backups (no `monthlyBudget`, no `transferId`, no `kind`/`goalAmount`,
-no `allowNegative`, no `subscriptions`) import unchanged.
+no `allowNegative`, no `subscriptions`, no `installmentPurchases`) import
+unchanged.
 
 ### Denormalized balance docs (Option B — see below)
 
@@ -94,7 +104,7 @@ in O(1) with `get()`/`getAfter()` (rules cannot sum a collection):
 These are a **derived cache, not source of truth**:
 
 - They are NOT part of the JSON backup. `AppDb.toJson()`/`fromJson()` stays the
-  five ledger collections only; the balances are recomputed from the ledger on
+  six ledger collections only; the balances are recomputed from the ledger on
   restore (`FirestoreService.replaceAll`) and by the backfill script. This
   keeps old backups importable and avoids storing redundant, drift-prone data
   in the backup file.
@@ -111,11 +121,11 @@ A subscription (`users/{uid}/subscriptions/{id}`) is a fixed monthly charge
 possible designs, same trade-off as the Option A/B split above:
 
 - **Chosen: client-triggered catch-up.** `FirestoreService.catchUpSubscriptions`
-  runs once per signed-in session (`subscriptionCatchUpProvider`, watched from
-  `AppShell`), computes every due date each subscription has missed since it
-  was last charged, and creates one account-level `Expense` per missed month,
-  oldest first — going through the exact same account-balance gate as a manual
-  expense (it will not overdraw the account; an unaffordable due date is
+  runs once per signed-in session (`recurringChargesCatchUpProvider`, watched
+  from `AppShell`), computes every due date each subscription has missed since
+  it was last charged, and creates one account-level `Expense` per missed
+  month, oldest first — going through the exact same account-balance gate as a
+  manual expense (it will not overdraw the account; an unaffordable due date is
   retried next run instead of failing loudly). This stays on the free Spark
   tier: no Cloud Scheduler, no Cloud Function. The real-world consequence is
   that a due date is only ever charged the next time the app is OPENED on or
@@ -124,6 +134,13 @@ possible designs, same trade-off as the Option A/B split above:
   Cloud Function daily could charge exactly on the due day regardless of
   whether the app is open, but requires the paid Blaze plan (same cost gate as
   Option A above) — declined for the same reason Option A was declined.
+
+**Installment purchases reuse this verbatim.** `FirestoreService.
+catchUpInstallmentPurchases` is called right after `catchUpSubscriptions` in
+the same provider, on the same per-session trigger — the only difference is
+it stops once every installment has been billed instead of running forever.
+No separate cost decision was needed: it was never going to be anything but
+client-triggered once subscriptions settled that question.
 
 If this ever needs to become "charges even if you never open the app",
 revisit alongside Option A — the two decisions share the same Blaze
