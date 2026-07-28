@@ -10,6 +10,7 @@ import 'package:dindin/models/category.dart';
 import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
+import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/models/subscription.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/theme/theme.dart';
@@ -26,6 +27,7 @@ void main() {
     WidgetTester tester, {
     required List<Expense> expenses,
     List<Subscription> subscriptions = const [],
+    List<InstallmentPurchase> installmentPurchases = const [],
   }) {
     return tester.pumpWidget(
       ProviderScope(
@@ -33,6 +35,7 @@ void main() {
           categoriesProvider.overrideWith((ref) => Stream.value([casa])),
           expensesProvider.overrideWith((ref) => Stream.value(expenses)),
           subscriptionsProvider.overrideWith((ref) => Stream.value(subscriptions)),
+          installmentPurchasesProvider.overrideWith((ref) => Stream.value(installmentPurchases)),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -76,6 +79,7 @@ void main() {
             ]),
           ),
           subscriptionsProvider.overrideWith((ref) => Stream.value(const [])),
+          installmentPurchasesProvider.overrideWith((ref) => Stream.value(const [])),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -152,6 +156,52 @@ void main() {
       await tester.pumpAndSettle();
 
       final addButton = find.widgetWithText(FilledButton, 'Adicionar assinatura');
+      await tester.ensureVisible(addButton); // a seção fica abaixo da dobra na ListView
+      await tester.pumpAndSettle();
+      await tester.tap(addButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Informe um nome.'), findsOneWidget);
+    });
+  });
+
+  group('parcelamentos', () {
+    testWidgets('sem nenhum parcelamento cadastrado mostra o estado vazio', (tester) async {
+      await pump(tester, expenses: []);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nenhum parcelamento cadastrado ainda.'), findsOneWidget);
+    });
+
+    testWidgets('parcelamento cadastrado aparece na lista com o progresso e ícone de remover', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        installmentPurchases: const [
+          InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 300,
+            installments: 3,
+            purchaseDate: '2026-01-10',
+            firstChargeDate: '2026-02-05',
+            createdAt: '2026-01-10',
+            chargedInstallments: 1,
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nenhum parcelamento cadastrado ainda.'), findsNothing);
+      expect(find.text('1 de 3 parcelas pagas'), findsOneWidget);
+      expect(find.byTooltip('Remover parcelamento'), findsOneWidget);
+    });
+
+    testWidgets('adicionar parcelamento sem nome mostra o erro de nome obrigatório', (tester) async {
+      await pump(tester, expenses: []);
+      await tester.pumpAndSettle();
+
+      final addButton = find.widgetWithText(FilledButton, 'Adicionar parcelamento');
       await tester.ensureVisible(addButton); // a seção fica abaixo da dobra na ListView
       await tester.pumpAndSettle();
       await tester.tap(addButton);

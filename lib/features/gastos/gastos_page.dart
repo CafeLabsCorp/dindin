@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
 import '../../models/expense.dart';
+import '../../models/installment_purchase.dart';
 import '../../models/subscription.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
@@ -43,12 +44,22 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   String? _subError;
   bool _subSubmitting = false;
 
+  final _instNameController = TextEditingController();
+  final _instTotalController = TextEditingController();
+  DateTime _instPurchaseDate = DateTime.now();
+  DateTime _instFirstChargeDate = DateTime.now();
+  int _instInstallments = 2;
+  String? _instError;
+  bool _instSubmitting = false;
+
   @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
     _subNameController.dispose();
     _subAmountController.dispose();
+    _instNameController.dispose();
+    _instTotalController.dispose();
     super.dispose();
   }
 
@@ -167,6 +178,62 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     await ref.read(firestoreServiceProvider)!.deleteSubscription(id);
   }
 
+  Future<void> _submitInstallmentPurchase() async {
+    final l10n = AppLocalizations.of(context)!;
+    final name = _instNameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _instError = l10n.nameRequiredError);
+      return;
+    }
+    final value = double.tryParse(_instTotalController.text.replaceAll(',', '.'));
+    if (value == null || value <= 0) {
+      setState(() => _instError = l10n.invalidAmountError);
+      return;
+    }
+    if (_instInstallments < 2 || _instInstallments > 36) {
+      setState(() => _instError = l10n.invalidInstallmentsError);
+      return;
+    }
+    final firestore = ref.read(firestoreServiceProvider);
+    if (firestore == null) return;
+    setState(() {
+      _instSubmitting = true;
+      _instError = null;
+    });
+    try {
+      await firestore.createInstallmentPurchase(
+        name: name,
+        totalAmount: value,
+        installments: _instInstallments,
+        purchaseDate: isoDateFrom(_instPurchaseDate),
+        firstChargeDate: isoDateFrom(_instFirstChargeDate),
+      );
+      _instNameController.clear();
+      _instTotalController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _instError = friendlyErrorMessage(l10n, e));
+    } finally {
+      if (mounted) setState(() => _instSubmitting = false);
+    }
+  }
+
+  Future<void> _deleteInstallmentPurchase(String id) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.removeInstallmentPurchaseConfirmTitle),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(firestoreServiceProvider)!.deleteInstallmentPurchase(id);
+  }
+
   void _editExpense(Expense expense, List<Category> categories) {
     showEditTransactionSheet(
       context,
@@ -188,6 +255,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final l10n = AppLocalizations.of(context)!;
     final expensesAsync = ref.watch(expensesProvider);
     final subscriptionsAsync = ref.watch(subscriptionsProvider);
+    final installmentPurchasesAsync = ref.watch(installmentPurchasesProvider);
     final categories = ref.watch(categoriesProvider).value ?? [];
     final summary = ref.watch(summaryProvider);
 
@@ -460,6 +528,130 @@ class _GastosPageState extends ConsumerState<GastosPage> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.installmentPurchasesTitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(l10n.installmentPurchasesSubtitle, style: TextStyle(color: context.tokens.muted)),
+              const SizedBox(height: 16),
+              ResponsiveFormRow(
+                fields: [
+                  (
+                    width: 200.0,
+                    child: TextField(
+                      controller: _instNameController,
+                      enabled: !_instSubmitting,
+                      decoration: InputDecoration(
+                        labelText: l10n.installmentNameLabel,
+                        hintText: l10n.installmentNameHint,
+                      ),
+                    ),
+                  ),
+                  (
+                    width: 160.0,
+                    child: InkWell(
+                      onTap: _instSubmitting
+                          ? null
+                          : () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _instPurchaseDate,
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) setState(() => _instPurchaseDate = picked);
+                            },
+                      child: InputDecorator(
+                        decoration: InputDecoration(labelText: l10n.purchaseDateLabel),
+                        child: Text(formatDate(isoDateFrom(_instPurchaseDate))),
+                      ),
+                    ),
+                  ),
+                  (
+                    width: 140.0,
+                    child: TextField(
+                      controller: _instTotalController,
+                      enabled: !_instSubmitting,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
+                    ),
+                  ),
+                  (
+                    width: 120.0,
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _instInstallments,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: l10n.installmentsCountLabel),
+                      items: [for (var n = 2; n <= 36; n++) DropdownMenuItem(value: n, child: Text('${n}x'))],
+                      onChanged: _instSubmitting
+                          ? null
+                          : (v) => setState(() => _instInstallments = v ?? _instInstallments),
+                    ),
+                  ),
+                  (
+                    width: 160.0,
+                    child: InkWell(
+                      onTap: _instSubmitting
+                          ? null
+                          : () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _instFirstChargeDate,
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) setState(() => _instFirstChargeDate = picked);
+                            },
+                      child: InputDecorator(
+                        decoration: InputDecoration(labelText: l10n.firstChargeDateLabel),
+                        child: Text(formatDate(isoDateFrom(_instFirstChargeDate))),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _instSubmitting ? null : _submitInstallmentPurchase,
+                child: Text(l10n.submitInstallmentPurchaseButton),
+              ),
+              if (_instError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_instError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                l10n.installmentPurchasesListTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              installmentPurchasesAsync.when(
+                data: (purchases) {
+                  if (purchases.isEmpty) return EmptyState(l10n.installmentPurchasesEmptyState);
+                  return Column(
+                    children: [
+                      for (var i = 0; i < purchases.length; i++)
+                        _InstallmentPurchaseRow(
+                          purchase: purchases[i],
+                          onDelete: () => _deleteInstallmentPurchase(purchases[i].id),
+                          divider: i > 0,
+                        ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -598,6 +790,67 @@ class _SubscriptionRow extends StatelessWidget {
             onPressed: onDelete,
             icon: const Icon(Icons.delete_outline),
             tooltip: l10n.removeSubscriptionTooltip,
+            color: Theme.of(context).colorScheme.error,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstallmentPurchaseRow extends StatelessWidget {
+  final InstallmentPurchase purchase;
+  final VoidCallback onDelete;
+  final bool divider;
+
+  const _InstallmentPurchaseRow({required this.purchase, required this.onDelete, required this.divider});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // Display-only approximation (Nx de R$Y): the actual last Expense may be
+    // a cent higher to absorb rounding, see FirestoreService._installmentAmounts.
+    final perInstallment = purchase.totalAmount / purchase.installments;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: formatCurrency(purchase.totalAmount),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      TextSpan(
+                        text:
+                            ' · ${purchase.name} · ${l10n.installmentSummaryLabel('${purchase.installments}', formatCurrency(perInstallment))}',
+                        style: TextStyle(color: context.tokens.subtle),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  l10n.installmentProgressLabel('${purchase.chargedInstallments}', '${purchase.installments}'),
+                  style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: l10n.removeInstallmentPurchaseTooltip,
             color: Theme.of(context).colorScheme.error,
           ),
         ],

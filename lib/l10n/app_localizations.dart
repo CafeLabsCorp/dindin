@@ -554,6 +554,96 @@ abstract class AppLocalizations {
   /// **'Remover assinatura'**
   String get removeSubscriptionTooltip;
 
+  /// No description provided for @installmentPurchasesTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Compras parceladas'**
+  String get installmentPurchasesTitle;
+
+  /// No description provided for @installmentPurchasesSubtitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Uma compra parcelada no cartão, dividida automaticamente pelos meses seguintes a partir da primeira cobrança.'**
+  String get installmentPurchasesSubtitle;
+
+  /// No description provided for @installmentNameLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nome'**
+  String get installmentNameLabel;
+
+  /// No description provided for @installmentNameHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ex: Notebook Dell'**
+  String get installmentNameHint;
+
+  /// No description provided for @purchaseDateLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Data da compra'**
+  String get purchaseDateLabel;
+
+  /// No description provided for @installmentsCountLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelas'**
+  String get installmentsCountLabel;
+
+  /// No description provided for @firstChargeDateLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Primeira cobrança'**
+  String get firstChargeDateLabel;
+
+  /// No description provided for @invalidInstallmentsError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Informe entre 2 e 36 parcelas.'**
+  String get invalidInstallmentsError;
+
+  /// No description provided for @submitInstallmentPurchaseButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Adicionar parcelamento'**
+  String get submitInstallmentPurchaseButton;
+
+  /// No description provided for @installmentPurchasesListTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelamentos cadastrados'**
+  String get installmentPurchasesListTitle;
+
+  /// No description provided for @installmentPurchasesEmptyState.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhum parcelamento cadastrado ainda.'**
+  String get installmentPurchasesEmptyState;
+
+  /// No description provided for @installmentSummaryLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'{count}x de {amount}'**
+  String installmentSummaryLabel(String count, String amount);
+
+  /// No description provided for @installmentProgressLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'{paid} de {total} parcelas pagas'**
+  String installmentProgressLabel(String paid, String total);
+
+  /// No description provided for @removeInstallmentPurchaseConfirmTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Remover esse parcelamento?'**
+  String get removeInstallmentPurchaseConfirmTitle;
+
+  /// No description provided for @removeInstallmentPurchaseTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Remover parcelamento'**
+  String get removeInstallmentPurchaseTooltip;
+
   /// No description provided for @receitasTitle.
   ///
   /// In pt, this message translates to:
