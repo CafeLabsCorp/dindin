@@ -48,6 +48,12 @@ jobs:
         working-directory: test/rules
         run: npm ci
 
+      # backfill.test.mjs spawns scripts/backfill_balances.mjs as a real
+      # subprocess, which needs its own firebase-admin install.
+      - name: Install backfill script deps
+        working-directory: scripts
+        run: npm ci
+
       # `emulators:exec` starts the Firestore emulator, runs the given
       # command, then tears the emulator down — no manual start/stop needed
       # and no project credentials required (emulator-only, never touches
