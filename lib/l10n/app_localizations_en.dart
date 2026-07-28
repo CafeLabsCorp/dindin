@@ -225,6 +225,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeExpenseTooltip => 'Remove expense';
 
   @override
+  String get subscriptionsTitle => 'Subscriptions';
+
+  @override
+  String get subscriptionsSubtitle =>
+      'Fixed expenses that repeat every month — register once and the amount is charged automatically from the account on the right day.';
+
+  @override
+  String get subscriptionNameLabel => 'Name';
+
+  @override
+  String get subscriptionNameHint => 'e.g. Netflix';
+
+  @override
+  String get subscriptionDueDayLabel => 'Billing day';
+
+  @override
+  String get invalidDueDayError => 'Enter a day between 1 and 31.';
+
+  @override
+  String get submitSubscriptionButton => 'Add subscription';
+
+  @override
+  String get subscriptionsListTitle => 'Registered subscriptions';
+
+  @override
+  String get subscriptionsEmptyState => 'No subscriptions registered yet.';
+
+  @override
+  String subscriptionChargedOnLabel(String day) {
+    return 'Charged on day $day';
+  }
+
+  @override
+  String get removeSubscriptionConfirmTitle => 'Remove this subscription?';
+
+  @override
+  String get removeSubscriptionTooltip => 'Remove subscription';
+
+  @override
   String get receitasTitle => 'Income';
 
   @override

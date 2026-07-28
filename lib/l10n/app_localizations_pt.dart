@@ -224,6 +224,45 @@ class AppLocalizationsPt extends AppLocalizations {
   String get removeExpenseTooltip => 'Remover gasto';
 
   @override
+  String get subscriptionsTitle => 'Assinaturas';
+
+  @override
+  String get subscriptionsSubtitle =>
+      'Gastos fixos que se repetem todo mês — cadastre uma vez e o valor é lançado automaticamente da conta no dia certo.';
+
+  @override
+  String get subscriptionNameLabel => 'Nome';
+
+  @override
+  String get subscriptionNameHint => 'Ex: Netflix';
+
+  @override
+  String get subscriptionDueDayLabel => 'Dia da cobrança';
+
+  @override
+  String get invalidDueDayError => 'Informe um dia entre 1 e 31.';
+
+  @override
+  String get submitSubscriptionButton => 'Adicionar assinatura';
+
+  @override
+  String get subscriptionsListTitle => 'Assinaturas cadastradas';
+
+  @override
+  String get subscriptionsEmptyState => 'Nenhuma assinatura cadastrada ainda.';
+
+  @override
+  String subscriptionChargedOnLabel(String day) {
+    return 'Cobra todo dia $day';
+  }
+
+  @override
+  String get removeSubscriptionConfirmTitle => 'Remover essa assinatura?';
+
+  @override
+  String get removeSubscriptionTooltip => 'Remover assinatura';
+
+  @override
   String get receitasTitle => 'Receitas';
 
   @override
