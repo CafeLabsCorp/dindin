@@ -365,6 +365,35 @@ service cloud.firestore {
                     );
     }
 
+    // --- subscriptions -------------------------------------------------------
+    // A fixed recurring monthly expense (e.g. "Netflix") — always charged
+    // straight from the account, never a caixinha. The doc itself carries no
+    // money invariant of its own (create/update/delete never touch a balance
+    // doc); the Expense docs `catchUpSubscriptions` generates from it go
+    // through the ordinary `expenses` rules above, which already enforce the
+    // account-balance floor. Only shape + ownership + immutable `createdAt`
+    // are validated here, same posture as `categories`.
+    function validSubscription(d) {
+      return d.name is string
+          && d.amount is number && d.amount > 0
+          && d.dueDay is int && d.dueDay >= 1 && d.dueDay <= 31
+          && isIsoDate(d.createdAt)
+          && (!('lastChargedDate' in d.keys()) || isIsoDate(d.lastChargedDate));
+    }
+
+    match /users/{uid}/subscriptions/{subscriptionId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validSubscription(request.resource.data);
+      // createdAt is immutable across edits, same as categories. In practice
+      // today the only update is catchUpSubscriptions bumping
+      // lastChargedDate — full edits aren't reachable from the UI yet (v1
+      // only supports add/remove, see docs/ARQUITETURA.md).
+      allow update: if isOwner(uid)
+                    && validSubscription(request.resource.data)
+                    && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(uid);
+    }
+
     // Everything else under the user subtree (and everywhere else) is denied
     // by default — no catch-all allow.
   }

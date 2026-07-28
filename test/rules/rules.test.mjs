@@ -84,6 +84,7 @@ const catDoc = (db, uid, id) => doc(db, `users/${uid}/categories/${id}`);
 const incomeDoc = (db, uid, id) => doc(db, `users/${uid}/incomes/${id}`);
 const allocDoc = (db, uid, id) => doc(db, `users/${uid}/allocations/${id}`);
 const expenseDoc = (db, uid, id) => doc(db, `users/${uid}/expenses/${id}`);
+const subscriptionDoc = (db, uid, id) => doc(db, `users/${uid}/subscriptions/${id}`);
 
 // -----------------------------------------------------------------------
 // 1. Per-write delta linkage (the core Option B invariant)
@@ -997,6 +998,131 @@ describe('categories: catDebtFree guard (spend->save conversion & delete refused
     batch.delete(catDoc(db, 'alice', 'c-clean'));
     batch.delete(balDoc(db, 'alice', 'c-clean'));
     await assertSucceeds(batch.commit());
+  });
+});
+
+// -----------------------------------------------------------------------
+// 9. Subscriptions (fixed recurring monthly expense, e.g. "Netflix"). No
+//    money invariant of its own (see docs/BACKEND.md, "Subscriptions
+//    (recurring expenses)") — just shape, ownership, and immutable createdAt,
+//    same posture as `categories`.
+// -----------------------------------------------------------------------
+
+describe('subscriptions', () => {
+  test('a shape-valid create succeeds', async () => {
+    await assertSucceeds(
+      setDoc(subscriptionDoc(aliceDb(), 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+      }),
+    );
+  });
+
+  test('create is rejected when amount is not positive', async () => {
+    await assertFails(
+      setDoc(subscriptionDoc(aliceDb(), 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 0,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+      }),
+    );
+  });
+
+  test('create is rejected when dueDay is outside 1-31', async () => {
+    await assertFails(
+      setDoc(subscriptionDoc(aliceDb(), 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 10,
+        dueDay: 32,
+        createdAt: '2026-01-01',
+      }),
+    );
+    await assertFails(
+      setDoc(subscriptionDoc(aliceDb(), 'alice', 's2'), {
+        name: 'Netflix',
+        amount: 10,
+        dueDay: 0,
+        createdAt: '2026-01-01',
+      }),
+    );
+  });
+
+  test('a lastChargedDate update (catchUpSubscriptions bumping it) succeeds, createdAt stays fixed', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) =>
+      setDoc(subscriptionDoc(sdb, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+      }),
+    );
+    await assertSucceeds(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+        lastChargedDate: '2026-01-05',
+      }),
+    );
+  });
+
+  test('update is rejected if it changes createdAt', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) =>
+      setDoc(subscriptionDoc(sdb, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+      }),
+    );
+    await assertFails(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-06-01',
+      }),
+    );
+  });
+
+  test('delete succeeds for the owner', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) =>
+      setDoc(subscriptionDoc(sdb, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+      }),
+    );
+    await assertSucceeds(deleteDoc(subscriptionDoc(db, 'alice', 's1')));
+  });
+
+  test("a user cannot read, write, or delete another user's subscription", async () => {
+    await seed(async (sdb) =>
+      setDoc(subscriptionDoc(sdb, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+      }),
+    );
+    await assertFails(getDoc(subscriptionDoc(bobDb(), 'alice', 's1')));
+    await assertFails(
+      setDoc(subscriptionDoc(bobDb(), 'alice', 's1'), {
+        name: 'Hijacked',
+        amount: 1,
+        dueDay: 1,
+        createdAt: '2026-01-01',
+      }),
+    );
+    await assertFails(deleteDoc(subscriptionDoc(bobDb(), 'alice', 's1')));
   });
 });
 
