@@ -394,6 +394,43 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    // --- installment purchases -----------------------------------------------
+    // A card purchase split into N fixed monthly charges (e.g. "Notebook
+    // Dell, 12x") — always charged straight from the account, same posture as
+    // subscriptions: no money invariant of its own, `createdAt` immutable,
+    // and `firstChargeDate`/`installments`/`totalAmount` also immutable
+    // across edits (changing the split after charges have already gone out
+    // would desync `chargedInstallments` from what was actually billed; v1
+    // only supports add/remove and catchUpInstallmentPurchases bumping
+    // `chargedInstallments`, see docs/ARQUITETURA.md).
+    function validInstallmentPurchase(d) {
+      return d.name is string
+          && d.totalAmount is number && d.totalAmount > 0
+          && d.installments is int && d.installments >= 2 && d.installments <= 36
+          && isIsoDate(d.purchaseDate)
+          && isIsoDate(d.firstChargeDate)
+          && isIsoDate(d.createdAt)
+          && d.chargedInstallments is int
+          && d.chargedInstallments >= 0
+          && d.chargedInstallments <= d.installments;
+    }
+
+    match /users/{uid}/installmentPurchases/{purchaseId} {
+      allow read: if isOwner(uid);
+      // chargedInstallments isn't pinned to 0 on create: a JSON restore
+      // recreates a purchase (genesis path, resource == null) at whatever
+      // progress it had when exported — see replaceAll, which deletes then
+      // rewrites this collection like any other ledger collection.
+      allow create: if isOwner(uid) && validInstallmentPurchase(request.resource.data);
+      allow update: if isOwner(uid)
+                    && validInstallmentPurchase(request.resource.data)
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.totalAmount == resource.data.totalAmount
+                    && request.resource.data.installments == resource.data.installments
+                    && request.resource.data.firstChargeDate == resource.data.firstChargeDate;
+      allow delete: if isOwner(uid);
+    }
+
     // Everything else under the user subtree (and everywhere else) is denied
     // by default — no catch-all allow.
   }
