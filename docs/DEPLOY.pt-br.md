@@ -113,7 +113,7 @@ O **único** rollback pros dados do usuário é a exportação manual de JSON
 feita durante o passo de backup do deploy-gate (`scripts/deploy.sh` passo 1
 / `docs/BACKEND.pt-br.md`). Pra restaurar: abrir o app, logar como o
 usuário afetado, Ajustes -> Importar JSON, escolher o arquivo de backup.
-Isso substitui as quatro coleções de ledger daquele usuário e reseta os
+Isso substitui as cinco coleções de ledger daquele usuário e reseta os
 docs de saldo a partir do ledger importado — não há restore parcial/
 seletivo, então usar a exportação boa mais recente.
 

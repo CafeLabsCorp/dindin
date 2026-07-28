@@ -32,7 +32,7 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   num formato portável e legível por humanos.
 - **Exclusão** — processo manual, documentado (aceitável neste estágio):
   1. O usuário pode limpar-e-substituir os próprios dados importando um
-     backup vazio/editado (`replaceAll` limpa as quatro coleções do ledger
+     backup vazio/editado (`replaceAll` limpa as cinco coleções do ledger
      e reseta os docs de saldo).
   2. Exclusão completa de conta (usuário de auth + toda a subárvore
      `users/{uid}`) é um passo manual de admin: apagar o usuário de Auth no
@@ -73,9 +73,19 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   — ver "allowNegative (dívida por caixinha)" abaixo. `null`/ausente (um
   doc anterior a este campo, ou qualquer caixinha `save`) se comporta como
   `false` — a única semântica que existia antes.
+- `subscriptions/{id}` — uma coleção nova (não um campo numa existente): um
+  gasto fixo recorrente mensal (name, amount, dueDay, createdAt,
+  lastChargedDate?), sempre cobrado direto da conta. Não carrega nenhum
+  invariante de dinheiro próprio — `FirestoreService.catchUpSubscriptions` é
+  o único escritor dos docs de `expenses` que ela gera, e esses passam pelo
+  mesmo portão de saldo da conta de qualquer outro gasto. Ver "Assinaturas
+  (gastos recorrentes)" abaixo pro modelo de catch-up disparado pelo cliente
+  que isso implica. Um backup antigo sem a chave `subscriptions` importa como
+  lista vazia.
 
 Backups JSON antigos (sem `monthlyBudget`, sem `transferId`, sem
-`kind`/`goalAmount`, sem `allowNegative`) importam sem alterações.
+`kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`) importam sem
+alterações.
 
 ### Docs de saldo denormalizados (Option B — ver abaixo)
 
@@ -94,7 +104,7 @@ somar uma coleção):
 Esses são um **cache derivado, não fonte de verdade**:
 
 - Eles NÃO fazem parte do backup JSON. `AppDb.toJson()`/`fromJson()`
-  continua sendo só as quatro coleções do ledger; os saldos são
+  continua sendo só as cinco coleções do ledger; os saldos são
   recalculados a partir do ledger no restore (`FirestoreService.
   replaceAll`) e pelo script de backfill. Isso mantém backups antigos
   importáveis e evita guardar dados redundantes e sujeitos a drift no
@@ -104,6 +114,35 @@ Esses são um **cache derivado, não fonte de verdade**:
   desalinhasse, a UI continuaria mostrando a verdade; os docs de saldo
   existem pra deixar as RULES aplicarem não-negatividade e dar ao cliente
   checagens O(1) antes de escrever.
+
+## Assinaturas (gastos recorrentes): catch-up disparado pelo cliente, não um agendamento no servidor
+
+Uma assinatura (`users/{uid}/subscriptions/{id}`) é uma cobrança fixa mensal
+(nome, valor, dia de cobrança) que o usuário cadastra uma vez. A parte
+"automática" — um `Expense` aparecer na data de cobrança sem o usuário digitar
+nada — tem dois desenhos possíveis, o mesmo trade-off da divisão Option A/B
+acima:
+
+- **Escolhido: catch-up disparado pelo cliente.**
+  `FirestoreService.catchUpSubscriptions` roda uma vez por sessão logada
+  (`subscriptionCatchUpProvider`, observado a partir do `AppShell`), calcula
+  toda data de cobrança que cada assinatura perdeu desde a última cobrança, e
+  cria um `Expense` de conta por mês perdido, do mais antigo pro mais novo —
+  passando pelo mesmo portão de saldo da conta de um gasto manual (nunca
+  deixa a conta negativa; uma data que não cabe no saldo é tentada de novo na
+  próxima vez em vez de falhar ruidosamente). Isso fica no tier gratuito
+  Spark: sem Cloud Scheduler, sem Cloud Function. A consequência no mundo
+  real é que uma data de cobrança só é lançada na próxima vez que o app é
+  ABERTO no dia ou depois dele — nunca com o app fechado.
+- **Não escolhido: cobrança agendada no servidor.** Um job do Cloud Scheduler
+  chamando uma Cloud Function todo dia poderia cobrar exatamente no dia certo
+  independente do app estar aberto, mas exige o plano pago Blaze (o mesmo
+  gate de custo da Option A acima) — recusado pelo mesmo motivo que a Option A
+  foi recusada.
+
+Se algum dia isso precisar virar "cobra mesmo que você nunca abra o app",
+revisitar junto com a Option A — as duas decisões compartilham o mesmo passo
+de habilitar o Blaze.
 
 ## Aplicação de integridade de dinheiro: DECIDIDO — Option B (só regras, tier Spark grátis)
 

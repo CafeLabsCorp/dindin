@@ -84,13 +84,19 @@ users/{uid}
     categoryId: string?        # null = gasto direto da conta, não de uma caixinha
     description: string?
 
+  subscriptions/{subscriptionId}
+    name: string, amount: number, dueDay: int (1-31)
+    createdAt: string (ISO date)
+    lastChargedDate: string?   # data ISO da última cobrança já virada gasto
+                                # por catchUpSubscriptions
+
   meta/account            { balance: number }   # saldo geral da conta (derivado)
   balances/{categoryId}   { balance: number }   # saldo de cada caixinha (derivado)
 ```
 
 `meta/account` e `balances/{categoryId}` são um **cache derivado**, não fonte
 de verdade: não fazem parte do backup JSON e são recalculados a partir do
-ledger (as quatro coleções acima) tanto no restore (`FirestoreService.
+ledger (as cinco coleções acima) tanto no restore (`FirestoreService.
 replaceAll`) quanto pelo script de backfill. Os saldos exibidos na tela
 sempre são somados do ledger por `aggregation_service.dart` — mesmo que o
 cache divergisse, a UI mostraria a verdade. Eles existem só para que as
@@ -101,7 +107,9 @@ invariantes garantidos e as limitações conhecidas desse desenho.
 `Category.kind`, `monthlyBudget`, `goalAmount`, `allowNegative` e
 `Allocation.transferId` são todos campos opcionais adicionados depois do
 schema original — um backup JSON antigo, sem eles, continua importável sem
-alterações.
+alterações. `subscriptions` é uma coleção inteira nova adicionada do mesmo
+jeito — um backup antigo sem a chave `subscriptions` importa como lista
+vazia.
 
 ## Decisões técnicas e por quê
 
@@ -112,6 +120,15 @@ alterações.
   `docs/BACKEND.pt-br.md`, escolhida para ficar no tier gratuito (Spark) do
   Firebase — a alternativa com Cloud Functions (`functions/`, tier pago
   Blaze) existe como referência inativa, não implantada.
+
+- **Uma assinatura só cobra quando o app é aberto, nunca num agendamento de
+  servidor.** `FirestoreService.catchUpSubscriptions` roda uma vez por sessão
+  logada e recupera toda data de cobrança que uma assinatura perdeu, do mais
+  antigo pro mais novo, direto da conta — mas nada roda com o app fechado. A
+  alternativa (Cloud Scheduler + Cloud Function cobrando exatamente no dia
+  certo) exigiria o mesmo plano pago Blaze recusado pra Option A acima, pelo
+  mesmo motivo. Ver `docs/BACKEND.pt-br.md`, "Assinaturas (gastos
+  recorrentes)".
 
 - **Transferência entre caixinhas = duas `Allocation`s pareadas por
   `transferId`, não uma coleção nova.** Uma perna negativa na caixinha de
