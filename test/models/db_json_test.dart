@@ -12,6 +12,7 @@ import 'package:dindin/models/db.dart';
 import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
+import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/models/subscription.dart';
 
 void main() {
@@ -55,6 +56,11 @@ void main() {
       expect(db.subscriptions, isEmpty);
     });
 
+    test('missing installmentPurchases key becomes an empty list, not a crash', () {
+      final db = AppDb.fromJson(oldJson);
+      expect(db.installmentPurchases, isEmpty);
+    });
+
     test('re-exporting an old-format import does not invent the new fields', () {
       final db = AppDb.fromJson(oldJson);
       final reExported = db.toJson();
@@ -63,6 +69,7 @@ void main() {
       final alloc = (reExported['allocations'] as List).single as Map<String, dynamic>;
       expect(alloc.containsKey('transferId'), isFalse);
       expect(reExported['subscriptions'], isEmpty);
+      expect(reExported['installmentPurchases'], isEmpty);
     });
   });
 
@@ -104,6 +111,18 @@ void main() {
       subscriptions: const [
         Subscription(id: 's1', name: 'Netflix', amount: 39.9, dueDay: 5, createdAt: '2026-01-01'),
       ],
+      installmentPurchases: const [
+        InstallmentPurchase(
+          id: 'p1',
+          name: 'Notebook Dell',
+          totalAmount: 300,
+          installments: 3,
+          purchaseDate: '2026-01-05',
+          firstChargeDate: '2026-02-05',
+          createdAt: '2026-01-05',
+          chargedInstallments: 1,
+        ),
+      ],
     );
 
     test('toJson -> fromJson reproduces every field exactly', () {
@@ -126,11 +145,18 @@ void main() {
 
       expect(restored.subscriptions.single.name, 'Netflix');
       expect(restored.subscriptions.single.dueDay, 5);
+
+      expect(restored.installmentPurchases.single.name, 'Notebook Dell');
+      expect(restored.installmentPurchases.single.installments, 3);
+      expect(restored.installmentPurchases.single.chargedInstallments, 1);
     });
   });
 
-  test('AppDb.toJson only ever has the five ledger keys — balance docs are never part of the backup', () {
+  test('AppDb.toJson only ever has the six ledger keys — balance docs are never part of the backup', () {
     final json = AppDb.empty.toJson();
-    expect(json.keys.toSet(), {'categories', 'incomes', 'allocations', 'expenses', 'subscriptions'});
+    expect(
+      json.keys.toSet(),
+      {'categories', 'incomes', 'allocations', 'expenses', 'subscriptions', 'installmentPurchases'},
+    );
   });
 }
