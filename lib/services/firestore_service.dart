@@ -6,6 +6,7 @@ import '../models/db.dart';
 import '../models/expense.dart';
 import '../models/income.dart';
 import '../models/income_source.dart';
+import '../models/subscription.dart';
 import 'aggregation_service.dart' as agg;
 
 /// CRUD for a single user's data, mirroring the Next.js API routes under
@@ -24,7 +25,7 @@ import 'aggregation_service.dart' as agg;
 /// docs/BACKEND.md.
 ///
 /// The balance docs are a DERIVED cache: they are NOT part of the JSON backup
-/// (which stays the four ledger collections only) and are rebuilt from the
+/// (which stays the five ledger collections only) and are rebuilt from the
 /// ledger by the one-time backfill script and by [replaceAll] on restore. The
 /// app's on-screen balances are still summed from the ledger by
 /// `aggregation_service`, so a cache that ever drifts never misleads the user.
@@ -32,8 +33,18 @@ class FirestoreService {
   final String uid;
   final FirebaseFirestore _db;
 
-  FirestoreService({required this.uid, FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  /// Injectable clock, used only by [catchUpSubscriptions]'s "which months
+  /// are due by now" math — defaults to the real wall clock. Overridable in
+  /// tests so month-boundary behavior (a due date landing exactly today, or
+  /// in a future month) doesn't depend on when the test suite happens to run.
+  final DateTime Function() _now;
+
+  FirestoreService({
+    required this.uid,
+    FirebaseFirestore? firestore,
+    DateTime Function()? clock,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _now = clock ?? DateTime.now;
 
   CollectionReference<Map<String, dynamic>> get _categories =>
       _db.collection('users/$uid/categories');
@@ -43,6 +54,8 @@ class FirestoreService {
       _db.collection('users/$uid/allocations');
   CollectionReference<Map<String, dynamic>> get _expenses =>
       _db.collection('users/$uid/expenses');
+  CollectionReference<Map<String, dynamic>> get _subscriptions =>
+      _db.collection('users/$uid/subscriptions');
   CollectionReference<Map<String, dynamic>> get _balances =>
       _db.collection('users/$uid/balances');
 
@@ -115,12 +128,19 @@ class FirestoreService {
     );
   }
 
+  Stream<List<Subscription>> watchSubscriptions() {
+    return _subscriptions.orderBy('createdAt').snapshots().map(
+      (s) => s.docs.map((d) => Subscription.fromMap(d.id, d.data())).toList(),
+    );
+  }
+
   Future<AppDb> fetchAll() async {
     final results = await Future.wait([
       _categories.get(),
       _incomes.get(),
       _allocations.get(),
       _expenses.get(),
+      _subscriptions.get(),
     ]);
     return AppDb(
       categories: results[0].docs
@@ -134,6 +154,9 @@ class FirestoreService {
           .toList(),
       expenses: results[3].docs
           .map((d) => Expense.fromMap(d.id, d.data()))
+          .toList(),
+      subscriptions: results[4].docs
+          .map((d) => Subscription.fromMap(d.id, d.data()))
           .toList(),
     );
   }
@@ -674,6 +697,131 @@ class FirestoreService {
   }
 
   // -------------------------------------------------------------------------
+  // Subscriptions (fixed recurring monthly expense, e.g. "Netflix"). Always
+  // charged straight from the account — no categoryId, unlike a plain
+  // expense. The doc itself carries no money invariant (creating/editing/
+  // deleting it never touches a balance); only the Expense docs it produces
+  // via [catchUpSubscriptions] go through the normal account-balance gate.
+  // -------------------------------------------------------------------------
+  Future<Subscription> createSubscription({
+    required String name,
+    required double amount,
+    required int dueDay,
+  }) async {
+    if (amount <= 0) throw StateError('subscription amount must be positive');
+    if (dueDay < 1 || dueDay > 31) {
+      throw StateError('dueDay must be between 1 and 31');
+    }
+    final doc = _subscriptions.doc();
+    final subscription = Subscription(
+      id: doc.id,
+      name: name,
+      amount: amount,
+      dueDay: dueDay,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    await doc.set(subscription.toMap());
+    return subscription;
+  }
+
+  Future<void> deleteSubscription(String id) async {
+    await _subscriptions.doc(id).delete();
+  }
+
+  /// Clamps [day] to the last day of [year]/[month] — e.g. dueDay 31 in
+  /// February resolves to the 28th (or 29th on a leap year).
+  DateTime _dueDateFor(int year, int month, int day) {
+    final lastDayOfMonth = DateTime(year, month + 1, 0).day;
+    return DateTime(year, month, day > lastDayOfMonth ? lastDayOfMonth : day);
+  }
+
+  /// Every due date [subscription] should have charged by [today], oldest
+  /// first: one per month starting the month after [Subscription.lastChargedDate]
+  /// (or the month it was created, if never charged), skipping only a first
+  /// occurrence that falls before [Subscription.createdAt] — a subscription
+  /// registered today must not backdate a charge to before it existed.
+  List<DateTime> _pendingDueDates(Subscription subscription, DateTime today) {
+    final created = DateTime.parse(subscription.createdAt.substring(0, 10));
+    final startMonth = subscription.lastChargedDate == null
+        ? DateTime(created.year, created.month)
+        : () {
+            final last = DateTime.parse(
+              subscription.lastChargedDate!.substring(0, 10),
+            );
+            return DateTime(last.year, last.month + 1);
+          }();
+    final dueDates = <DateTime>[];
+    var cursor = startMonth;
+    while (!cursor.isAfter(DateTime(today.year, today.month))) {
+      final due = _dueDateFor(cursor.year, cursor.month, subscription.dueDay);
+      if (!due.isAfter(today) && !due.isBefore(created)) {
+        dueDates.add(due);
+      }
+      cursor = DateTime(cursor.year, cursor.month + 1);
+    }
+    return dueDates;
+  }
+
+  /// Catches up every subscription's missed due dates since it was last
+  /// charged, creating one account-level [Expense] per month (oldest first) —
+  /// this IS the "cobrança automática" the feature promises. Meant to be
+  /// called once per app open (see `subscriptionCatchUpProvider`), not on a
+  /// server schedule: staying on that client-triggered model is what keeps
+  /// this on the free Firestore Spark tier, consistent with the rest of the
+  /// app's Option B design (see docs/BACKEND.md) — a due date is only ever
+  /// charged the next time the app is opened on or after it, never while
+  /// closed.
+  ///
+  /// If the account balance can't cover a due charge, that subscription's
+  /// catch-up stops there (mirrors [createExpense]'s "never overdraw the
+  /// account" guarantee) and is retried from the same due date next time this
+  /// runs; other subscriptions are unaffected.
+  Future<void> catchUpSubscriptions() async {
+    final snap = await _subscriptions.get();
+    final today = _now();
+    for (final doc in snap.docs) {
+      final subscription = Subscription.fromMap(doc.id, doc.data());
+      for (final due in _pendingDueDates(subscription, today)) {
+        final dueIso =
+            '${due.year.toString().padLeft(4, '0')}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
+        try {
+          await _db.runTransaction((tx) async {
+            final acct = await _readBalance(tx, _account);
+            if (subscription.amount > acct + _eps) {
+              throw StateError('amount exceeds available balance');
+            }
+            final expenseDoc = _expenses.doc();
+            final expense = Expense(
+              id: expenseDoc.id,
+              date: dueIso,
+              amount: subscription.amount,
+              description: subscription.name,
+            );
+            tx.set(expenseDoc, expense.toMap());
+            tx.set(_account, {'balance': acct - subscription.amount});
+            // A full overwrite (not a merge) — every other field is copied
+            // from the already-fetched [subscription] unchanged, so this
+            // never depends on transactional merge support.
+            tx.set(
+              doc.reference,
+              Subscription(
+                id: subscription.id,
+                name: subscription.name,
+                amount: subscription.amount,
+                dueDay: subscription.dueDay,
+                createdAt: subscription.createdAt,
+                lastChargedDate: dueIso,
+              ).toMap(),
+            );
+          });
+        } on StateError {
+          break; // insufficient balance now; retry this due date next time.
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Full restore (from a JSON backup). Wipes the user's data and writes `db`
   // in its place, preserving original ids — used by [ImportExportService].
   //
@@ -724,7 +872,16 @@ class FirestoreService {
     ]);
 
     // 2. Delete existing ledger docs (balance docs now absent -> rules skip deltas).
-    for (final collection in [_categories, _incomes, _allocations, _expenses]) {
+    //    Subscriptions carry no balance/delta of their own (see the
+    //    "Subscriptions" section above), so they're wiped and rewritten here
+    //    alongside the other ledger collections with no special ordering need.
+    for (final collection in [
+      _categories,
+      _incomes,
+      _allocations,
+      _expenses,
+      _subscriptions,
+    ]) {
       final existing = await collection.get();
       await _deleteRefs(existing.docs.map((d) => d.reference).toList());
     }
@@ -735,6 +892,7 @@ class FirestoreService {
       for (final i in db.incomes) (_incomes.doc(i.id), i.toMap()),
       for (final a in db.allocations) (_allocations.doc(a.id), a.toMap()),
       for (final e in db.expenses) (_expenses.doc(e.id), e.toMap()),
+      for (final s in db.subscriptions) (_subscriptions.doc(s.id), s.toMap()),
     ]);
 
     // 4. Write the derived balance docs last (recomputed in step 0). Only
