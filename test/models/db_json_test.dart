@@ -12,6 +12,7 @@ import 'package:dindin/models/db.dart';
 import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
+import 'package:dindin/models/subscription.dart';
 
 void main() {
   group('old-format backup (pre monthlyBudget/transferId) imports unchanged', () {
@@ -49,6 +50,11 @@ void main() {
       expect(db.allocations.single.isTransfer, isFalse);
     });
 
+    test('missing subscriptions key becomes an empty list, not a crash', () {
+      final db = AppDb.fromJson(oldJson);
+      expect(db.subscriptions, isEmpty);
+    });
+
     test('re-exporting an old-format import does not invent the new fields', () {
       final db = AppDb.fromJson(oldJson);
       final reExported = db.toJson();
@@ -56,6 +62,7 @@ void main() {
       expect(cat.containsKey('monthlyBudget'), isFalse);
       final alloc = (reExported['allocations'] as List).single as Map<String, dynamic>;
       expect(alloc.containsKey('transferId'), isFalse);
+      expect(reExported['subscriptions'], isEmpty);
     });
   });
 
@@ -94,6 +101,9 @@ void main() {
       expenses: const [
         Expense(id: 'e1', date: '2026-01-04', amount: 30, categoryId: 'c1'),
       ],
+      subscriptions: const [
+        Subscription(id: 's1', name: 'Netflix', amount: 39.9, dueDay: 5, createdAt: '2026-01-01'),
+      ],
     );
 
     test('toJson -> fromJson reproduces every field exactly', () {
@@ -113,11 +123,14 @@ void main() {
       final plainAlloc = restored.allocations.firstWhere((a) => a.id == 'a1');
       expect(plainAlloc.transferId, isNull);
       expect(plainAlloc.isTransfer, isFalse);
+
+      expect(restored.subscriptions.single.name, 'Netflix');
+      expect(restored.subscriptions.single.dueDay, 5);
     });
   });
 
-  test('AppDb.toJson only ever has the four ledger keys — balance docs are never part of the backup', () {
+  test('AppDb.toJson only ever has the five ledger keys — balance docs are never part of the backup', () {
     final json = AppDb.empty.toJson();
-    expect(json.keys.toSet(), {'categories', 'incomes', 'allocations', 'expenses'});
+    expect(json.keys.toSet(), {'categories', 'incomes', 'allocations', 'expenses', 'subscriptions'});
   });
 }
