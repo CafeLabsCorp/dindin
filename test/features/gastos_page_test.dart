@@ -151,7 +151,10 @@ void main() {
       await pump(tester, expenses: []);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Adicionar assinatura'));
+      final addButton = find.widgetWithText(FilledButton, 'Adicionar assinatura');
+      await tester.ensureVisible(addButton); // a seção fica abaixo da dobra na ListView
+      await tester.pumpAndSettle();
+      await tester.tap(addButton);
       await tester.pumpAndSettle();
 
       expect(find.text('Informe um nome.'), findsOneWidget);
