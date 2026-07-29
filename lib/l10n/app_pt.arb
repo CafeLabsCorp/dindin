@@ -131,6 +131,17 @@
   "removeInstallmentPurchaseConfirmTitle": "Remover esse parcelamento?",
   "removeInstallmentPurchaseTooltip": "Remover parcelamento",
 
+  "pendingChargesWarning": "{count, plural, =1{1 cobrança não foi lançada porque o saldo da conta não cobriu. Ela entra sozinha assim que houver saldo.} other{{count} cobranças não foram lançadas porque o saldo da conta não cobriu. Elas entram sozinhas assim que houver saldo.}}",
+  "@pendingChargesWarning": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "pendingChargesRowLabel": "{count, plural, =1{1 cobrança pendente} other{{count} cobranças pendentes}}",
+  "@pendingChargesRowLabel": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "catchUpFailedWarning": "Não deu pra processar as cobranças automáticas agora. O app tenta de novo na próxima vez que você abrir.",
+  "generatedExpenseTooltip": "Lançado automaticamente por uma assinatura ou parcelamento",
+
   "receitasTitle": "Receitas",
   "receitasSubtitle": "Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\naloque em caixinhas quando quiser, no Dashboard.",
   "incomeSourceFieldLabel": "Origem",

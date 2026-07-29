@@ -292,10 +292,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get submitInstallmentPurchaseButton => 'Add installment purchase';
 
   @override
-  String get installmentPurchasesListTitle => 'Registered installment purchases';
+  String get installmentPurchasesListTitle =>
+      'Registered installment purchases';
 
   @override
-  String get installmentPurchasesEmptyState => 'No installment purchases registered yet.';
+  String get installmentPurchasesEmptyState =>
+      'No installment purchases registered yet.';
 
   @override
   String installmentSummaryLabel(String count, String amount) {
@@ -308,10 +310,43 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get removeInstallmentPurchaseConfirmTitle => 'Remove this installment purchase?';
+  String get removeInstallmentPurchaseConfirmTitle =>
+      'Remove this installment purchase?';
 
   @override
   String get removeInstallmentPurchaseTooltip => 'Remove installment purchase';
+
+  @override
+  String pendingChargesWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count charges weren\'t posted because the account balance didn\'t cover them. They go through on their own once there\'s enough.',
+      one:
+          '1 charge wasn\'t posted because the account balance didn\'t cover it. It goes through on its own once there\'s enough.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pendingChargesRowLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pending charges',
+      one: '1 pending charge',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catchUpFailedWarning =>
+      'Couldn\'t process automatic charges right now. The app tries again next time you open it.';
+
+  @override
+  String get generatedExpenseTooltip =>
+      'Posted automatically by a subscription or installment purchase';
 
   @override
   String get receitasTitle => 'Income';

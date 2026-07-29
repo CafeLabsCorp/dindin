@@ -102,6 +102,11 @@
   "removeInstallmentPurchaseConfirmTitle": "Remove this installment purchase?",
   "removeInstallmentPurchaseTooltip": "Remove installment purchase",
 
+  "pendingChargesWarning": "{count, plural, =1{1 charge wasn't posted because the account balance didn't cover it. It goes through on its own once there's enough.} other{{count} charges weren't posted because the account balance didn't cover them. They go through on their own once there's enough.}}",
+  "pendingChargesRowLabel": "{count, plural, =1{1 pending charge} other{{count} pending charges}}",
+  "catchUpFailedWarning": "Couldn't process automatic charges right now. The app tries again next time you open it.",
+  "generatedExpenseTooltip": "Posted automatically by a subscription or installment purchase",
+
   "receitasTitle": "Income",
   "receitasSubtitle": "Log how much came in and where from. The amount goes straight into your account —\nallocate it to envelopes whenever you want, from the Dashboard.",
   "incomeSourceFieldLabel": "Source",
