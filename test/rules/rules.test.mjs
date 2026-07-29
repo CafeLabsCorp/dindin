@@ -85,6 +85,7 @@ const incomeDoc = (db, uid, id) => doc(db, `users/${uid}/incomes/${id}`);
 const allocDoc = (db, uid, id) => doc(db, `users/${uid}/allocations/${id}`);
 const expenseDoc = (db, uid, id) => doc(db, `users/${uid}/expenses/${id}`);
 const subscriptionDoc = (db, uid, id) => doc(db, `users/${uid}/subscriptions/${id}`);
+const installmentPurchaseDoc = (db, uid, id) => doc(db, `users/${uid}/installmentPurchases/${id}`);
 
 // -----------------------------------------------------------------------
 // 1. Per-write delta linkage (the core Option B invariant)
@@ -1123,6 +1124,99 @@ describe('subscriptions', () => {
       }),
     );
     await assertFails(deleteDoc(subscriptionDoc(bobDb(), 'alice', 's1')));
+  });
+});
+
+// -----------------------------------------------------------------------
+// 10. Installment purchases (a card purchase split into N fixed monthly
+//     charges, e.g. "Notebook Dell, 12x"). Same posture as subscriptions —
+//     no money invariant of its own — plus totalAmount/installments/
+//     firstChargeDate immutable across edits (see docs/ARQUITETURA.md).
+// -----------------------------------------------------------------------
+
+describe('installmentPurchases', () => {
+  const base = {
+    name: 'Notebook Dell',
+    totalAmount: 300,
+    installments: 3,
+    purchaseDate: '2026-01-10',
+    firstChargeDate: '2026-02-05',
+    createdAt: '2026-01-10',
+    chargedInstallments: 0,
+  };
+
+  test('a shape-valid create succeeds', async () => {
+    await assertSucceeds(setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p1'), base));
+  });
+
+  test('a restore recreating a purchase already mid-progress (chargedInstallments > 0) succeeds', async () => {
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p1'), { ...base, chargedInstallments: 1 }),
+    );
+  });
+
+  test('create is rejected when totalAmount is not positive', async () => {
+    await assertFails(
+      setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p1'), { ...base, totalAmount: 0 }),
+    );
+  });
+
+  test('create is rejected when installments is outside 2-36', async () => {
+    await assertFails(
+      setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p1'), { ...base, installments: 1 }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p2'), { ...base, installments: 37 }),
+    );
+  });
+
+  test('create is rejected when chargedInstallments is negative or exceeds installments', async () => {
+    await assertFails(
+      setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p1'), { ...base, chargedInstallments: -1 }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(aliceDb(), 'alice', 'p2'), { ...base, chargedInstallments: 4 }),
+    );
+  });
+
+  test('a chargedInstallments bump (catchUpInstallmentPurchases billing the next one) succeeds', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, chargedInstallments: 1 }),
+    );
+  });
+
+  test('update is rejected if it changes createdAt, totalAmount, installments, or firstChargeDate', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, createdAt: '2026-06-01' }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, totalAmount: 999 }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, installments: 12 }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, firstChargeDate: '2026-03-05' }),
+    );
+  });
+
+  test('delete succeeds for the owner', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertSucceeds(deleteDoc(installmentPurchaseDoc(db, 'alice', 'p1')));
+  });
+
+  test("a user cannot read, write, or delete another user's installment purchase", async () => {
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertFails(getDoc(installmentPurchaseDoc(bobDb(), 'alice', 'p1')));
+    await assertFails(
+      setDoc(installmentPurchaseDoc(bobDb(), 'alice', 'p1'), { ...base, name: 'Hijacked' }),
+    );
+    await assertFails(deleteDoc(installmentPurchaseDoc(bobDb(), 'alice', 'p1')));
   });
 });
 
