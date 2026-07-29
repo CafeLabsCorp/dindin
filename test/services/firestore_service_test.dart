@@ -256,6 +256,75 @@ void main() {
       );
     });
 
+    group('updateSubscription', () {
+      test('changes name, amount, day and source, keeping billing history', () async {
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 39.90,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            lastChargedDate: '2026-03-05',
+          ),
+        );
+
+        await svc.updateSubscription(
+          's1',
+          name: 'Netflix 4K',
+          amount: 59.90,
+          dueDay: 10,
+          categoryId: 'c1',
+        );
+
+        final s = (await subscription('s1'))!;
+        expect(s.name, 'Netflix 4K');
+        expect(s.amount, 59.90);
+        expect(s.dueDay, 10);
+        expect(s.categoryId, 'c1');
+        expect(s.createdAt, '2026-01-01', reason: 'imutável, as rules exigem');
+        expect(
+          s.lastChargedDate,
+          '2026-03-05',
+          reason: 'perder isso faria o catch-up recobrar meses já pagos',
+        );
+      });
+
+      test('a price change never re-bills a month already charged', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 20));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-03-01'),
+        );
+        await svc.catchUpSubscriptions(); // cobra 05/03 a 40
+
+        await svc.updateSubscription('s1', name: 'Netflix', amount: 90, dueDay: 5);
+        await svc.catchUpSubscriptions();
+
+        final exps = await expenses();
+        expect(exps, hasLength(1), reason: 'março já foi cobrado');
+        expect(exps.single.amount, 40, reason: 'e foi cobrado pelo preço da época');
+        expect(await accountBalance(), 960);
+      });
+
+      test('rejects an invalid amount or day, leaving the doc untouched', () async {
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await expectLater(
+          svc.updateSubscription('s1', name: 'X', amount: 0, dueDay: 5),
+          throwsA(isA<StateError>()),
+        );
+        await expectLater(
+          svc.updateSubscription('s1', name: 'X', amount: 10, dueDay: 32),
+          throwsA(isA<StateError>()),
+        );
+
+        expect((await subscription('s1'))!.name, 'Netflix');
+      });
+    });
+
     test('deleteSubscription removes the doc', () async {
       final sub = await svc.createSubscription(name: 'Netflix', amount: 10, dueDay: 5);
       await svc.deleteSubscription(sub.id);

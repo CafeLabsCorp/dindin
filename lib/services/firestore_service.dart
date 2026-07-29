@@ -783,6 +783,50 @@ class FirestoreService {
     return subscription;
   }
 
+  /// Edits a subscription in place — the price went up, the billing day
+  /// moved, it should come out of a different caixinha now.
+  ///
+  /// Deliberately an edit and not delete-and-recreate: recreating loses
+  /// [Subscription.lastChargedDate] (so catch-up would re-evaluate months it
+  /// already billed) and orphans the `sourceId` on every [Expense] it already
+  /// generated, which is what tells the app those charges came from here.
+  ///
+  /// [createdAt] and [lastChargedDate] are carried over untouched, so this
+  /// can never make an already-billed month billable again: catch-up resumes
+  /// from the month after whatever was last charged, whichever day of the
+  /// month the new [dueDay] points at. Changing the day therefore takes
+  /// effect from the NEXT unbilled month, never retroactively.
+  Future<void> updateSubscription(
+    String id, {
+    required String name,
+    required double amount,
+    required int dueDay,
+    String? categoryId,
+  }) async {
+    if (amount <= 0) throw StateError('subscription amount must be positive');
+    if (dueDay < 1 || dueDay > 31) {
+      throw StateError('dueDay must be between 1 and 31');
+    }
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(_subscriptions.doc(id));
+      final data = snap.data();
+      if (data == null) throw StateError('subscription not found');
+      final current = Subscription.fromMap(id, data);
+      tx.set(
+        _subscriptions.doc(id),
+        Subscription(
+          id: id,
+          name: name,
+          amount: amount,
+          dueDay: dueDay,
+          createdAt: current.createdAt,
+          lastChargedDate: current.lastChargedDate,
+          categoryId: categoryId,
+        ).toMap(),
+      );
+    });
+  }
+
   Future<void> deleteSubscription(String id) async {
     await _subscriptions.doc(id).delete();
   }
