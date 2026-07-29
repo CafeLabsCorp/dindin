@@ -28,7 +28,15 @@ void main() {
     required List<Expense> expenses,
     List<Subscription> subscriptions = const [],
     List<InstallmentPurchase> installmentPurchases = const [],
-  }) {
+  }) async {
+    // GastosPage's ListView now has 4 cards (gasto, lista, assinaturas,
+    // parcelamentos) — taller than the default 600px test surface, and a
+    // sliver list only builds Elements for children within the viewport +
+    // cache extent. Without a tall-enough surface, find.text() on the last
+    // card's content returns 0 matches (the Element genuinely doesn't exist
+    // yet), not because anything is broken.
+    await tester.binding.setSurfaceSize(const Size(800, 3200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -58,7 +66,9 @@ void main() {
   Future<void> pumpWithNegativeBalance(
     WidgetTester tester, {
     required Category category,
-  }) {
+  }) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
