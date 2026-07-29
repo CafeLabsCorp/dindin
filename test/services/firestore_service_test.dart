@@ -10,6 +10,7 @@
 // does NOT exercise firestore.rules (which fake_cloud_firestore doesn't
 // evaluate) — that is covered separately by test/rules/ against the real
 // Firestore emulator.
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,6 +18,7 @@ import 'package:dindin/models/allocation.dart';
 import 'package:dindin/models/category.dart';
 import 'package:dindin/models/db.dart';
 import 'package:dindin/models/expense.dart';
+import 'package:dindin/models/expense_source.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
 import 'package:dindin/models/installment_purchase.dart';
@@ -348,6 +350,79 @@ void main() {
         expect(await accountBalance(), 10); // 50 - 40
       });
 
+      test('tags the generated expense with the subscription that produced it', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        final exp = (await expenses()).single;
+        expect(exp.sourceType, 'subscription');
+        expect(exp.sourceId, 's1');
+        expect(exp.source, ExpenseSource.subscription);
+        expect(exp.isGenerated, isTrue);
+      });
+
+      test('does not re-charge a due date another device charged mid-run', () async {
+        final hooked = _HookedFirestore(fake);
+        svc = FirestoreService(uid: 'u1', firestore: hooked, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        // The other device commits January's charge in the window between our
+        // subscriptions.get() and our transaction — the same state a real
+        // transaction retry would find after losing the race.
+        hooked.beforeNextTransaction = () async {
+          await fake.doc('users/u1/expenses/other').set(
+            const Expense(
+              id: 'other',
+              date: '2026-01-05',
+              amount: 40,
+              description: 'Netflix',
+              sourceType: 'subscription',
+              sourceId: 's1',
+            ).toMap(),
+          );
+          await fake.doc('users/u1/meta/account').set({'balance': 60});
+          await fake.doc('users/u1/subscriptions/s1').set(
+            const Subscription(
+              id: 's1',
+              name: 'Netflix',
+              amount: 40,
+              dueDay: 5,
+              createdAt: '2026-01-01',
+              lastChargedDate: '2026-01-05',
+            ).toMap(),
+          );
+        };
+
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), hasLength(1), reason: 'January must not be billed twice');
+        expect(await accountBalance(), 60, reason: 'the duplicate debit must not happen either');
+      });
+
+      test('skips a subscription deleted mid-run instead of resurrecting it', () async {
+        final hooked = _HookedFirestore(fake);
+        svc = FirestoreService(uid: 'u1', firestore: hooked, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+        hooked.beforeNextTransaction = () => fake.doc('users/u1/subscriptions/s1').delete();
+
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), isEmpty);
+        expect(await accountBalance(), 100);
+        expect(await subscription('s1'), isNull);
+      });
+
       test('clamps dueDay 31 to the last day of a shorter month (Feb 28 in a non-leap year)', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 1));
         await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
@@ -465,6 +540,81 @@ void main() {
         expect(exps.single.date, '2026-01-05');
         expect(exps.single.amount, 33.33);
         expect(exps.single.description, 'Notebook Dell (1/3)');
+        expect(await accountBalance(), 1000 - 33.33);
+        expect((await purchase('p1'))!.chargedInstallments, 1);
+      });
+
+      test('tags the generated expense with the purchase that produced it', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        final exp = (await expenses()).single;
+        expect(exp.sourceType, 'installment');
+        expect(exp.sourceId, 'p1');
+        expect(exp.source, ExpenseSource.installment);
+        expect(exp.isGenerated, isTrue);
+      });
+
+      test('does not re-charge an installment another device charged mid-run', () async {
+        final hooked = _HookedFirestore(fake);
+        svc = FirestoreService(uid: 'u1', firestore: hooked, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        // The other device bills installment 1/3 between our get() and our
+        // transaction — see _HookedFirestore.
+        hooked.beforeNextTransaction = () async {
+          await fake.doc('users/u1/expenses/other').set(
+            const Expense(
+              id: 'other',
+              date: '2026-01-05',
+              amount: 33.33,
+              description: 'Notebook Dell (1/3)',
+              sourceType: 'installment',
+              sourceId: 'p1',
+            ).toMap(),
+          );
+          await fake.doc('users/u1/meta/account').set({'balance': 1000 - 33.33});
+          await fake.doc('users/u1/installmentPurchases/p1').set(
+            const InstallmentPurchase(
+              id: 'p1',
+              name: 'Notebook Dell',
+              totalAmount: 100,
+              installments: 3,
+              purchaseDate: '2025-12-20',
+              firstChargeDate: '2026-01-05',
+              createdAt: '2025-12-20',
+              chargedInstallments: 1,
+            ).toMap(),
+          );
+        };
+
+        await svc.catchUpInstallmentPurchases();
+
+        expect(await expenses(), hasLength(1), reason: 'installment 1/3 must not be billed twice');
         expect(await accountBalance(), 1000 - 33.33);
         expect((await purchase('p1'))!.chargedInstallments, 1);
       });
@@ -1264,4 +1414,56 @@ void main() {
       },
     );
   });
+}
+
+/// A [FirebaseFirestore] that forwards everything [FirestoreService] uses to
+/// [inner], but can run a one-shot callback right before the next transaction
+/// begins.
+///
+/// This exists to make the "two devices ran catch-up at the same time" case
+/// deterministic. `FakeFirebaseFirestore` implements neither transaction
+/// isolation nor conflict retries, so it can't reproduce the real race by
+/// itself. The hook stands in for the other device's ALREADY-COMMITTED write,
+/// which is exactly the state a real transaction retry re-reads — so a
+/// catch-up that trusts the copy of the doc it fetched before the transaction
+/// (instead of re-reading inside it) bills the same occurrence twice here,
+/// just as it would against real Firestore.
+class _HookedFirestore implements FirebaseFirestore {
+  final FakeFirebaseFirestore inner;
+
+  /// Cleared as it fires: a single lost race, not every transaction.
+  Future<void> Function()? beforeNextTransaction;
+
+  _HookedFirestore(this.inner);
+
+  @override
+  CollectionReference<Map<String, dynamic>> collection(String collectionPath) =>
+      inner.collection(collectionPath);
+
+  @override
+  DocumentReference<Map<String, dynamic>> doc(String documentPath) => inner.doc(documentPath);
+
+  @override
+  WriteBatch batch() => inner.batch();
+
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) async {
+    final hook = beforeNextTransaction;
+    beforeNextTransaction = null;
+    if (hook != null) await hook();
+    return inner.runTransaction(
+      transactionHandler,
+      timeout: timeout,
+      maxAttempts: maxAttempts,
+    );
+  }
+
+  // FirestoreService only ever touches the four members above; anything else
+  // reaching this double is a bug in the test, and should throw loudly.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

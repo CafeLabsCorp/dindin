@@ -4,12 +4,15 @@
 // backup with those fields must round-trip exactly, and the denormalized
 // balance docs must never be part of the backup shape at all (they're
 // derived and rebuilt on restore by FirestoreService.replaceAll, not stored).
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dindin/models/allocation.dart';
 import 'package:dindin/models/category.dart';
 import 'package:dindin/models/db.dart';
 import 'package:dindin/models/expense.dart';
+import 'package:dindin/models/expense_source.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
 import 'package:dindin/models/installment_purchase.dart';
@@ -70,6 +73,69 @@ void main() {
       expect(alloc.containsKey('transferId'), isFalse);
       expect(reExported['subscriptions'], isEmpty);
       expect(reExported['installmentPurchases'], isEmpty);
+      // An expense predating the origin link stays a plain manual expense on
+      // the way back out — no invented sourceType/sourceId.
+      final exp = (reExported['expenses'] as List).single as Map<String, dynamic>;
+      expect(exp.containsKey('sourceType'), isFalse);
+      expect(exp.containsKey('sourceId'), isFalse);
+      expect(db.expenses.single.isGenerated, isFalse);
+    });
+  });
+
+  group('expense origin link (sourceType/sourceId) survives a backup round trip', () {
+    test('a generated expense keeps both fields through toJson -> fromJson', () {
+      final db = AppDb(
+        categories: const [],
+        incomes: const [],
+        allocations: const [],
+        expenses: const [
+          Expense(
+            id: 'e1',
+            date: '2026-01-05',
+            amount: 39.90,
+            description: 'Netflix',
+            sourceType: 'subscription',
+            sourceId: 's1',
+          ),
+        ],
+      );
+
+      final restored = AppDb.fromJson(jsonDecode(jsonEncode(db.toJson())) as Map<String, dynamic>);
+
+      final exp = restored.expenses.single;
+      expect(exp.sourceType, 'subscription');
+      expect(exp.sourceId, 's1');
+      expect(exp.source, ExpenseSource.subscription);
+      expect(exp.isGenerated, isTrue);
+    });
+
+    test('a source kind this build does not know is preserved, not dropped', () {
+      // Expense.sourceType is stored raw precisely so a value written by a
+      // newer build survives an export/import here instead of being silently
+      // erased on the way back out.
+      final restored = AppDb.fromJson({
+        'categories': [],
+        'incomes': [],
+        'allocations': [],
+        'expenses': [
+          {
+            'id': 'e1',
+            'date': '2026-01-05',
+            'amount': 10,
+            'sourceType': 'somethingNewer',
+            'sourceId': 'x1',
+          },
+        ],
+      });
+
+      final exp = restored.expenses.single;
+      expect(exp.sourceType, 'somethingNewer');
+      expect(exp.isGenerated, isTrue, reason: 'it still came from something');
+      expect(exp.source, isNull, reason: 'but this build cannot say what');
+      expect(
+        (restored.toJson()['expenses'] as List).single,
+        containsPair('sourceType', 'somethingNewer'),
+      );
     });
   });
 

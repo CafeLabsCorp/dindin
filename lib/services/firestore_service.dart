@@ -4,11 +4,13 @@ import '../models/allocation.dart';
 import '../models/category.dart';
 import '../models/db.dart';
 import '../models/expense.dart';
+import '../models/expense_source.dart';
 import '../models/income.dart';
 import '../models/income_source.dart';
 import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
 import 'aggregation_service.dart' as agg;
+import 'recurring_schedule.dart' as schedule;
 
 /// CRUD for a single user's data, mirroring the Next.js API routes under
 /// `src/app/api/*` — same validation rules, now enforced client-side against
@@ -741,51 +743,11 @@ class FirestoreService {
     await _subscriptions.doc(id).delete();
   }
 
-  /// Clamps [day] to the last day of [year]/[month] — e.g. dueDay 31 in
-  /// February resolves to the 28th (or 29th on a leap year). Shared by
-  /// subscriptions (recurring, unbounded) and installment purchases (bounded
-  /// to N occurrences) — both anchor their monthly occurrence on a day of the
-  /// month that may not exist in every month.
-  DateTime _dueDateFor(int year, int month, int day) {
-    final lastDayOfMonth = DateTime(year, month + 1, 0).day;
-    return DateTime(year, month, day > lastDayOfMonth ? lastDayOfMonth : day);
-  }
-
-  String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
-  /// Every due date [subscription] should have charged by [today], oldest
-  /// first: one per month starting the month after [Subscription.lastChargedDate]
-  /// (or the month it was created, if never charged), skipping only a first
-  /// occurrence that falls before [Subscription.createdAt] — a subscription
-  /// registered today must not backdate a charge to before it existed.
-  List<DateTime> _pendingDueDates(Subscription subscription, DateTime today) {
-    final created = DateTime.parse(subscription.createdAt.substring(0, 10));
-    final startMonth = subscription.lastChargedDate == null
-        ? DateTime(created.year, created.month)
-        : () {
-            final last = DateTime.parse(
-              subscription.lastChargedDate!.substring(0, 10),
-            );
-            return DateTime(last.year, last.month + 1);
-          }();
-    final dueDates = <DateTime>[];
-    var cursor = startMonth;
-    while (!cursor.isAfter(DateTime(today.year, today.month))) {
-      final due = _dueDateFor(cursor.year, cursor.month, subscription.dueDay);
-      if (!due.isAfter(today) && !due.isBefore(created)) {
-        dueDates.add(due);
-      }
-      cursor = DateTime(cursor.year, cursor.month + 1);
-    }
-    return dueDates;
-  }
-
   /// Catches up every subscription's missed due dates since it was last
   /// charged, creating one account-level [Expense] per month (oldest first) —
   /// this IS the "cobrança automática" the feature promises. Meant to be
-  /// called once per app open (see `subscriptionCatchUpProvider`), not on a
-  /// server schedule: staying on that client-triggered model is what keeps
+  /// called once per app open (see `recurringChargesCatchUpProvider`), not on
+  /// a server schedule: staying on that client-triggered model is what keeps
   /// this on the free Firestore Spark tier, consistent with the rest of the
   /// app's Option B design (see docs/BACKEND.md) — a due date is only ever
   /// charged the next time the app is opened on or after it, never while
@@ -794,47 +756,79 @@ class FirestoreService {
   /// If the account balance can't cover a due charge, that subscription's
   /// catch-up stops there (mirrors [createExpense]'s "never overdraw the
   /// account" guarantee) and is retried from the same due date next time this
-  /// runs; other subscriptions are unaffected.
+  /// runs; other subscriptions are unaffected. The Gastos screen surfaces
+  /// whatever is left pending — see `recurring_schedule.dart`.
   Future<void> catchUpSubscriptions() async {
     final snap = await _subscriptions.get();
     final today = _now();
     for (final doc in snap.docs) {
       final subscription = Subscription.fromMap(doc.id, doc.data());
-      for (final due in _pendingDueDates(subscription, today)) {
-        final dueIso = _isoDate(due);
-        try {
-          await _db.runTransaction((tx) async {
-            final acct = await _readBalance(tx, _account);
-            if (subscription.amount > acct + _eps) {
-              throw StateError('amount exceeds available balance');
-            }
-            final expenseDoc = _expenses.doc();
-            final expense = Expense(
-              id: expenseDoc.id,
-              date: dueIso,
-              amount: subscription.amount,
-              description: subscription.name,
-            );
-            tx.set(expenseDoc, expense.toMap());
-            tx.set(_account, {'balance': acct - subscription.amount});
-            // A full overwrite (not a merge) — every other field is copied
-            // from the already-fetched [subscription] unchanged, so this
-            // never depends on transactional merge support.
-            tx.set(
-              doc.reference,
-              Subscription(
-                id: subscription.id,
-                name: subscription.name,
-                amount: subscription.amount,
-                dueDay: subscription.dueDay,
-                createdAt: subscription.createdAt,
-                lastChargedDate: dueIso,
-              ).toMap(),
-            );
-          });
-        } on StateError {
-          break; // insufficient balance now; retry this due date next time.
-        }
+      for (final due in schedule.pendingDueDates(subscription, today)) {
+        final dueIso = schedule.isoDate(due);
+        final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
+          // Re-read the subscription INSIDE the transaction. Two things
+          // depend on this, and both break without it:
+          //
+          //  1. It puts this doc in the transaction's read set, so a
+          //     concurrent charge of the same due date from another device
+          //     (or a second tab) is detected as a conflict.
+          //  2. On the retry that conflict triggers, the guard below runs
+          //     against the FRESH doc. The `subscription` captured above came
+          //     from a get() outside the transaction and stays stale across
+          //     retries — trusting it would re-bill a due date the other
+          //     device just billed, since the retry only refreshes what the
+          //     transaction itself read.
+          //
+          // Reads must all precede writes in a Firestore transaction, so this
+          // and the balance read below both come before any tx.set.
+          final fresh = await tx.get(doc.reference);
+          final data = fresh.data();
+          if (data == null) return _ChargeOutcome.superseded; // deleted meanwhile
+          final current = Subscription.fromMap(doc.id, data);
+          final alreadyCharged =
+              current.lastChargedDate != null &&
+              !DateTime.parse(
+                current.lastChargedDate!.substring(0, 10),
+              ).isBefore(due);
+          if (alreadyCharged) return _ChargeOutcome.superseded;
+
+          final acct = await _readBalance(tx, _account);
+          if (current.amount > acct + _eps) {
+            return _ChargeOutcome.insufficientBalance;
+          }
+          final expenseDoc = _expenses.doc();
+          final expense = Expense(
+            id: expenseDoc.id,
+            date: dueIso,
+            amount: current.amount,
+            description: current.name,
+            // Links the generated expense back to the subscription that
+            // produced it, so the app can tell it apart from a manual entry
+            // with the same description.
+            sourceType: ExpenseSource.subscription.value,
+            sourceId: current.id,
+          );
+          tx.set(expenseDoc, expense.toMap());
+          tx.set(_account, {'balance': acct - current.amount});
+          // A full overwrite (not a merge) — every other field is copied
+          // from the just-read [current] unchanged, so this never depends
+          // on transactional merge support.
+          tx.set(
+            doc.reference,
+            Subscription(
+              id: current.id,
+              name: current.name,
+              amount: current.amount,
+              dueDay: current.dueDay,
+              createdAt: current.createdAt,
+              lastChargedDate: dueIso,
+            ).toMap(),
+          );
+          return _ChargeOutcome.charged;
+        });
+        // Insufficient balance -> retry this same due date next run.
+        // Superseded -> another runner owns this subscription's catch-up.
+        if (outcome != _ChargeOutcome.charged) break;
       }
     }
   }
@@ -878,40 +872,6 @@ class FirestoreService {
     await _installmentPurchases.doc(id).delete();
   }
 
-  /// Splits [totalAmount] into [installments] equal monthly slices, rounded
-  /// to the cent, with any rounding remainder absorbed into the LAST
-  /// installment — matches how a real card bill splits a purchase, and
-  /// guarantees the slices sum to exactly [totalAmount] (no drift from
-  /// summing many rounded fractions, same `round2` discipline as
-  /// `aggregation_service.dart`).
-  List<double> _installmentAmounts(double totalAmount, int installments) {
-    final each = agg.round2(totalAmount / installments);
-    final amounts = List<double>.filled(installments, each);
-    final allButLast = agg.round2(each * (installments - 1));
-    amounts[installments - 1] = agg.round2(totalAmount - allButLast);
-    return amounts;
-  }
-
-  /// The 0-indexed occurrence's due date: [firstChargeDate]'s day of month,
-  /// [index] months later, clamped for short months (see [_dueDateFor]).
-  DateTime _installmentDueDate(InstallmentPurchase purchase, int index) {
-    final first = DateTime.parse(purchase.firstChargeDate.substring(0, 10));
-    return _dueDateFor(first.year, first.month + index, first.day);
-  }
-
-  /// Every installment index [purchase] should have charged by [today] but
-  /// hasn't yet — starting at [InstallmentPurchase.chargedInstallments], oldest
-  /// first, stopping at [InstallmentPurchase.installments] (bounded, unlike a
-  /// subscription's open-ended catch-up).
-  List<int> _pendingInstallmentIndexes(InstallmentPurchase purchase, DateTime today) {
-    final indexes = <int>[];
-    for (var i = purchase.chargedInstallments; i < purchase.installments; i++) {
-      if (_installmentDueDate(purchase, i).isAfter(today)) break;
-      indexes.add(i);
-    }
-    return indexes;
-  }
-
   /// Catches up every installment purchase's missed charges since it was last
   /// billed, creating one account-level [Expense] per missed installment
   /// (oldest first) — the bounded counterpart to [catchUpSubscriptions], same
@@ -930,44 +890,68 @@ class FirestoreService {
     for (final doc in snap.docs) {
       final purchase = InstallmentPurchase.fromMap(doc.id, doc.data());
       if (purchase.isFullyCharged) continue;
-      final amounts = _installmentAmounts(purchase.totalAmount, purchase.installments);
-      for (final index in _pendingInstallmentIndexes(purchase, today)) {
+      final amounts = schedule.installmentAmounts(
+        purchase.totalAmount,
+        purchase.installments,
+      );
+      for (final index in schedule.pendingInstallmentIndexes(purchase, today)) {
         final amount = amounts[index];
-        final dueIso = _isoDate(_installmentDueDate(purchase, index));
-        try {
-          await _db.runTransaction((tx) async {
-            final acct = await _readBalance(tx, _account);
-            if (amount > acct + _eps) {
-              throw StateError('amount exceeds available balance');
-            }
-            final expenseDoc = _expenses.doc();
-            final expense = Expense(
-              id: expenseDoc.id,
-              date: dueIso,
-              amount: amount,
-              description: '${purchase.name} (${index + 1}/${purchase.installments})',
-            );
-            tx.set(expenseDoc, expense.toMap());
-            tx.set(_account, {'balance': acct - amount});
-            // A full overwrite (not a merge) — every other field is copied
-            // from the already-fetched [purchase] unchanged.
-            tx.set(
-              doc.reference,
-              InstallmentPurchase(
-                id: purchase.id,
-                name: purchase.name,
-                totalAmount: purchase.totalAmount,
-                installments: purchase.installments,
-                purchaseDate: purchase.purchaseDate,
-                firstChargeDate: purchase.firstChargeDate,
-                createdAt: purchase.createdAt,
-                chargedInstallments: index + 1,
-              ).toMap(),
-            );
-          });
-        } on StateError {
-          break; // insufficient balance now; retry this installment next time.
-        }
+        final dueIso = schedule.isoDate(
+          schedule.installmentDueDate(purchase, index),
+        );
+        final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
+          // Re-read inside the transaction, for the same two reasons spelled
+          // out in [catchUpSubscriptions]: it puts the doc in the read set so
+          // a concurrent charge conflicts, and the retry that conflict
+          // triggers then sees the bumped `chargedInstallments` instead of
+          // the stale `purchase` captured outside. `chargedInstallments`
+          // must be exactly [index] — that is what makes this installment
+          // the next one owed.
+          final fresh = await tx.get(doc.reference);
+          final data = fresh.data();
+          if (data == null) return _ChargeOutcome.superseded; // deleted meanwhile
+          final current = InstallmentPurchase.fromMap(doc.id, data);
+          if (current.chargedInstallments != index) {
+            return _ChargeOutcome.superseded;
+          }
+
+          final acct = await _readBalance(tx, _account);
+          if (amount > acct + _eps) {
+            return _ChargeOutcome.insufficientBalance;
+          }
+          final expenseDoc = _expenses.doc();
+          final expense = Expense(
+            id: expenseDoc.id,
+            date: dueIso,
+            amount: amount,
+            description: '${current.name} (${index + 1}/${current.installments})',
+            // Links the generated expense back to the purchase that produced
+            // it — see [catchUpSubscriptions].
+            sourceType: ExpenseSource.installment.value,
+            sourceId: current.id,
+          );
+          tx.set(expenseDoc, expense.toMap());
+          tx.set(_account, {'balance': acct - amount});
+          // A full overwrite (not a merge) — every other field is copied
+          // from the just-read [current] unchanged.
+          tx.set(
+            doc.reference,
+            InstallmentPurchase(
+              id: current.id,
+              name: current.name,
+              totalAmount: current.totalAmount,
+              installments: current.installments,
+              purchaseDate: current.purchaseDate,
+              firstChargeDate: current.firstChargeDate,
+              createdAt: current.createdAt,
+              chargedInstallments: index + 1,
+            ).toMap(),
+          );
+          return _ChargeOutcome.charged;
+        });
+        // Insufficient balance -> retry this same installment next run.
+        // Superseded -> another runner owns this purchase's catch-up.
+        if (outcome != _ChargeOutcome.charged) break;
       }
     }
   }
@@ -1086,4 +1070,31 @@ class FirestoreService {
       await batch.commit();
     }
   }
+}
+
+/// How one occurrence's charge attempt ended, inside
+/// [FirestoreService.catchUpSubscriptions] /
+/// [FirestoreService.catchUpInstallmentPurchases].
+///
+/// Returned from the transaction rather than thrown: "already handled" and
+/// "can't afford it" stage no writes, so they commit as harmless no-op
+/// transactions instead of unwinding through exception control flow (which
+/// would also have meant catching `StateError`, the same type the real
+/// validation failures use).
+///
+/// Anything other than [charged] stops that doc's catch-up for this run —
+/// occurrences are billed oldest-first, so skipping one and then billing a
+/// later one would bill out of order.
+enum _ChargeOutcome {
+  /// The expense was created and the source doc's progress bumped.
+  charged,
+
+  /// The account couldn't cover it. Nothing was written; the same occurrence
+  /// is retried on the next run, and stays visible as pending in the UI
+  /// meanwhile.
+  insufficientBalance,
+
+  /// Another runner (a second device or tab) already charged this occurrence,
+  /// or the source doc was deleted mid-run. Nothing to do and nothing wrong.
+  superseded,
 }

@@ -14,7 +14,7 @@ class Subscription {
   final double amount;
 
   /// 1-31. A month shorter than this is clamped to its last day (see
-  /// `FirestoreService._dueDateFor`) — e.g. dueDay 31 charges on Feb 28/29.
+  /// `recurring_schedule.dueDateFor`) — e.g. dueDay 31 charges on Feb 28/29.
   final int dueDay;
   final String createdAt; // ISO date string (YYYY-MM-DD)
   final String? lastChargedDate; // ISO date string (YYYY-MM-DD)
