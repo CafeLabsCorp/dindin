@@ -345,8 +345,94 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t process automatic charges right now. The app tries again next time you open it.';
 
   @override
+  String recurringChargesPosted(int count, String amount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count charges just posted · $amount',
+      one: '1 charge just posted · $amount',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get generatedExpenseTooltip =>
       'Posted automatically by a subscription or installment purchase';
+
+  @override
+  String get chargeSourceLabel => 'Comes out of';
+
+  @override
+  String get chargeSourceMissingWarning =>
+      'This charge\'s envelope was removed — pick another source so it can post again.';
+
+  @override
+  String get editSubscriptionTooltip => 'Edit subscription';
+
+  @override
+  String get editSubscriptionTitle => 'Edit subscription';
+
+  @override
+  String get editSubscriptionHint =>
+      'Changing the amount or the day applies from the next unbilled month — months already posted don\'t change.';
+
+  @override
+  String get recurringEntryTitle => 'Subscriptions and installments';
+
+  @override
+  String recurringEntryCommitted(String amount) {
+    return '$amount committed this month';
+  }
+
+  @override
+  String get openSubscriptionsButton => 'Subscriptions';
+
+  @override
+  String get openInstallmentPurchasesButton => 'Installments';
+
+  @override
+  String installmentOutstandingLabel(String amount) {
+    return '$amount left';
+  }
+
+  @override
+  String get installmentSettledLabel => 'Paid off';
+
+  @override
+  String installmentPaidAheadLabel(String amount) {
+    return '$amount paid ahead';
+  }
+
+  @override
+  String get payInstallmentTooltip => 'Pay ahead or pay off';
+
+  @override
+  String payInstallmentTitle(String name) {
+    return 'Pay $name';
+  }
+
+  @override
+  String payInstallmentHint(String amount) {
+    return 'Paying more than the installment reduces what\'s left and shortens the schedule — the installment itself stays the same size. Outstanding: $amount.';
+  }
+
+  @override
+  String get payInstallmentButton => 'Pay this amount';
+
+  @override
+  String settleInstallmentButton(String amount) {
+    return 'Pay it all off ($amount)';
+  }
+
+  @override
+  String installmentPayAheadDescription(String name) {
+    return '$name (extra payment)';
+  }
+
+  @override
+  String installmentSettleDescription(String name) {
+    return '$name (paid off)';
+  }
 
   @override
   String get receitasTitle => 'Income';

@@ -3,10 +3,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/assinaturas/assinaturas_page.dart';
 import 'features/auth/login_page.dart';
 import 'features/categorias/categorias_page.dart';
 import 'features/dashboard/dashboard_page.dart';
 import 'features/gastos/gastos_page.dart';
+import 'features/parcelamentos/parcelamentos_page.dart';
 import 'features/receitas/receitas_page.dart';
 import 'features/settings/settings_page.dart';
 import 'l10n/app_localizations.dart';
@@ -43,7 +45,30 @@ class _DindinAppState extends ConsumerState<DindinApp> {
         branches: [
           StatefulShellBranch(routes: [GoRoute(path: '/', builder: (context, state) => const DashboardPage())]),
           StatefulShellBranch(routes: [GoRoute(path: '/receitas', builder: (context, state) => const ReceitasPage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/gastos', builder: (context, state) => const GastosPage())]),
+          // Assinaturas/Parcelamentos hang off Gastos as sub-routes rather
+          // than becoming nav destinations of their own: five is already the
+          // practical ceiling for a bottom NavigationBar, and setting up a
+          // recurring charge is configuration you do once, not a daily
+          // destination. They still render inside the shell, so the nav bar
+          // stays put and Gastos remains the selected tab.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/gastos',
+                builder: (context, state) => const GastosPage(),
+                routes: [
+                  GoRoute(
+                    path: 'assinaturas',
+                    builder: (context, state) => const AssinaturasPage(),
+                  ),
+                  GoRoute(
+                    path: 'parcelamentos',
+                    builder: (context, state) => const ParcelamentosPage(),
+                  ),
+                ],
+              ),
+            ],
+          ),
           StatefulShellBranch(routes: [GoRoute(path: '/categorias', builder: (context, state) => const CategoriasPage())]),
           StatefulShellBranch(routes: [GoRoute(path: '/ajustes', builder: (context, state) => const SettingsPage())]),
         ],

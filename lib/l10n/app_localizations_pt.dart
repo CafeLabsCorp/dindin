@@ -343,8 +343,94 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não deu pra processar as cobranças automáticas agora. O app tenta de novo na próxima vez que você abrir.';
 
   @override
+  String recurringChargesPosted(int count, String amount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cobranças lançadas agora · $amount',
+      one: '1 cobrança lançada agora · $amount',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get generatedExpenseTooltip =>
       'Lançado automaticamente por uma assinatura ou parcelamento';
+
+  @override
+  String get chargeSourceLabel => 'Sai de';
+
+  @override
+  String get chargeSourceMissingWarning =>
+      'A caixinha dessa cobrança foi removida — escolha outra origem pra ela voltar a ser lançada.';
+
+  @override
+  String get editSubscriptionTooltip => 'Editar assinatura';
+
+  @override
+  String get editSubscriptionTitle => 'Editar assinatura';
+
+  @override
+  String get editSubscriptionHint =>
+      'Mudar o valor ou o dia vale a partir do próximo mês ainda não cobrado — meses já lançados não mudam.';
+
+  @override
+  String get recurringEntryTitle => 'Assinaturas e parcelamentos';
+
+  @override
+  String recurringEntryCommitted(String amount) {
+    return '$amount comprometidos neste mês';
+  }
+
+  @override
+  String get openSubscriptionsButton => 'Assinaturas';
+
+  @override
+  String get openInstallmentPurchasesButton => 'Parcelamentos';
+
+  @override
+  String installmentOutstandingLabel(String amount) {
+    return 'Faltam $amount';
+  }
+
+  @override
+  String get installmentSettledLabel => 'Quitado';
+
+  @override
+  String installmentPaidAheadLabel(String amount) {
+    return '$amount pagos adiantado';
+  }
+
+  @override
+  String get payInstallmentTooltip => 'Pagar adiantado ou quitar';
+
+  @override
+  String payInstallmentTitle(String name) {
+    return 'Pagar $name';
+  }
+
+  @override
+  String payInstallmentHint(String amount) {
+    return 'Pagar mais que a parcela reduz o que falta e encurta o prazo — a parcela continua do mesmo tamanho. Saldo devedor: $amount.';
+  }
+
+  @override
+  String get payInstallmentButton => 'Pagar esse valor';
+
+  @override
+  String settleInstallmentButton(String amount) {
+    return 'Quitar tudo ($amount)';
+  }
+
+  @override
+  String installmentPayAheadDescription(String name) {
+    return '$name (adiantamento)';
+  }
+
+  @override
+  String installmentSettleDescription(String name) {
+    return '$name (quitação)';
+  }
 
   @override
   String get receitasTitle => 'Receitas';

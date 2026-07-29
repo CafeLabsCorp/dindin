@@ -13,6 +13,7 @@ import 'package:dindin/models/income_source.dart';
 import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/models/subscription.dart';
 import 'package:dindin/providers/providers.dart';
+import 'package:dindin/services/firestore_service.dart';
 import 'package:dindin/theme/theme.dart';
 
 void main() {
@@ -36,12 +37,12 @@ void main() {
     // differently from "catch-up finished and these didn't fit the balance".
     bool catchUpFailed = false,
   }) async {
-    // GastosPage's ListView now has 4 cards (gasto, lista, assinaturas,
-    // parcelamentos) — taller than the default 600px test surface, and a
-    // sliver list only builds Elements for children within the viewport +
-    // cache extent. Without a tall-enough surface, find.text() on the last
-    // card's content returns 0 matches (the Element genuinely doesn't exist
-    // yet), not because anything is broken.
+    // GastosPage's ListView has 3 cards (atalho pras recorrentes, formulário
+    // de gasto, lista) — mais alto que a superfície padrão de 600px, e uma
+    // sliver list só constrói Elements pros filhos dentro da viewport +
+    // cache extent. Sem uma superfície alta o bastante, find.text() no
+    // conteúdo do último card retorna 0 matches (o Element genuinamente
+    // ainda não existe), e não porque algo quebrou.
     await tester.binding.setSurfaceSize(const Size(800, 3200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     return tester.pumpWidget(
@@ -54,7 +55,7 @@ void main() {
           todayProvider.overrideWithValue(today ?? DateTime(2026, 1, 1)),
           if (catchUpFailed)
             recurringChargesCatchUpProvider.overrideWith(
-              (ref) => Future<void>.error(Exception('firestore unavailable')),
+              (ref) => Future<RecurringChargeReport>.error(Exception('firestore unavailable')),
             ),
         ],
         child: MaterialApp(
@@ -150,148 +151,67 @@ void main() {
     expect(find.text('Nenhum gasto lançado ainda.'), findsOneWidget);
   });
 
-  group('assinaturas', () {
-    testWidgets('sem nenhuma assinatura cadastrada mostra o estado vazio', (tester) async {
-      await pump(tester, expenses: []);
+  group('entrada pra assinaturas e parcelamentos', () {
+    testWidgets('mostra os dois atalhos no topo, acima da lista de gastos', (tester) async {
+      await pump(tester, expenses: [expense]);
       await tester.pumpAndSettle();
 
-      expect(find.text('Nenhuma assinatura cadastrada ainda.'), findsOneWidget);
+      // O motivo de existirem: antes as duas seções ficavam DEPOIS da lista
+      // de gastos, que é ilimitada — na prática, inalcançáveis.
+      expect(find.widgetWithText(OutlinedButton, 'Assinaturas'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Parcelamentos'), findsOneWidget);
     });
 
-    testWidgets('assinatura cadastrada aparece na lista com o dia de cobrança e ícone de remover', (tester) async {
+    testWidgets('soma o quanto do mês já está comprometido', (tester) async {
       await pump(
         tester,
         expenses: [],
         subscriptions: const [
-          Subscription(id: 's1', name: 'Netflix', amount: 39.90, dueDay: 5, createdAt: '2026-01-01'),
+          Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+          Subscription(id: 's2', name: 'Spotify', amount: 20, dueDay: 10, createdAt: '2026-01-01'),
         ],
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Nenhuma assinatura cadastrada ainda.'), findsNothing);
-      expect(find.text('Cobra todo dia 5'), findsOneWidget);
-      expect(find.byTooltip('Remover assinatura'), findsOneWidget);
-    });
-
-    testWidgets('adicionar assinatura sem nome mostra o erro de nome obrigatório', (tester) async {
-      await pump(tester, expenses: []);
-      await tester.pumpAndSettle();
-
-      final addButton = find.widgetWithText(FilledButton, 'Adicionar assinatura');
-      await tester.ensureVisible(addButton); // a seção fica abaixo da dobra na ListView
-      await tester.pumpAndSettle();
-      await tester.tap(addButton);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Informe um nome.'), findsOneWidget);
-    });
-  });
-
-  group('cobranças pendentes (catch-up que não coube no saldo)', () {
-    // Uma assinatura de 5 de janeiro, com o app aberto em 20 de março e nada
-    // cobrado ainda: jan/fev/mar venceram e não entraram.
-    const atrasada = Subscription(
-      id: 's1',
-      name: 'Netflix',
-      amount: 39.90,
-      dueDay: 5,
-      createdAt: '2026-01-01',
-    );
-
-    testWidgets('assinatura com cobranças que não entraram mostra o aviso e a contagem na linha', (tester) async {
-      await pump(
-        tester,
-        expenses: [],
-        subscriptions: const [atrasada],
-        today: DateTime(2026, 3, 20),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('3 cobranças pendentes'), findsOneWidget);
-      expect(
-        find.textContaining('3 cobranças não foram lançadas porque o saldo da conta não cobriu'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('o texto fica no singular com uma única cobrança pendente', (tester) async {
-      await pump(
-        tester,
-        expenses: [],
-        subscriptions: const [atrasada],
-        today: DateTime(2026, 1, 20),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('1 cobrança pendente'), findsOneWidget);
-      expect(
-        find.textContaining('1 cobrança não foi lançada porque o saldo da conta não cobriu'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('sem nada pendente não mostra aviso nenhum', (tester) async {
-      await pump(
-        tester,
-        expenses: [],
-        subscriptions: const [
-          Subscription(
-            id: 's1',
-            name: 'Netflix',
-            amount: 39.90,
-            dueDay: 5,
+        installmentPurchases: const [
+          // 300 em 3x -> a parcela de março é 100.
+          InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook',
+            totalAmount: 300,
+            installments: 3,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
             createdAt: '2026-01-01',
-            lastChargedDate: '2026-03-05',
+            chargedInstallments: 2,
           ),
         ],
-        today: DateTime(2026, 3, 20),
+        today: DateTime(2026, 3, 15),
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('cobrança pendente'), findsNothing);
-      expect(find.textContaining('cobranças pendentes'), findsNothing);
-      expect(find.textContaining('não foram lançadas'), findsNothing);
+      expect(find.textContaining('160,00 comprometidos neste mês'), findsOneWidget);
     });
 
-    testWidgets('parcelamento atrasado também conta as parcelas pendentes', (tester) async {
+    testWidgets('um parcelamento quitado não conta mais no comprometido', (tester) async {
       await pump(
         tester,
         expenses: [],
         installmentPurchases: const [
           InstallmentPurchase(
             id: 'p1',
-            name: 'Notebook Dell',
+            name: 'Notebook',
             totalAmount: 300,
             installments: 3,
-            purchaseDate: '2026-01-10',
-            firstChargeDate: '2026-02-05',
-            createdAt: '2026-01-10',
-            chargedInstallments: 1,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
+            createdAt: '2026-01-01',
+            chargedInstallments: 2,
+            amortizedAmount: 100, // quitado
           ),
         ],
-        today: DateTime(2026, 4, 20),
+        today: DateTime(2026, 3, 15),
       );
       await tester.pumpAndSettle();
 
-      // Parcelas 2/3 (05/03) e 3/3 (05/04) venceram e não foram cobradas.
-      expect(find.text('2 cobranças pendentes'), findsOneWidget);
-    });
-
-    testWidgets('quando o catch-up falha, culpa a falha em vez do saldo', (tester) async {
-      await pump(
-        tester,
-        expenses: [],
-        subscriptions: const [atrasada],
-        today: DateTime(2026, 3, 20),
-        catchUpFailed: true,
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Não deu pra processar as cobranças automáticas agora'), findsWidgets);
-      // "Pendente" não significa nada enquanto o catch-up não terminou: não
-      // dá pra dizer que o saldo é o culpado.
-      expect(find.textContaining('não foram lançadas'), findsNothing);
-      expect(find.text('3 cobranças pendentes'), findsNothing);
+      expect(find.textContaining('0,00 comprometidos neste mês'), findsOneWidget);
     });
   });
 
@@ -320,52 +240,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byTooltip('Lançado automaticamente por uma assinatura ou parcelamento'), findsNothing);
-    });
-  });
-
-  group('parcelamentos', () {
-    testWidgets('sem nenhum parcelamento cadastrado mostra o estado vazio', (tester) async {
-      await pump(tester, expenses: []);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Nenhum parcelamento cadastrado ainda.'), findsOneWidget);
-    });
-
-    testWidgets('parcelamento cadastrado aparece na lista com o progresso e ícone de remover', (tester) async {
-      await pump(
-        tester,
-        expenses: [],
-        installmentPurchases: const [
-          InstallmentPurchase(
-            id: 'p1',
-            name: 'Notebook Dell',
-            totalAmount: 300,
-            installments: 3,
-            purchaseDate: '2026-01-10',
-            firstChargeDate: '2026-02-05',
-            createdAt: '2026-01-10',
-            chargedInstallments: 1,
-          ),
-        ],
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Nenhum parcelamento cadastrado ainda.'), findsNothing);
-      expect(find.text('1 de 3 parcelas pagas'), findsOneWidget);
-      expect(find.byTooltip('Remover parcelamento'), findsOneWidget);
-    });
-
-    testWidgets('adicionar parcelamento sem nome mostra o erro de nome obrigatório', (tester) async {
-      await pump(tester, expenses: []);
-      await tester.pumpAndSettle();
-
-      final addButton = find.widgetWithText(FilledButton, 'Adicionar parcelamento');
-      await tester.ensureVisible(addButton); // a seção fica abaixo da dobra na ListView
-      await tester.pumpAndSettle();
-      await tester.tap(addButton);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Informe um nome.'), findsOneWidget);
     });
   });
 

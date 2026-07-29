@@ -97,12 +97,15 @@ final todayProvider = Provider<DateTime>((ref) => DateTime.now());
 ///    fit the account balance (actionable: add money);
 ///  - never finished, so "pending" says nothing yet (not actionable, and
 ///    blaming the balance there would be a lie).
-final recurringChargesCatchUpProvider = FutureProvider<void>((ref) async {
+final recurringChargesCatchUpProvider = FutureProvider<RecurringChargeReport>((ref) async {
   final firestore = ref.watch(firestoreServiceProvider);
-  if (firestore == null) return;
+  if (firestore == null) return const RecurringChargeReport();
   try {
-    await firestore.catchUpSubscriptions();
-    await firestore.catchUpInstallmentPurchases();
+    final subscriptions = await firestore.catchUpSubscriptions();
+    final installments = await firestore.catchUpInstallmentPurchases();
+    // What this app open cost the user, for the screen to actually say so —
+    // these charges are posted without any interaction, so nothing else would.
+    return subscriptions + installments;
   } catch (error, stackTrace) {
     developer.log(
       'recurring charge catch-up failed',

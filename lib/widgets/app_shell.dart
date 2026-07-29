@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
+import '../services/firestore_service.dart';
+import '../utils/format.dart';
 
 List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLocalizations l10n) => [
   (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: l10n.navDashboard),
@@ -26,9 +28,32 @@ class AppShell extends ConsumerWidget {
     // Fires recurring-charge catch-up (subscriptions + installment purchases)
     // once per signed-in session — see recurringChargesCatchUpProvider.
     // Watched (not read) so it re-runs if the user signs out and back in as
-    // someone else; the result itself is unused here, the provider's side
-    // effect is the point.
+    // someone else.
     ref.watch(recurringChargesCatchUpProvider);
+
+    // Tell the user money just left their account. These charges are posted
+    // with no interaction at all, so without this the only trace is rows
+    // quietly appearing in a list they may not open. Listened from the shell
+    // (not a single screen) because the charge happens on app open, whichever
+    // tab that lands on.
+    ref.listen<AsyncValue<RecurringChargeReport>>(recurringChargesCatchUpProvider, (
+      previous,
+      next,
+    ) {
+      final report = next.value;
+      if (report == null || report.isEmpty) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger == null) return;
+      final l10n = AppLocalizations.of(context)!;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.recurringChargesPosted(report.count, formatCurrency(report.total)),
+          ),
+        ),
+      );
+    });
+
     final l10n = AppLocalizations.of(context)!;
     final destinations = _destinations(l10n);
     final wide = MediaQuery.sizeOf(context).width >= 720;

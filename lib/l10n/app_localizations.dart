@@ -662,11 +662,131 @@ abstract class AppLocalizations {
   /// **'Não deu pra processar as cobranças automáticas agora. O app tenta de novo na próxima vez que você abrir.'**
   String get catchUpFailedWarning;
 
+  /// No description provided for @recurringChargesPosted.
+  ///
+  /// In pt, this message translates to:
+  /// **'{count, plural, =1{1 cobrança lançada agora · {amount}} other{{count} cobranças lançadas agora · {amount}}}'**
+  String recurringChargesPosted(int count, String amount);
+
   /// No description provided for @generatedExpenseTooltip.
   ///
   /// In pt, this message translates to:
   /// **'Lançado automaticamente por uma assinatura ou parcelamento'**
   String get generatedExpenseTooltip;
+
+  /// No description provided for @chargeSourceLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sai de'**
+  String get chargeSourceLabel;
+
+  /// No description provided for @chargeSourceMissingWarning.
+  ///
+  /// In pt, this message translates to:
+  /// **'A caixinha dessa cobrança foi removida — escolha outra origem pra ela voltar a ser lançada.'**
+  String get chargeSourceMissingWarning;
+
+  /// No description provided for @editSubscriptionTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Editar assinatura'**
+  String get editSubscriptionTooltip;
+
+  /// No description provided for @editSubscriptionTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Editar assinatura'**
+  String get editSubscriptionTitle;
+
+  /// No description provided for @editSubscriptionHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mudar o valor ou o dia vale a partir do próximo mês ainda não cobrado — meses já lançados não mudam.'**
+  String get editSubscriptionHint;
+
+  /// No description provided for @recurringEntryTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinaturas e parcelamentos'**
+  String get recurringEntryTitle;
+
+  /// No description provided for @recurringEntryCommitted.
+  ///
+  /// In pt, this message translates to:
+  /// **'{amount} comprometidos neste mês'**
+  String recurringEntryCommitted(String amount);
+
+  /// No description provided for @openSubscriptionsButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinaturas'**
+  String get openSubscriptionsButton;
+
+  /// No description provided for @openInstallmentPurchasesButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelamentos'**
+  String get openInstallmentPurchasesButton;
+
+  /// No description provided for @installmentOutstandingLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Faltam {amount}'**
+  String installmentOutstandingLabel(String amount);
+
+  /// No description provided for @installmentSettledLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Quitado'**
+  String get installmentSettledLabel;
+
+  /// No description provided for @installmentPaidAheadLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'{amount} pagos adiantado'**
+  String installmentPaidAheadLabel(String amount);
+
+  /// No description provided for @payInstallmentTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagar adiantado ou quitar'**
+  String get payInstallmentTooltip;
+
+  /// No description provided for @payInstallmentTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagar {name}'**
+  String payInstallmentTitle(String name);
+
+  /// No description provided for @payInstallmentHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagar mais que a parcela reduz o que falta e encurta o prazo — a parcela continua do mesmo tamanho. Saldo devedor: {amount}.'**
+  String payInstallmentHint(String amount);
+
+  /// No description provided for @payInstallmentButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagar esse valor'**
+  String get payInstallmentButton;
+
+  /// No description provided for @settleInstallmentButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Quitar tudo ({amount})'**
+  String settleInstallmentButton(String amount);
+
+  /// No description provided for @installmentPayAheadDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'{name} (adiantamento)'**
+  String installmentPayAheadDescription(String name);
+
+  /// No description provided for @installmentSettleDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'{name} (quitação)'**
+  String installmentSettleDescription(String name);
 
   /// No description provided for @receitasTitle.
   ///
