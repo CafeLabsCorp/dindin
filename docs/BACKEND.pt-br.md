@@ -32,7 +32,7 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   num formato portável e legível por humanos.
 - **Exclusão** — processo manual, documentado (aceitável neste estágio):
   1. O usuário pode limpar-e-substituir os próprios dados importando um
-     backup vazio/editado (`replaceAll` limpa as cinco coleções do ledger
+     backup vazio/editado (`replaceAll` limpa as seis coleções do ledger
      e reseta os docs de saldo).
   2. Exclusão completa de conta (usuário de auth + toda a subárvore
      `users/{uid}`) é um passo manual de admin: apagar o usuário de Auth no
@@ -82,10 +82,19 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   (gastos recorrentes)" abaixo pro modelo de catch-up disparado pelo cliente
   que isso implica. Um backup antigo sem a chave `subscriptions` importa como
   lista vazia.
+- `installmentPurchases/{id}` — outra coleção nova, a contraparte LIMITADA de
+  `subscriptions`: uma compra no cartão (name, totalAmount, installments,
+  purchaseDate, firstChargeDate, createdAt, chargedInstallments) dividida em
+  N cobranças mensais fixas em vez de uma recorrência sem fim. Mesma postura
+  de não carregar invariante próprio; `FirestoreService.
+  catchUpInstallmentPurchases` gera seus docs de `expenses` e para quando
+  `chargedInstallments` chega em `installments`. Ver "Assinaturas (gastos
+  recorrentes)" abaixo — compartilha literalmente o modelo de catch-up
+  disparado pelo cliente daquela seção.
 
 Backups JSON antigos (sem `monthlyBudget`, sem `transferId`, sem
-`kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`) importam sem
-alterações.
+`kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`, sem
+`installmentPurchases`) importam sem alterações.
 
 ### Docs de saldo denormalizados (Option B — ver abaixo)
 
@@ -104,7 +113,7 @@ somar uma coleção):
 Esses são um **cache derivado, não fonte de verdade**:
 
 - Eles NÃO fazem parte do backup JSON. `AppDb.toJson()`/`fromJson()`
-  continua sendo só as cinco coleções do ledger; os saldos são
+  continua sendo só as seis coleções do ledger; os saldos são
   recalculados a partir do ledger no restore (`FirestoreService.
   replaceAll`) e pelo script de backfill. Isso mantém backups antigos
   importáveis e evita guardar dados redundantes e sujeitos a drift no
@@ -125,7 +134,7 @@ acima:
 
 - **Escolhido: catch-up disparado pelo cliente.**
   `FirestoreService.catchUpSubscriptions` roda uma vez por sessão logada
-  (`subscriptionCatchUpProvider`, observado a partir do `AppShell`), calcula
+  (`recurringChargesCatchUpProvider`, observado a partir do `AppShell`), calcula
   toda data de cobrança que cada assinatura perdeu desde a última cobrança, e
   cria um `Expense` de conta por mês perdido, do mais antigo pro mais novo —
   passando pelo mesmo portão de saldo da conta de um gasto manual (nunca
@@ -139,6 +148,13 @@ acima:
   independente do app estar aberto, mas exige o plano pago Blaze (o mesmo
   gate de custo da Option A acima) — recusado pelo mesmo motivo que a Option A
   foi recusada.
+
+**Parcelamentos reaproveitam isso literalmente.** `FirestoreService.
+catchUpInstallmentPurchases` é chamado logo depois de `catchUpSubscriptions`
+no mesmo provider, no mesmo gatilho por sessão — a única diferença é que ele
+para quando toda parcela já foi cobrada, em vez de rodar pra sempre. Não
+precisou de uma decisão de custo separada: já ia ser disparado pelo cliente
+de qualquer jeito, essa questão já tinha sido resolvida pelas assinaturas.
 
 Se algum dia isso precisar virar "cobra mesmo que você nunca abra o app",
 revisitar junto com a Option A — as duas decisões compartilham o mesmo passo

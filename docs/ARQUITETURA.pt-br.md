@@ -90,13 +90,21 @@ users/{uid}
     lastChargedDate: string?   # data ISO da última cobrança já virada gasto
                                 # por catchUpSubscriptions
 
+  installmentPurchases/{purchaseId}
+    name: string, totalAmount: number, installments: int (2-36)
+    purchaseDate: string (ISO date)     # só informativo
+    firstChargeDate: string (ISO date)  # âncora de toda ocorrência mensal
+    createdAt: string (ISO date)
+    chargedInstallments: int  # 0..installments; quantas já viraram gasto
+                                # por catchUpInstallmentPurchases
+
   meta/account            { balance: number }   # saldo geral da conta (derivado)
   balances/{categoryId}   { balance: number }   # saldo de cada caixinha (derivado)
 ```
 
 `meta/account` e `balances/{categoryId}` são um **cache derivado**, não fonte
 de verdade: não fazem parte do backup JSON e são recalculados a partir do
-ledger (as cinco coleções acima) tanto no restore (`FirestoreService.
+ledger (as seis coleções acima) tanto no restore (`FirestoreService.
 replaceAll`) quanto pelo script de backfill. Os saldos exibidos na tela
 sempre são somados do ledger por `aggregation_service.dart` — mesmo que o
 cache divergisse, a UI mostraria a verdade. Eles existem só para que as
@@ -109,7 +117,7 @@ invariantes garantidos e as limitações conhecidas desse desenho.
 schema original — um backup JSON antigo, sem eles, continua importável sem
 alterações. `subscriptions` é uma coleção inteira nova adicionada do mesmo
 jeito — um backup antigo sem a chave `subscriptions` importa como lista
-vazia.
+vazia. `installmentPurchases` é uma segunda adição assim, logo em seguida.
 
 ## Decisões técnicas e por quê
 
@@ -129,6 +137,17 @@ vazia.
   certo) exigiria o mesmo plano pago Blaze recusado pra Option A acima, pelo
   mesmo motivo. Ver `docs/BACKEND.pt-br.md`, "Assinaturas (gastos
   recorrentes)".
+
+- **Um parcelamento reaproveita exatamente o mesmo mecanismo de catch-up de
+  uma assinatura, só que limitado.** `catchUpInstallmentPurchases` compartilha
+  o clamp de mês do `_dueDateFor` com `catchUpSubscriptions` e segue o mesmo
+  modelo disparado-pelo-cliente-ao-abrir-o-app — a única diferença estrutural
+  é que ele para quando `chargedInstallments` chega em `installments`, em vez
+  de rodar pra sempre. O resto do arredondamento ao dividir `totalAmount` em
+  parcelas iguais sempre cai na ÚLTIMA parcela (igual fatura de cartão de
+  verdade), calculado uma vez por parcelamento via `_installmentAmounts`,
+  nunca recalculado por cobrança (pra nunca divergir entre execuções do
+  catch-up).
 
 - **Transferência entre caixinhas = duas `Allocation`s pareadas por
   `transferId`, não uma coleção nova.** Uma perna negativa na caixinha de
