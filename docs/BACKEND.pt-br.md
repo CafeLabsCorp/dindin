@@ -92,9 +92,24 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   recorrentes)" abaixo — compartilha literalmente o modelo de catch-up
   disparado pelo cliente daquela seção.
 
+- `expenses/{id}.sourceType` + `sourceId` — dois campos opcionais que andam
+  juntos (os dois presentes ou os dois ausentes) ligando um gasto ao doc que
+  o gerou: `'subscription'`/`'installment'` mais o id. Ausentes = o usuário
+  digitou. Mesma ideia do `Allocation.transferId`, e mesma postura de não
+  carregar invariante de dinheiro próprio — um gasto gerado debita a conta
+  igualzinho a um manual, então as regras de delta de saldo já cobrem o lado
+  do dinheiro. O que as rules acrescentam é que o vínculo é **imutável**
+  depois de criado: uma edição não pode plantar, remover nem repontar
+  (`sameExpenseSource`). Motivo de existirem: sem eles, um gasto gerado é
+  indistinguível de um manual com a mesma descrição — não dá pra dizer quanto
+  uma assinatura já custou, nem perceber que uma cobrança foi apagada na mão.
+  `sourceType` é guardado como string crua (e não como enum) pra que um valor
+  escrito por uma versão mais nova do app sobreviva a um ciclo de
+  exportar/importar em vez de sumir na volta.
+
 Backups JSON antigos (sem `monthlyBudget`, sem `transferId`, sem
 `kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`, sem
-`installmentPurchases`) importam sem alterações.
+`installmentPurchases`, sem `sourceType`/`sourceId`) importam sem alterações.
 
 ### Docs de saldo denormalizados (Option B — ver abaixo)
 
@@ -159,6 +174,45 @@ de qualquer jeito, essa questão já tinha sido resolvida pelas assinaturas.
 Se algum dia isso precisar virar "cobra mesmo que você nunca abra o app",
 revisitar junto com a Option A — as duas decisões compartilham o mesmo passo
 de habilitar o Blaze.
+
+### Duas sessões ao mesmo tempo não cobram duas vezes
+
+Como o catch-up é disparado pelo cliente, nada impede duas sessões de rodarem
+juntas — celular e web abertos ao mesmo tempo, ou duas abas. O
+`subscriptions.get()` que lista o que fazer acontece FORA da transação, então
+os dois lados podem enxergar a mesma cobrança em aberto.
+
+Quem resolve é a releitura dentro da transação: antes de gravar, cada
+cobrança relê seu próprio doc via `tx.get` e só segue se ele ainda estiver
+onde esperava (`lastChargedDate` anterior à data em questão, ou
+`chargedInstallments` exatamente na parcela pretendida). Isso cobre os dois
+lados do problema:
+
+1. O doc entra no read set da transação, então a gravação concorrente do
+   outro dispositivo vira conflito detectado, e não escrita cega.
+2. O retry que esse conflito dispara reexecuta o corpo — e como o Firestore
+   só atualiza o que a própria transação leu, sem essa releitura ele
+   reexecutaria contra o objeto velho capturado lá fora e cobraria de novo o
+   mês que o outro dispositivo acabou de cobrar.
+
+O mesmo caminho cobre o doc apagado no meio da execução (some, não
+ressuscita). Todo leitura vem antes de toda escrita, como o Firestore exige.
+
+### Cobrança pendente é mostrada, não escondida
+
+Quando o saldo da conta não cobre uma cobrança, o catch-up para naquela
+ocorrência e tenta de novo na próxima execução — a conta nunca fica negativa.
+Isso está certo, mas era invisível: uma assinatura sem cobrar por meses ficava
+igual a uma paga.
+
+A tela de Gastos agora conta o que sobrou pendente com as MESMAS funções que o
+catch-up usa pra cobrar (`lib/services/recurring_schedule.dart`), e mostra em
+dois lugares: um aviso no topo do card e a contagem na linha de cada
+assinatura/parcelamento. A contagem só aparece depois que o catch-up terminou
+— antes disso tudo que venceu parece "pendente" só porque nada rodou ainda. E
+se o próprio catch-up falhar, o aviso diz isso, em vez de culpar o saldo:
+`recurringChargesCatchUpProvider` loga e propaga a falha como `AsyncError` em
+vez de engolir, e a tela distingue os dois estados.
 
 ## Aplicação de integridade de dinheiro: DECIDIDO — Option B (só regras, tier Spark grátis)
 
