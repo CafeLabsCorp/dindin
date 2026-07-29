@@ -109,6 +109,28 @@
   "removeSubscriptionConfirmTitle": "Remover essa assinatura?",
   "removeSubscriptionTooltip": "Remover assinatura",
 
+  "installmentPurchasesTitle": "Compras parceladas",
+  "installmentPurchasesSubtitle": "Uma compra parcelada no cartão, dividida automaticamente pelos meses seguintes a partir da primeira cobrança.",
+  "installmentNameLabel": "Nome",
+  "installmentNameHint": "Ex: Notebook Dell",
+  "purchaseDateLabel": "Data da compra",
+  "installmentsCountLabel": "Parcelas",
+  "firstChargeDateLabel": "Primeira cobrança",
+  "invalidInstallmentsError": "Informe entre 2 e 36 parcelas.",
+  "submitInstallmentPurchaseButton": "Adicionar parcelamento",
+  "installmentPurchasesListTitle": "Parcelamentos cadastrados",
+  "installmentPurchasesEmptyState": "Nenhum parcelamento cadastrado ainda.",
+  "installmentSummaryLabel": "{count}x de {amount}",
+  "@installmentSummaryLabel": {
+    "placeholders": { "count": { "type": "String" }, "amount": { "type": "String" } }
+  },
+  "installmentProgressLabel": "{paid} de {total} parcelas pagas",
+  "@installmentProgressLabel": {
+    "placeholders": { "paid": { "type": "String" }, "total": { "type": "String" } }
+  },
+  "removeInstallmentPurchaseConfirmTitle": "Remover esse parcelamento?",
+  "removeInstallmentPurchaseTooltip": "Remover parcelamento",
+
   "receitasTitle": "Receitas",
   "receitasSubtitle": "Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\naloque em caixinhas quando quiser, no Dashboard.",
   "incomeSourceFieldLabel": "Origem",

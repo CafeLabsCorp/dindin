@@ -263,6 +263,56 @@ class AppLocalizationsPt extends AppLocalizations {
   String get removeSubscriptionTooltip => 'Remover assinatura';
 
   @override
+  String get installmentPurchasesTitle => 'Compras parceladas';
+
+  @override
+  String get installmentPurchasesSubtitle =>
+      'Uma compra parcelada no cartão, dividida automaticamente pelos meses seguintes a partir da primeira cobrança.';
+
+  @override
+  String get installmentNameLabel => 'Nome';
+
+  @override
+  String get installmentNameHint => 'Ex: Notebook Dell';
+
+  @override
+  String get purchaseDateLabel => 'Data da compra';
+
+  @override
+  String get installmentsCountLabel => 'Parcelas';
+
+  @override
+  String get firstChargeDateLabel => 'Primeira cobrança';
+
+  @override
+  String get invalidInstallmentsError => 'Informe entre 2 e 36 parcelas.';
+
+  @override
+  String get submitInstallmentPurchaseButton => 'Adicionar parcelamento';
+
+  @override
+  String get installmentPurchasesListTitle => 'Parcelamentos cadastrados';
+
+  @override
+  String get installmentPurchasesEmptyState => 'Nenhum parcelamento cadastrado ainda.';
+
+  @override
+  String installmentSummaryLabel(String count, String amount) {
+    return '${count}x de $amount';
+  }
+
+  @override
+  String installmentProgressLabel(String paid, String total) {
+    return '$paid de $total parcelas pagas';
+  }
+
+  @override
+  String get removeInstallmentPurchaseConfirmTitle => 'Remover esse parcelamento?';
+
+  @override
+  String get removeInstallmentPurchaseTooltip => 'Remover parcelamento';
+
+  @override
   String get receitasTitle => 'Receitas';
 
   @override

@@ -264,6 +264,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeSubscriptionTooltip => 'Remove subscription';
 
   @override
+  String get installmentPurchasesTitle => 'Installment purchases';
+
+  @override
+  String get installmentPurchasesSubtitle =>
+      'A card purchase split into installments, billed automatically over the following months starting from the first charge.';
+
+  @override
+  String get installmentNameLabel => 'Name';
+
+  @override
+  String get installmentNameHint => 'e.g. Dell laptop';
+
+  @override
+  String get purchaseDateLabel => 'Purchase date';
+
+  @override
+  String get installmentsCountLabel => 'Installments';
+
+  @override
+  String get firstChargeDateLabel => 'First charge';
+
+  @override
+  String get invalidInstallmentsError => 'Enter between 2 and 36 installments.';
+
+  @override
+  String get submitInstallmentPurchaseButton => 'Add installment purchase';
+
+  @override
+  String get installmentPurchasesListTitle => 'Registered installment purchases';
+
+  @override
+  String get installmentPurchasesEmptyState => 'No installment purchases registered yet.';
+
+  @override
+  String installmentSummaryLabel(String count, String amount) {
+    return '${count}x of $amount';
+  }
+
+  @override
+  String installmentProgressLabel(String paid, String total) {
+    return '$paid of $total installments paid';
+  }
+
+  @override
+  String get removeInstallmentPurchaseConfirmTitle => 'Remove this installment purchase?';
+
+  @override
+  String get removeInstallmentPurchaseTooltip => 'Remove installment purchase';
+
+  @override
   String get receitasTitle => 'Income';
 
   @override
