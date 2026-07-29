@@ -91,18 +91,111 @@ DateTime installmentDueDate(InstallmentPurchase purchase, int index) {
   return dueDateFor(first.year, first.month + index, first.day);
 }
 
+/// Tolerance for "this debt is paid off", in the same spirit as
+/// `FirestoreService._eps`: cents computed by subtraction can land a hair
+/// off zero, and a purchase 0.0000001 short of settled is settled.
+const _eps = 1e-9;
+
+/// How much of [purchase] the SCHEDULED installments have billed so far —
+/// the first [InstallmentPurchase.chargedInstallments] slices, summed.
+double scheduledPaidAmount(InstallmentPurchase purchase) {
+  final slices = installmentAmounts(purchase.totalAmount, purchase.installments);
+  var total = 0.0;
+  for (var i = 0; i < purchase.chargedInstallments && i < slices.length; i++) {
+    total += slices[i];
+  }
+  return agg.round2(total);
+}
+
+/// What is still owed on [purchase]: the total, minus what the scheduled
+/// installments already billed, minus anything paid ahead
+/// ([InstallmentPurchase.amortizedAmount]).
+///
+/// This — not the installment counter — is what says whether the purchase is
+/// over. Paying ahead shortens the schedule, so a purchase can owe nothing
+/// while occurrences remain unbilled.
+double outstandingAmount(InstallmentPurchase purchase) {
+  final remaining =
+      purchase.totalAmount - scheduledPaidAmount(purchase) - purchase.amortizedAmount;
+  return remaining <= _eps ? 0 : agg.round2(remaining);
+}
+
+/// Whether [purchase] is fully paid — nothing left to charge, whether it got
+/// there by running its course or by being settled early.
+bool isSettled(InstallmentPurchase purchase) => outstandingAmount(purchase) <= _eps;
+
+/// What occurrence [index] should actually charge, given [outstanding] still
+/// owed: its scheduled slice, or whatever is left if that is less.
+///
+/// The clamp is what makes an early payoff end the purchase cleanly instead
+/// of overcharging past the debt. With no extra payments it is a no-op — the
+/// last occurrence's outstanding is exactly its slice, so this reproduces the
+/// original "remainder on the final installment" behavior unchanged.
+double installmentChargeAmount(
+  InstallmentPurchase purchase,
+  int index,
+  double outstanding,
+) {
+  final slice = installmentAmounts(purchase.totalAmount, purchase.installments)[index];
+  return slice <= outstanding ? slice : agg.round2(outstanding);
+}
+
+/// What [today]'s month already owes to recurring charges: every
+/// subscription that bills this month, plus every installment falling due in
+/// it that hasn't been settled.
+///
+/// This is the "before you spend anything, this much of the month is already
+/// spoken for" figure. It counts the whole month, past due dates included —
+/// the point is what the month costs, not what is left of it.
+double committedThisMonth(
+  List<Subscription> subscriptions,
+  List<InstallmentPurchase> purchases,
+  DateTime today,
+) {
+  final monthStart = DateTime(today.year, today.month);
+  final monthEnd = DateTime(today.year, today.month + 1, 0);
+  bool inThisMonth(DateTime d) => !d.isBefore(monthStart) && !d.isAfter(monthEnd);
+
+  var total = 0.0;
+  for (final s in subscriptions) {
+    final due = dueDateFor(today.year, today.month, s.dueDay);
+    // Skip a subscription registered after this month's due date already
+    // passed — catch-up wouldn't bill it either.
+    if (due.isBefore(_parseIsoDate(s.createdAt))) continue;
+    total += s.amount;
+  }
+  for (final p in purchases) {
+    var outstanding = outstandingAmount(p);
+    for (var i = p.chargedInstallments; i < p.installments; i++) {
+      if (outstanding <= _eps) break;
+      final due = installmentDueDate(p, i);
+      if (due.isAfter(monthEnd)) break;
+      final amount = installmentChargeAmount(p, i, outstanding);
+      if (inThisMonth(due)) total += amount;
+      outstanding = agg.round2(outstanding - amount);
+    }
+  }
+  return agg.round2(total);
+}
+
 /// Every installment index [purchase] should have charged by [today] but
 /// hasn't yet — starting at [InstallmentPurchase.chargedInstallments], oldest
-/// first, stopping at [InstallmentPurchase.installments] (bounded, unlike a
-/// subscription's open-ended catch-up).
+/// first, stopping at [InstallmentPurchase.installments] OR as soon as the
+/// debt is paid off, whichever comes first (bounded, unlike a subscription's
+/// open-ended catch-up).
 ///
 /// After catch-up has run, a non-empty result means those installments did
-/// NOT go through (almost always: insufficient account balance).
+/// NOT go through (almost always: the funding balance couldn't cover them).
 List<int> pendingInstallmentIndexes(InstallmentPurchase purchase, DateTime today) {
+  var outstanding = outstandingAmount(purchase);
   final indexes = <int>[];
   for (var i = purchase.chargedInstallments; i < purchase.installments; i++) {
+    if (outstanding <= _eps) break; // settled early — the rest never bills
     if (installmentDueDate(purchase, i).isAfter(today)) break;
     indexes.add(i);
+    outstanding = agg.round2(
+      outstanding - installmentChargeAmount(purchase, i, outstanding),
+    );
   }
   return indexes;
 }

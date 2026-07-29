@@ -423,6 +423,131 @@ void main() {
         expect(await subscription('s1'), isNull);
       });
 
+      test('reports what it charged, so the app can say money left the account', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 15));
+        await svc.createIncome(date: '2025-11-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 10, createdAt: '2026-01-01'),
+        );
+        await seed(
+          const Subscription(id: 's2', name: 'Spotify', amount: 20, dueDay: 10, createdAt: '2026-03-01'),
+        );
+
+        final report = await svc.catchUpSubscriptions();
+
+        // Netflix: jan, fev, mar = 3 x 40. Spotify: só março = 1 x 20.
+        expect(report.count, 4);
+        expect(report.total, 140);
+        expect(report.isEmpty, isFalse);
+      });
+
+      test('reports nothing when there was nothing to charge', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 1));
+        final report = await svc.catchUpSubscriptions();
+        expect(report.isEmpty, isTrue);
+        expect(report.total, 0);
+      });
+
+      test('charges the caixinha instead of the account when categoryId is set', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        final cat = await svc.createCategory(name: 'Lazer', recurring: false);
+        await svc.createAllocation(categoryId: cat.id, amount: 60, date: '2026-01-01');
+        await seed(
+          Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            categoryId: cat.id,
+          ),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        final exp = (await expenses()).single;
+        expect(exp.categoryId, cat.id, reason: 'the expense belongs to the caixinha');
+        expect(await categoryBalance(cat.id), 20); // 60 - 40
+        // The account only lost the 60 it allocated — the charge itself did
+        // NOT come out of it a second time.
+        expect(await accountBalance(), 40);
+      });
+
+      test('a caixinha with allowNegative can go into debt for a charge', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        final cat = await svc.createCategory(
+          name: 'Lazer',
+          recurring: false,
+          kind: CategoryKind.spend,
+          allowNegative: true,
+        );
+        await svc.createAllocation(categoryId: cat.id, amount: 10, date: '2026-01-01');
+        await seed(
+          Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            categoryId: cat.id,
+          ),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), hasLength(1));
+        expect(await categoryBalance(cat.id), -30); // 10 - 40, debt allowed
+      });
+
+      test('a caixinha without allowNegative refuses the charge and leaves it pending', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        final cat = await svc.createCategory(name: 'Lazer', recurring: false);
+        await svc.createAllocation(categoryId: cat.id, amount: 10, date: '2026-01-01');
+        await seed(
+          Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            categoryId: cat.id,
+          ),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), isEmpty);
+        expect(await categoryBalance(cat.id), 10, reason: 'untouched');
+        expect((await subscription('s1'))!.lastChargedDate, isNull);
+        // The account has money — but it is NOT the configured source, so it
+        // must not be raided to make the charge go through.
+        expect(await accountBalance(), 90);
+      });
+
+      test('a deleted caixinha stops the charge instead of falling back to the account', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            categoryId: 'ghost', // never existed / already deleted
+          ),
+        );
+
+        await svc.catchUpSubscriptions();
+
+        expect(await expenses(), isEmpty);
+        expect(await accountBalance(), 100, reason: 'the account is not a silent fallback');
+        expect((await subscription('s1'))!.lastChargedDate, isNull);
+      });
+
       test('clamps dueDay 31 to the last day of a shorter month (Feb 28 in a non-leap year)', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 1));
         await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
@@ -452,6 +577,135 @@ void main() {
       final data = snap.data();
       return data == null ? null : InstallmentPurchase.fromMap(id, data);
     }
+
+    group('payInstallmentPurchase (adiantar / quitar)', () {
+      test('an extra payment debits the account and shortens the schedule', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 4, 15));
+        await svc.createIncome(date: '2026-01-01', amount: 2000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook',
+            totalAmount: 1000,
+            installments: 10,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
+            createdAt: '2026-01-01',
+            chargedInstallments: 3, // 300 já cobrados
+          ),
+        );
+
+        await svc.payInstallmentPurchase('p1', amount: 300, date: '2026-04-15');
+
+        expect(await accountBalance(), 1700); // 2000 - 300
+        final p = (await purchase('p1'))!;
+        expect(p.amortizedAmount, 300);
+        expect(p.chargedInstallments, 3, reason: 'o contador de parcelas não muda');
+        // Faltavam 700; agora faltam 400 -> 4 parcelas em vez de 7.
+        final exp = (await expenses()).single;
+        expect(exp.amount, 300);
+        expect(exp.sourceId, 'p1');
+        expect(exp.sourceType, 'installment');
+        expect(exp.categoryId, isNull);
+      });
+
+      test('pays out of a caixinha when asked to', () async {
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        final cat = await svc.createCategory(name: 'Eletrônicos', recurring: false);
+        await svc.createAllocation(categoryId: cat.id, amount: 500, date: '2026-01-01');
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook',
+            totalAmount: 1000,
+            installments: 10,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
+            createdAt: '2026-01-01',
+          ),
+        );
+
+        await svc.payInstallmentPurchase(
+          'p1',
+          amount: 200,
+          date: '2026-04-15',
+          categoryId: cat.id,
+        );
+
+        expect(await categoryBalance(cat.id), 300); // 500 - 200
+        expect(await accountBalance(), 500, reason: 'só a alocação saiu da conta');
+        expect((await purchase('p1'))!.amortizedAmount, 200);
+      });
+
+      test('clamps a payment bigger than the debt instead of overpaying', () async {
+        await svc.createIncome(date: '2026-01-01', amount: 2000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook',
+            totalAmount: 1000,
+            installments: 10,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
+            createdAt: '2026-01-01',
+            chargedInstallments: 3,
+          ),
+        );
+
+        // Manda 9999 ("quitar"); só 700 são devidos.
+        await svc.payInstallmentPurchase('p1', amount: 9999, date: '2026-04-15');
+
+        expect((await expenses()).single.amount, 700);
+        expect(await accountBalance(), 1300); // 2000 - 700
+        expect((await purchase('p1'))!.amortizedAmount, 700);
+      });
+
+      test('refuses when the funding balance cannot cover it, writing nothing', () async {
+        await svc.createIncome(date: '2026-01-01', amount: 50, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook',
+            totalAmount: 1000,
+            installments: 10,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
+            createdAt: '2026-01-01',
+          ),
+        );
+
+        await expectLater(
+          svc.payInstallmentPurchase('p1', amount: 300, date: '2026-04-15'),
+          throwsA(isA<StateError>()),
+        );
+
+        expect(await expenses(), isEmpty);
+        expect(await accountBalance(), 50);
+        expect((await purchase('p1'))!.amortizedAmount, 0);
+      });
+
+      test('refuses to pay an already settled purchase', () async {
+        await svc.createIncome(date: '2026-01-01', amount: 2000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook',
+            totalAmount: 1000,
+            installments: 10,
+            purchaseDate: '2026-01-01',
+            firstChargeDate: '2026-01-10',
+            createdAt: '2026-01-01',
+            amortizedAmount: 1000,
+          ),
+        );
+
+        await expectLater(
+          svc.payInstallmentPurchase('p1', amount: 10, date: '2026-04-15'),
+          throwsA(isA<StateError>()),
+        );
+        expect(await expenses(), isEmpty);
+      });
+    });
 
     test('createInstallmentPurchase creates the doc with the given fields, starting at 0 charged', () async {
       final p = await svc.createInstallmentPurchase(
@@ -616,6 +870,57 @@ void main() {
 
         expect(await expenses(), hasLength(1), reason: 'installment 1/3 must not be billed twice');
         expect(await accountBalance(), 1000 - 33.33);
+        expect((await purchase('p1'))!.chargedInstallments, 1);
+      });
+
+      test('charges the caixinha instead of the account when categoryId is set', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        final cat = await svc.createCategory(name: 'Eletrônicos', recurring: false);
+        await svc.createAllocation(categoryId: cat.id, amount: 200, date: '2026-01-01');
+        await seed(
+          InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 300,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+            categoryId: cat.id,
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        final exp = (await expenses()).single;
+        expect(exp.categoryId, cat.id);
+        expect(exp.amount, 100);
+        expect(await categoryBalance(cat.id), 100); // 200 - 100
+        expect(await accountBalance(), 800, reason: 'only the allocation left the account');
+      });
+
+      test('stops charging once an early payoff settled the debt', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 6, 15));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 300,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+            chargedInstallments: 1,
+            amortizedAmount: 200, // 100 charged + 200 paid ahead = settled
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        expect(await expenses(), isEmpty, reason: 'nothing is owed anymore');
+        expect(await accountBalance(), 1000);
         expect((await purchase('p1'))!.chargedInstallments, 1);
       });
 

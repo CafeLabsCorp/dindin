@@ -190,4 +190,88 @@ void main() {
       expect(pendingInstallmentIndexes(purchase(charged: 3), DateTime(2027, 1, 1)), isEmpty);
     });
   });
+
+  group('amortização (pagar adiantado encurta o prazo)', () {
+    // 1.000 em 10x de 100 — o exemplo do pedido.
+    InstallmentPurchase purchase({int charged = 0, double amortized = 0}) =>
+        InstallmentPurchase(
+          id: 'p1',
+          name: 'Notebook',
+          totalAmount: 1000,
+          installments: 10,
+          purchaseDate: '2026-01-01',
+          firstChargeDate: '2026-01-10',
+          createdAt: '2026-01-01',
+          chargedInstallments: charged,
+          amortizedAmount: amortized,
+        );
+
+    test('sem nada pago, deve o total', () {
+      expect(outstandingAmount(purchase()), 1000);
+      expect(isSettled(purchase()), isFalse);
+    });
+
+    test('parcelas cobradas abatem o saldo devedor', () {
+      expect(scheduledPaidAmount(purchase(charged: 3)), 300);
+      expect(outstandingAmount(purchase(charged: 3)), 700);
+    });
+
+    test('pagar 300 a mais com 3 parcelas pagas deixa 400 e encurta o prazo', () {
+      final p = purchase(charged: 3, amortized: 300);
+      expect(outstandingAmount(p), 400);
+      // Faltavam 7 parcelas; com 400 devendo, sobram 4 de R$ 100.
+      expect(pendingInstallmentIndexes(p, DateTime(2027, 1, 1)), [3, 4, 5, 6]);
+    });
+
+    test('a parcela continua em 100 — quem encurta é o prazo, não o valor', () {
+      final p = purchase(charged: 3, amortized: 300);
+      expect(installmentChargeAmount(p, 3, outstandingAmount(p)), 100);
+    });
+
+    test('quitar zera o saldo e cancela todas as ocorrências restantes', () {
+      final p = purchase(charged: 3, amortized: 700);
+      expect(outstandingAmount(p), 0);
+      expect(isSettled(p), isTrue);
+      expect(pendingInstallmentIndexes(p, DateTime(2027, 1, 1)), isEmpty);
+    });
+
+    test('a última cobrança é limitada ao que resta, nunca cobra a mais', () {
+      // 3 pagas (300) + 250 adiantados = 450 devendo -> 4 de 100 e uma de 50.
+      final p = purchase(charged: 3, amortized: 250);
+      expect(outstandingAmount(p), 450);
+      final indexes = pendingInstallmentIndexes(p, DateTime(2027, 1, 1));
+      expect(indexes, [3, 4, 5, 6, 7]);
+      // Somando o que cada uma cobra, dá exatamente o saldo devedor.
+      var remaining = outstandingAmount(p);
+      var total = 0.0;
+      for (final i in indexes) {
+        final amount = installmentChargeAmount(p, i, remaining);
+        total += amount;
+        remaining -= amount;
+      }
+      expect(total, 450);
+      expect(remaining, 0);
+    });
+
+    test('sem amortização o comportamento é idêntico ao de antes', () {
+      // A regra do "resto na última parcela" tem que sobreviver ao clamp.
+      const p = InstallmentPurchase(
+        id: 'p1',
+        name: 'X',
+        totalAmount: 100,
+        installments: 3,
+        purchaseDate: '2026-01-01',
+        firstChargeDate: '2026-01-10',
+        createdAt: '2026-01-01',
+      );
+      var remaining = outstandingAmount(p);
+      final charges = <double>[];
+      for (final i in pendingInstallmentIndexes(p, DateTime(2027, 1, 1))) {
+        final amount = installmentChargeAmount(p, i, remaining);
+        charges.add(amount);
+        remaining -= amount;
+      }
+      expect(charges, [33.33, 33.33, 33.34]);
+    });
+  });
 }
