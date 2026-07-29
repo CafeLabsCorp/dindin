@@ -23,11 +23,12 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Fires subscription catch-up once per signed-in session — see
-    // subscriptionCatchUpProvider. Watched (not read) so it re-runs if the
-    // user signs out and back in as someone else; the result itself is
-    // unused here, the provider's side effect is the point.
-    ref.watch(subscriptionCatchUpProvider);
+    // Fires recurring-charge catch-up (subscriptions + installment purchases)
+    // once per signed-in session — see recurringChargesCatchUpProvider.
+    // Watched (not read) so it re-runs if the user signs out and back in as
+    // someone else; the result itself is unused here, the provider's side
+    // effect is the point.
+    ref.watch(recurringChargesCatchUpProvider);
     final l10n = AppLocalizations.of(context)!;
     final destinations = _destinations(l10n);
     final wide = MediaQuery.sizeOf(context).width >= 720;
