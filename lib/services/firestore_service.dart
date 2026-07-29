@@ -6,6 +6,7 @@ import '../models/db.dart';
 import '../models/expense.dart';
 import '../models/income.dart';
 import '../models/income_source.dart';
+import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
 import 'aggregation_service.dart' as agg;
 
@@ -25,7 +26,7 @@ import 'aggregation_service.dart' as agg;
 /// docs/BACKEND.md.
 ///
 /// The balance docs are a DERIVED cache: they are NOT part of the JSON backup
-/// (which stays the five ledger collections only) and are rebuilt from the
+/// (which stays the six ledger collections only) and are rebuilt from the
 /// ledger by the one-time backfill script and by [replaceAll] on restore. The
 /// app's on-screen balances are still summed from the ledger by
 /// `aggregation_service`, so a cache that ever drifts never misleads the user.
@@ -56,6 +57,8 @@ class FirestoreService {
       _db.collection('users/$uid/expenses');
   CollectionReference<Map<String, dynamic>> get _subscriptions =>
       _db.collection('users/$uid/subscriptions');
+  CollectionReference<Map<String, dynamic>> get _installmentPurchases =>
+      _db.collection('users/$uid/installmentPurchases');
   CollectionReference<Map<String, dynamic>> get _balances =>
       _db.collection('users/$uid/balances');
 
@@ -134,6 +137,12 @@ class FirestoreService {
     );
   }
 
+  Stream<List<InstallmentPurchase>> watchInstallmentPurchases() {
+    return _installmentPurchases.orderBy('createdAt').snapshots().map(
+      (s) => s.docs.map((d) => InstallmentPurchase.fromMap(d.id, d.data())).toList(),
+    );
+  }
+
   Future<AppDb> fetchAll() async {
     final results = await Future.wait([
       _categories.get(),
@@ -141,6 +150,7 @@ class FirestoreService {
       _allocations.get(),
       _expenses.get(),
       _subscriptions.get(),
+      _installmentPurchases.get(),
     ]);
     return AppDb(
       categories: results[0].docs
@@ -157,6 +167,9 @@ class FirestoreService {
           .toList(),
       subscriptions: results[4].docs
           .map((d) => Subscription.fromMap(d.id, d.data()))
+          .toList(),
+      installmentPurchases: results[5].docs
+          .map((d) => InstallmentPurchase.fromMap(d.id, d.data()))
           .toList(),
     );
   }
@@ -729,11 +742,17 @@ class FirestoreService {
   }
 
   /// Clamps [day] to the last day of [year]/[month] — e.g. dueDay 31 in
-  /// February resolves to the 28th (or 29th on a leap year).
+  /// February resolves to the 28th (or 29th on a leap year). Shared by
+  /// subscriptions (recurring, unbounded) and installment purchases (bounded
+  /// to N occurrences) — both anchor their monthly occurrence on a day of the
+  /// month that may not exist in every month.
   DateTime _dueDateFor(int year, int month, int day) {
     final lastDayOfMonth = DateTime(year, month + 1, 0).day;
     return DateTime(year, month, day > lastDayOfMonth ? lastDayOfMonth : day);
   }
+
+  String _isoDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   /// Every due date [subscription] should have charged by [today], oldest
   /// first: one per month starting the month after [Subscription.lastChargedDate]
@@ -782,8 +801,7 @@ class FirestoreService {
     for (final doc in snap.docs) {
       final subscription = Subscription.fromMap(doc.id, doc.data());
       for (final due in _pendingDueDates(subscription, today)) {
-        final dueIso =
-            '${due.year.toString().padLeft(4, '0')}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
+        final dueIso = _isoDate(due);
         try {
           await _db.runTransaction((tx) async {
             final acct = await _readBalance(tx, _account);
@@ -816,6 +834,139 @@ class FirestoreService {
           });
         } on StateError {
           break; // insufficient balance now; retry this due date next time.
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Installment purchases (a card purchase split into N fixed monthly
+  // charges, e.g. "Notebook Dell, 12x"). Always charged straight from the
+  // account, same as a subscription — but bounded: it stops generating
+  // charges once every installment has been billed. No money invariant of
+  // its own; only the Expense docs [catchUpInstallmentPurchases] produces go
+  // through the normal account-balance gate.
+  // -------------------------------------------------------------------------
+  Future<InstallmentPurchase> createInstallmentPurchase({
+    required String name,
+    required double totalAmount,
+    required int installments,
+    required String purchaseDate,
+    required String firstChargeDate,
+  }) async {
+    if (totalAmount <= 0) {
+      throw StateError('installment purchase amount must be positive');
+    }
+    if (installments < 2 || installments > 36) {
+      throw StateError('installments must be between 2 and 36');
+    }
+    final doc = _installmentPurchases.doc();
+    final purchase = InstallmentPurchase(
+      id: doc.id,
+      name: name,
+      totalAmount: totalAmount,
+      installments: installments,
+      purchaseDate: purchaseDate,
+      firstChargeDate: firstChargeDate,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    await doc.set(purchase.toMap());
+    return purchase;
+  }
+
+  Future<void> deleteInstallmentPurchase(String id) async {
+    await _installmentPurchases.doc(id).delete();
+  }
+
+  /// Splits [totalAmount] into [installments] equal monthly slices, rounded
+  /// to the cent, with any rounding remainder absorbed into the LAST
+  /// installment — matches how a real card bill splits a purchase, and
+  /// guarantees the slices sum to exactly [totalAmount] (no drift from
+  /// summing many rounded fractions, same `round2` discipline as
+  /// `aggregation_service.dart`).
+  List<double> _installmentAmounts(double totalAmount, int installments) {
+    final each = agg.round2(totalAmount / installments);
+    final amounts = List<double>.filled(installments, each);
+    final allButLast = agg.round2(each * (installments - 1));
+    amounts[installments - 1] = agg.round2(totalAmount - allButLast);
+    return amounts;
+  }
+
+  /// The 0-indexed occurrence's due date: [firstChargeDate]'s day of month,
+  /// [index] months later, clamped for short months (see [_dueDateFor]).
+  DateTime _installmentDueDate(InstallmentPurchase purchase, int index) {
+    final first = DateTime.parse(purchase.firstChargeDate.substring(0, 10));
+    return _dueDateFor(first.year, first.month + index, first.day);
+  }
+
+  /// Every installment index [purchase] should have charged by [today] but
+  /// hasn't yet — starting at [InstallmentPurchase.chargedInstallments], oldest
+  /// first, stopping at [InstallmentPurchase.installments] (bounded, unlike a
+  /// subscription's open-ended catch-up).
+  List<int> _pendingInstallmentIndexes(InstallmentPurchase purchase, DateTime today) {
+    final indexes = <int>[];
+    for (var i = purchase.chargedInstallments; i < purchase.installments; i++) {
+      if (_installmentDueDate(purchase, i).isAfter(today)) break;
+      indexes.add(i);
+    }
+    return indexes;
+  }
+
+  /// Catches up every installment purchase's missed charges since it was last
+  /// billed, creating one account-level [Expense] per missed installment
+  /// (oldest first) — the bounded counterpart to [catchUpSubscriptions], same
+  /// client-triggered-on-app-open model (see its doc comment for why: no
+  /// Cloud Scheduler/Functions, stays on the free Spark tier). Stops
+  /// generating once [InstallmentPurchase.chargedInstallments] reaches
+  /// [InstallmentPurchase.installments].
+  ///
+  /// If the account balance can't cover a due installment, that purchase's
+  /// catch-up stops there (mirrors [createExpense]'s "never overdraw the
+  /// account" guarantee) and is retried from the same installment next time
+  /// this runs; other purchases are unaffected.
+  Future<void> catchUpInstallmentPurchases() async {
+    final snap = await _installmentPurchases.get();
+    final today = _now();
+    for (final doc in snap.docs) {
+      final purchase = InstallmentPurchase.fromMap(doc.id, doc.data());
+      if (purchase.isFullyCharged) continue;
+      final amounts = _installmentAmounts(purchase.totalAmount, purchase.installments);
+      for (final index in _pendingInstallmentIndexes(purchase, today)) {
+        final amount = amounts[index];
+        final dueIso = _isoDate(_installmentDueDate(purchase, index));
+        try {
+          await _db.runTransaction((tx) async {
+            final acct = await _readBalance(tx, _account);
+            if (amount > acct + _eps) {
+              throw StateError('amount exceeds available balance');
+            }
+            final expenseDoc = _expenses.doc();
+            final expense = Expense(
+              id: expenseDoc.id,
+              date: dueIso,
+              amount: amount,
+              description: '${purchase.name} (${index + 1}/${purchase.installments})',
+            );
+            tx.set(expenseDoc, expense.toMap());
+            tx.set(_account, {'balance': acct - amount});
+            // A full overwrite (not a merge) — every other field is copied
+            // from the already-fetched [purchase] unchanged.
+            tx.set(
+              doc.reference,
+              InstallmentPurchase(
+                id: purchase.id,
+                name: purchase.name,
+                totalAmount: purchase.totalAmount,
+                installments: purchase.installments,
+                purchaseDate: purchase.purchaseDate,
+                firstChargeDate: purchase.firstChargeDate,
+                createdAt: purchase.createdAt,
+                chargedInstallments: index + 1,
+              ).toMap(),
+            );
+          });
+        } on StateError {
+          break; // insufficient balance now; retry this installment next time.
         }
       }
     }
@@ -872,15 +1023,17 @@ class FirestoreService {
     ]);
 
     // 2. Delete existing ledger docs (balance docs now absent -> rules skip deltas).
-    //    Subscriptions carry no balance/delta of their own (see the
-    //    "Subscriptions" section above), so they're wiped and rewritten here
-    //    alongside the other ledger collections with no special ordering need.
+    //    Subscriptions and installment purchases carry no balance/delta of
+    //    their own (see their sections above), so they're wiped and
+    //    rewritten here alongside the other ledger collections with no
+    //    special ordering need.
     for (final collection in [
       _categories,
       _incomes,
       _allocations,
       _expenses,
       _subscriptions,
+      _installmentPurchases,
     ]) {
       final existing = await collection.get();
       await _deleteRefs(existing.docs.map((d) => d.reference).toList());
@@ -893,6 +1046,7 @@ class FirestoreService {
       for (final a in db.allocations) (_allocations.doc(a.id), a.toMap()),
       for (final e in db.expenses) (_expenses.doc(e.id), e.toMap()),
       for (final s in db.subscriptions) (_subscriptions.doc(s.id), s.toMap()),
+      for (final p in db.installmentPurchases) (_installmentPurchases.doc(p.id), p.toMap()),
     ]);
 
     // 4. Write the derived balance docs last (recomputed in step 0). Only

@@ -19,6 +19,7 @@ import 'package:dindin/models/db.dart';
 import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/income_source.dart';
+import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/models/subscription.dart';
 import 'package:dindin/services/firestore_service.dart';
 
@@ -358,6 +359,235 @@ void main() {
 
         final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
         expect(exps.map((e) => e.date), ['2026-01-31', '2026-02-28']);
+      });
+    });
+  });
+
+  group('installmentPurchases', () {
+    Future<void> seed(InstallmentPurchase purchase) =>
+        fake.doc('users/u1/installmentPurchases/${purchase.id}').set(purchase.toMap());
+
+    Future<List<Expense>> expenses() async {
+      final snap = await fake.collection('users/u1/expenses').get();
+      return snap.docs.map((d) => Expense.fromMap(d.id, d.data())).toList();
+    }
+
+    Future<InstallmentPurchase?> purchase(String id) async {
+      final snap = await fake.doc('users/u1/installmentPurchases/$id').get();
+      final data = snap.data();
+      return data == null ? null : InstallmentPurchase.fromMap(id, data);
+    }
+
+    test('createInstallmentPurchase creates the doc with the given fields, starting at 0 charged', () async {
+      final p = await svc.createInstallmentPurchase(
+        name: 'Notebook Dell',
+        totalAmount: 300,
+        installments: 3,
+        purchaseDate: '2026-01-10',
+        firstChargeDate: '2026-02-05',
+      );
+      expect(p.name, 'Notebook Dell');
+      expect(p.totalAmount, 300);
+      expect(p.installments, 3);
+      expect(p.chargedInstallments, 0);
+      final stored = await purchase(p.id);
+      expect(stored, isNotNull);
+    });
+
+    test('createInstallmentPurchase rejects a non-positive total amount', () {
+      expect(
+        () => svc.createInstallmentPurchase(
+          name: 'x',
+          totalAmount: 0,
+          installments: 3,
+          purchaseDate: '2026-01-10',
+          firstChargeDate: '2026-02-05',
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('createInstallmentPurchase rejects installments outside 2-36', () {
+      expect(
+        () => svc.createInstallmentPurchase(
+          name: 'x',
+          totalAmount: 100,
+          installments: 1,
+          purchaseDate: '2026-01-10',
+          firstChargeDate: '2026-02-05',
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        () => svc.createInstallmentPurchase(
+          name: 'x',
+          totalAmount: 100,
+          installments: 37,
+          purchaseDate: '2026-01-10',
+          firstChargeDate: '2026-02-05',
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('deleteInstallmentPurchase removes the doc', () async {
+      final p = await svc.createInstallmentPurchase(
+        name: 'Notebook Dell',
+        totalAmount: 300,
+        installments: 3,
+        purchaseDate: '2026-01-10',
+        firstChargeDate: '2026-02-05',
+      );
+      await svc.deleteInstallmentPurchase(p.id);
+      expect(await purchase(p.id), isNull);
+    });
+
+    group('catchUpInstallmentPurchases', () {
+      test('charges the first installment once its date arrives', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 5));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        final exps = await expenses();
+        expect(exps, hasLength(1));
+        expect(exps.single.date, '2026-01-05');
+        expect(exps.single.amount, 33.33);
+        expect(exps.single.description, 'Notebook Dell (1/3)');
+        expect(await accountBalance(), 1000 - 33.33);
+        expect((await purchase('p1'))!.chargedInstallments, 1);
+      });
+
+      test('does not charge before firstChargeDate', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 1));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        expect(await expenses(), isEmpty);
+        expect((await purchase('p1'))!.chargedInstallments, 0);
+      });
+
+      test('catches up every due installment in one run, putting the rounding remainder on the last', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 5));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
+        expect(exps.map((e) => e.date), ['2026-01-05', '2026-02-05', '2026-03-05']);
+        expect(exps.map((e) => e.amount), [33.33, 33.33, 33.34]);
+        expect(exps.fold<double>(0, (s, e) => s + e.amount), 100.0);
+        final p = await purchase('p1');
+        expect(p!.chargedInstallments, 3);
+        expect(p.isFullyCharged, isTrue);
+      });
+
+      test('stops generating once fully charged — a later run is a no-op', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 5));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+        await svc.catchUpInstallmentPurchases();
+
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 6, 1));
+        await svc.catchUpInstallmentPurchases();
+
+        expect(await expenses(), hasLength(3)); // no 4th installment invented
+      });
+
+      test('stops without overdrawing the account when balance is insufficient, and retries later', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 5));
+        await svc.createIncome(date: '2026-01-01', amount: 10, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        expect(await expenses(), isEmpty);
+        expect(await accountBalance(), 10);
+        expect((await purchase('p1'))!.chargedInstallments, 0);
+
+        await svc.createIncome(date: '2026-01-06', amount: 50, source: IncomeSource.freela);
+        await svc.catchUpInstallmentPurchases();
+
+        final exps = await expenses();
+        expect(exps, hasLength(1));
+        expect(exps.single.amount, 33.33);
+        expect((await purchase('p1'))!.chargedInstallments, 1);
+      });
+
+      test('clamps the first-charge day for a shorter month (Jan 31 -> Feb 28 in a non-leap year)', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 1));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Aluguel adiantado',
+            totalAmount: 100,
+            installments: 2,
+            purchaseDate: '2026-01-31',
+            firstChargeDate: '2026-01-31',
+            createdAt: '2026-01-31',
+          ),
+        );
+
+        await svc.catchUpInstallmentPurchases();
+
+        final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
+        expect(exps.map((e) => e.date), ['2026-01-31', '2026-02-28']);
+        expect(exps.map((e) => e.amount), [50.0, 50.0]);
       });
     });
   });
