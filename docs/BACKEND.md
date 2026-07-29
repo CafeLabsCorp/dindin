@@ -69,10 +69,11 @@ Before onboarding real users there is a working path for both:
   before.
 - `subscriptions/{id}` — a new collection (not a field on an existing one): a
   fixed recurring monthly expense (name, amount, dueDay, createdAt,
-  lastChargedDate?), always charged straight from the account. It carries no
+  lastChargedDate?, categoryId?), charged from the account or from an
+  envelope (see `categoryId` below). It carries no
   money invariant of its own — `FirestoreService.catchUpSubscriptions` is the
   only writer of the `expenses` docs it produces, and those go through the
-  ordinary account-balance gate like any other expense. See "Subscriptions
+  ordinary balance gate like any other expense. See "Subscriptions
   (recurring expenses)" below for the client-triggered catch-up model this
   implies. An old backup with no `subscriptions` key imports as an empty list.
 - `installmentPurchases/{id}` — another new collection, the BOUNDED
@@ -100,9 +101,26 @@ Before onboarding real users there is a working path for both:
   a newer build survives an export/import cycle instead of vanishing on the
   way back out.
 
+- `subscriptions/{id}.categoryId` and `installmentPurchases/{id}.categoryId` —
+  the envelope the charge comes out of; absent = the general account, the same
+  meaning it has on an expense. No invariant of its own: the balance only
+  moves when catch-up writes the `Expense`, and that write is validated by the
+  `expenses` rules against whichever balance doc it targets. The client
+  (`_readChargeSource`) mirrors `createExpense`'s two branches, `allowNegative`
+  included. A deleted envelope means the charge stays pending with a warning,
+  never a silent fallback to the account.
+- `installmentPurchases/{id}.amortizedAmount` — how much has been paid beyond
+  the scheduled installments (paying extra one month, or settling). Mutable
+  but only ever grows, never negative and never above `totalAmount` — beyond
+  that would mean collecting more than the debt. It exists so
+  `totalAmount`/`installments` never have to be rewritten; those stay
+  immutable because they are what `chargedInstallments` is counted against.
+  Absent = 0.
+
 Old JSON backups (no `monthlyBudget`, no `transferId`, no `kind`/`goalAmount`,
 no `allowNegative`, no `subscriptions`, no `installmentPurchases`, no
-`sourceType`/`sourceId`) import unchanged.
+`sourceType`/`sourceId`, no `categoryId` on the recurring collections, no
+`amortizedAmount`) import unchanged.
 
 ### Denormalized balance docs (Option B — see below)
 
@@ -183,6 +201,31 @@ both halves of the problem:
 
 The same path covers a doc deleted mid-run (it's skipped, not resurrected).
 All reads precede all writes, as Firestore requires.
+
+### Paying ahead and paying off
+
+An installment purchase isn't only a fixed schedule: you can pay extra one
+month, or settle the whole thing. `FirestoreService.payInstallmentPurchase`
+creates an ordinary `Expense` (out of the account or an envelope, chosen at
+payment time — not necessarily the same source as the monthly charges) and
+adds the amount to `amortizedAmount`.
+
+The effect is on the TERM, not the installment: the outstanding balance is
+`totalAmount − installments already billed − amount paid ahead`, and catch-up
+simply stops once it reaches zero. A purchase can be settled with occurrences
+still on the calendar — which is why what decides whether it's over is the
+outstanding balance (`isSettled`), not the `chargedInstallments` counter.
+
+Two details worth recording:
+
+- The payment is **clamped to what is still owed**, read inside the
+  transaction. That is what makes the "pay it all off" button safe: it sends
+  the outstanding it last saw, and if a scheduled charge landed in between,
+  the clamp prevents an overpayment.
+- The final scheduled charge is clamped the same way
+  (`installmentChargeAmount`), so it can never bill past the debt after an
+  early payment. With no extra payments it is a no-op — it reproduces the
+  original "rounding remainder lands on the last installment" behavior.
 
 ### A pending charge is shown, not hidden
 
