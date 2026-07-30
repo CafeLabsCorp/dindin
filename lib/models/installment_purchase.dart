@@ -1,6 +1,6 @@
 /// A card purchase split into fixed monthly installments (e.g. "Notebook Dell,
 /// R$ 1.200 em 12x"): the total amount is charged in equal monthly slices —
-/// see `FirestoreService._installmentAmounts` for the exact split, which puts
+/// see `recurring_schedule.installmentAmounts` for the exact split, which puts
 /// any rounding remainder on the LAST installment (matches a real card bill) —
 /// straight out of the account balance, same as a [Subscription].
 ///

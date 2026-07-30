@@ -319,11 +319,19 @@ service cloud.firestore {
     // --- expenses -----------------------------------------------------------
     // A caixinha expense (has categoryId): caixinha -= amount, account unchanged.
     // An account expense (no categoryId): account -= amount.
+    // sourceType/sourceId (both present or both absent) link an expense back
+    // to the subscription / installment purchase whose catch-up generated it;
+    // absent means the user typed it in. They carry no money invariant — a
+    // generated expense debits the account exactly like a manual one — so
+    // they're only shape-checked here, and pinned immutable on update below.
     function validExpense(d) {
       return isIsoDate(d.date)
           && isNonNegNumber(d.amount)
           && (!('categoryId' in d.keys()) || d.categoryId is string)
-          && (!('description' in d.keys()) || d.description is string);
+          && (!('description' in d.keys()) || d.description is string)
+          && (!('sourceType' in d.keys()) || d.sourceType is string)
+          && (!('sourceId' in d.keys()) || d.sourceId is string)
+          && (('sourceType' in d.keys()) == ('sourceId' in d.keys()));
     }
     function isCaixinhaExpense(d) {
       return 'categoryId' in d.keys();
@@ -331,6 +339,18 @@ service cloud.firestore {
     function sameExpenseTarget(before, after) {
       return (('categoryId' in before.keys()) == ('categoryId' in after.keys()))
           && (!('categoryId' in after.keys()) || before.categoryId == after.categoryId);
+    }
+    // Editing an expense can't attach, detach or repoint its origin: the link
+    // is a record of what actually produced this row, so letting an edit
+    // rewrite it would let a manual expense pose as a generated one (or a
+    // generated one shed the link that proves a charge already happened).
+    // Only the date/amount/description are editable, same posture as
+    // createdAt on the source docs below.
+    function sameExpenseSource(before, after) {
+      return (('sourceId' in before.keys()) == ('sourceId' in after.keys()))
+          && (!('sourceId' in after.keys())
+                || (before.sourceId == after.sourceId
+                    && before.sourceType == after.sourceType));
     }
 
     match /users/{uid}/expenses/{expenseId} {
@@ -349,6 +369,7 @@ service cloud.firestore {
       allow update: if isOwner(uid)
                     && validExpense(request.resource.data)
                     && sameExpenseTarget(resource.data, request.resource.data)
+                    && sameExpenseSource(resource.data, request.resource.data)
                     && (isCaixinhaExpense(request.resource.data)
                           ? (accountDeltaOk(uid, 0)
                              && catDeltaOk(uid, request.resource.data.categoryId,

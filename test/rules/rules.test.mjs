@@ -1220,3 +1220,118 @@ describe('installmentPurchases', () => {
   });
 });
 
+
+// -----------------------------------------------------------------------
+// 12. Expense origin link (sourceType/sourceId)
+//
+// A generated expense carries the id of the subscription / installment
+// purchase whose catch-up produced it. It moves money exactly like a manual
+// expense, so the balance-delta rules above already cover the money side;
+// what these tests pin down is that the LINK itself can't be forged, half-
+// written, or rewritten after the fact.
+// -----------------------------------------------------------------------
+
+describe('expenses: origin link (sourceType/sourceId)', () => {
+  const generated = {
+    date: '2026-01-05',
+    amount: 40,
+    description: 'Netflix',
+    sourceType: 'subscription',
+    sourceId: 's1',
+  };
+
+  test('an account expense carrying both source fields is accepted', async () => {
+    await seed(async (sdb) => setDoc(accountDoc(sdb, 'alice'), { balance: 100 }));
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(expenseDoc(db, 'alice', 'e1'), generated);
+    batch.set(accountDoc(db, 'alice'), { balance: 60 }); // 100 - 40
+    await assertSucceeds(batch.commit());
+  });
+
+  test('an expense with only one of the two source fields is rejected', async () => {
+    await seed(async (sdb) => setDoc(accountDoc(sdb, 'alice'), { balance: 100 }));
+    const db = aliceDb();
+
+    const onlyType = writeBatch(db);
+    onlyType.set(expenseDoc(db, 'alice', 'e1'), {
+      date: '2026-01-05',
+      amount: 40,
+      sourceType: 'subscription',
+    });
+    onlyType.set(accountDoc(db, 'alice'), { balance: 60 });
+    await assertFails(onlyType.commit());
+
+    const onlyId = writeBatch(db);
+    onlyId.set(expenseDoc(db, 'alice', 'e2'), {
+      date: '2026-01-05',
+      amount: 40,
+      sourceId: 's1',
+    });
+    onlyId.set(accountDoc(db, 'alice'), { balance: 60 });
+    await assertFails(onlyId.commit());
+  });
+
+  test('a non-string source field is rejected', async () => {
+    await seed(async (sdb) => setDoc(accountDoc(sdb, 'alice'), { balance: 100 }));
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(expenseDoc(db, 'alice', 'e1'), {
+      date: '2026-01-05',
+      amount: 40,
+      sourceType: 'subscription',
+      sourceId: 42,
+    });
+    batch.set(accountDoc(db, 'alice'), { balance: 60 });
+    await assertFails(batch.commit());
+  });
+
+  test('editing amount/description keeps working while the link stays put', async () => {
+    await seed(async (sdb) => {
+      await setDoc(accountDoc(sdb, 'alice'), { balance: 60 });
+      await setDoc(expenseDoc(sdb, 'alice', 'e1'), generated);
+    });
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(expenseDoc(db, 'alice', 'e1'), { ...generated, amount: 30, description: 'Netflix HD' });
+    batch.set(accountDoc(db, 'alice'), { balance: 70 }); // 60 + (40 - 30)
+    await assertSucceeds(batch.commit());
+  });
+
+  test('an edit cannot strip, repoint, or forge the origin link', async () => {
+    await seed(async (sdb) => {
+      await setDoc(accountDoc(sdb, 'alice'), { balance: 60 });
+      await setDoc(expenseDoc(sdb, 'alice', 'e1'), generated);
+      // A manual expense, for the "forge a link onto it" case below.
+      await setDoc(expenseDoc(sdb, 'alice', 'e2'), { date: '2026-01-06', amount: 10 });
+    });
+    const db = aliceDb();
+
+    // Strip the link (making a generated charge look hand-entered).
+    const stripped = writeBatch(db);
+    stripped.set(expenseDoc(db, 'alice', 'e1'), {
+      date: generated.date,
+      amount: generated.amount,
+      description: generated.description,
+    });
+    stripped.set(accountDoc(db, 'alice'), { balance: 60 });
+    await assertFails(stripped.commit());
+
+    // Repoint it at a different subscription.
+    const repointed = writeBatch(db);
+    repointed.set(expenseDoc(db, 'alice', 'e1'), { ...generated, sourceId: 's2' });
+    repointed.set(accountDoc(db, 'alice'), { balance: 60 });
+    await assertFails(repointed.commit());
+
+    // Forge a link onto an expense that never had one.
+    const forged = writeBatch(db);
+    forged.set(expenseDoc(db, 'alice', 'e2'), {
+      date: '2026-01-06',
+      amount: 10,
+      sourceType: 'subscription',
+      sourceId: 's1',
+    });
+    forged.set(accountDoc(db, 'alice'), { balance: 60 });
+    await assertFails(forged.commit());
+  });
+});
