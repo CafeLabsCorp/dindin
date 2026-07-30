@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../services/firestore_service.dart';
+import '../theme/theme.dart';
 import '../utils/format.dart';
 
 /// Every top-level destination, in the SAME order as the branches in
@@ -102,32 +103,58 @@ class AppShell extends ConsumerWidget {
       );
     }
 
+    final onMoreScreen = navigationShell.currentIndex >= _bottomDestinationCount;
+
     return Scaffold(
-      appBar: AppBar(title: SvgPicture.asset('assets/logo.svg', height: 28)),
+      // The logo is the overflow button, and it lives UP HERE rather than in
+      // the bottom bar. Putting it in the bar made six slots on a phone, and
+      // six is one too many: at ~380px each slot gets ~63px and "Assinaturas"
+      // wrapped mid-word. The bar now holds exactly the five destinations it
+      // can fit, and the logo — which was already in this app bar anyway —
+      // does double duty.
+      appBar: AppBar(
+        title: Tooltip(
+          message: l10n.navMore,
+          child: InkWell(
+            onTap: () => _openMoreMenu(context, l10n, destinations),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset('assets/logo.svg', height: 28),
+                  // A logo alone gives no hint that it opens anything; the
+                  // chevron is what makes it read as a menu.
+                  Icon(
+                    Icons.expand_more,
+                    size: 20,
+                    color: onMoreScreen
+                        ? Theme.of(context).colorScheme.primary
+                        : context.tokens.subtle,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Padding(padding: const EdgeInsets.all(16), child: navigationShell),
       ),
       bottomNavigationBar: NavigationBar(
-        // The logo occupies the last slot. When the user is on one of the
-        // screens BEHIND it, that slot is what reads as selected — which is
-        // honest: "you're in the section this button opens".
+        // On a screen reached from the logo menu, no bar slot is the right
+        // answer — but NavigationBar demands an in-range index, so it keeps
+        // showing the last bar destination. The app bar chevron is what turns
+        // primary-coloured to say where you actually are.
         selectedIndex: navigationShell.currentIndex < _bottomDestinationCount
             ? navigationShell.currentIndex
-            : _bottomDestinationCount,
-        onDestinationSelected: (i) {
-          if (i == _bottomDestinationCount) {
-            _openMoreMenu(context, l10n, destinations);
-            return;
-          }
-          navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex);
-        },
+            : _bottomDestinationCount - 1,
+        onDestinationSelected: (i) =>
+            navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
         destinations: [
           for (final d in destinations.take(_bottomDestinationCount))
             NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: d.label),
-          NavigationDestination(
-            icon: SvgPicture.asset('assets/logo.svg', height: 24),
-            label: l10n.navMore,
-          ),
         ],
       ),
     );

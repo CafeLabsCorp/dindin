@@ -1199,7 +1199,7 @@ abstract class AppLocalizations {
   /// No description provided for @navAssinaturas.
   ///
   /// In pt, this message translates to:
-  /// **'Assinaturas'**
+  /// **'Fixos'**
   String get navAssinaturas;
 
   /// No description provided for @navParcelamentos.

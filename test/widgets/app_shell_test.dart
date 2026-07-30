@@ -68,26 +68,55 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('a barra mostra os 5 destinos de dinheiro mais o logo', (tester) async {
+  testWidgets('a barra mostra exatamente os 5 destinos de dinheiro', (tester) async {
     await pump(tester);
 
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.destinations, hasLength(6), reason: '5 destinos + o botão do logo');
+    expect(bar.destinations, hasLength(5), reason: 'o logo NÃO ocupa slot da barra');
 
-    for (final label in ['Dashboard', 'Receitas', 'Gastos', 'Assinaturas', 'Parcelas']) {
+    for (final label in ['Dashboard', 'Receitas', 'Gastos', 'Fixos', 'Parcelas']) {
       expect(find.text(label), findsWidgets, reason: '$label deve estar na barra');
     }
-    expect(find.text('Mais'), findsOneWidget);
     // Categorias e Ajustes saíram da barra — são gerenciamento, não rotina.
     expect(find.text('Categorias'), findsNothing);
     expect(find.text('Ajustes'), findsNothing);
+  });
+
+  testWidgets('nenhum rótulo destoa em altura num celular estreito', (tester) async {
+    // Regressão real: com o logo ocupando um sexto slot, cada um ficava com
+    // ~63px e "Assinaturas" quebrava no meio da palavra ("Assinatura" / "s").
+    //
+    // A comparação é RELATIVA de propósito. A fonte do flutter_test é
+    // sintética (glifos de largura fixa), então altura absoluta aqui não diz
+    // nada sobre o navegador — o que diz é um rótulo ficar mais alto que os
+    // outros, que foi exatamente como o bug apareceu.
+    await pump(tester, size: const Size(360, 780));
+
+    final heights = <String, double>{};
+    for (final label in ['Dashboard', 'Receitas', 'Gastos', 'Fixos', 'Parcelas']) {
+      final finder = find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text(label),
+      );
+      expect(finder, findsOneWidget, reason: '$label deve estar na barra');
+      heights[label] = tester.renderObject<RenderBox>(finder).size.height;
+    }
+
+    final shortest = heights.values.reduce((a, b) => a < b ? a : b);
+    for (final entry in heights.entries) {
+      expect(
+        entry.value,
+        lessThanOrEqualTo(shortest * 2),
+        reason: '"${entry.key}" ficou desproporcionalmente alto — indício de quebra',
+      );
+    }
   });
 
   testWidgets('tocar num destino da barra troca de página', (tester) async {
     await pump(tester);
     expect(find.text('page:dashboard'), findsOneWidget);
 
-    await tester.tap(find.text('Assinaturas'));
+    await tester.tap(find.text('Fixos'));
     await tester.pumpAndSettle();
 
     expect(find.text('page:assinaturas'), findsOneWidget);
@@ -97,7 +126,7 @@ void main() {
   testWidgets('o logo abre a folha com Categorias e Ajustes', (tester) async {
     await pump(tester);
 
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.byTooltip('Mais'));
     await tester.pumpAndSettle();
 
     expect(find.text('Categorias'), findsOneWidget);
@@ -107,7 +136,7 @@ void main() {
   testWidgets('escolher na folha navega e fecha a folha', (tester) async {
     await pump(tester);
 
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.byTooltip('Mais'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ajustes'));
     await tester.pumpAndSettle();
@@ -118,16 +147,16 @@ void main() {
 
   testWidgets('estando numa tela de trás do logo, é o logo que aparece selecionado', (tester) async {
     await pump(tester);
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.byTooltip('Mais'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Categorias'));
     await tester.pumpAndSettle();
 
-    // Índice 5 é o slot do logo. Sem esse clamp o NavigationBar receberia um
-    // selectedIndex fora da faixa (a branch de Categorias é a 5 de 7) e
-    // estouraria.
+    // A branch de Categorias é a 5 (de 7), fora da faixa da barra de 5 slots:
+    // sem o clamp o NavigationBar estouraria. Quem sinaliza onde você está de
+    // verdade é o chevron do logo, que fica na cor primária.
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.selectedIndex, 5);
+    expect(bar.selectedIndex, lessThan(5));
     expect(find.text('page:categorias'), findsOneWidget);
   });
 
@@ -139,6 +168,6 @@ void main() {
     expect(rail.destinations, hasLength(7), reason: 'uma lista vertical comporta todos');
     expect(find.text('Categorias'), findsWidgets);
     expect(find.text('Ajustes'), findsWidgets);
-    expect(find.text('Mais'), findsNothing);
+    expect(find.byTooltip('Mais'), findsNothing, reason: 'sem overflow em tela larga');
   });
 }
