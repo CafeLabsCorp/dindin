@@ -19,11 +19,20 @@
  * dance is needed here.
  *
  * HOW TO RUN:
- *   1. Firebase console -> Project settings -> Service accounts ->
- *      "Generate new private key". Save the JSON somewhere OUTSIDE the repo.
+ *   1. Get admin credentials. On this project that means gcloud user ADC:
+ *        gcloud auth application-default login
+ *        gcloud auth application-default set-quota-project dindin-cafelabs
+ *      (The console's "Generate new private key" is BLOCKED here by the org
+ *      policy iam.disableServiceAccountKeyCreation. A service-account key
+ *      still works if you have one from elsewhere — point
+ *      GOOGLE_APPLICATION_CREDENTIALS at it — but you cannot mint one.)
  *   2. cd scripts && npm install
- *   3. GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/serviceAccount.json \
+ *   3. GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/application_default_credentials.json \
+ *      GOOGLE_CLOUD_PROJECT=dindin-cafelabs \
  *        node backfill_balances.mjs --dry-run     # inspect first
+ *      GOOGLE_CLOUD_PROJECT is required with user ADC and harmless with a
+ *      service-account key: user credentials carry no project of their own.
+ *      scripts/deploy.sh sets both for you.
  *   4. Re-run without --dry-run to write.
  *   5. --verify checks every /users/{uid} has a meta/account balance doc
  *      (does not read/write anything else). This is the deploy-gate

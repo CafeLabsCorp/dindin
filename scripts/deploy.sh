@@ -25,9 +25,15 @@
 #
 # Requires:
 #   - `firebase` CLI on PATH, logged in with deploy access to dindin-cafelabs.
-#   - GOOGLE_APPLICATION_CREDENTIALS pointing at a service-account key with
-#     Firestore admin access (see scripts/backfill_balances.mjs header for how
-#     to generate one). Never commit this key.
+#   - Firestore admin credentials for the backfill steps. Normally gcloud
+#     Application Default Credentials, which this script picks up on its own:
+#
+#       gcloud auth application-default login
+#       gcloud auth application-default set-quota-project dindin-cafelabs
+#
+#     A service-account JSON key also works via GOOGLE_APPLICATION_CREDENTIALS,
+#     but creating one is blocked by org policy on this project — see the
+#     credential block below. Never commit a key.
 #
 # Usage: scripts/deploy.sh
 
@@ -55,10 +61,35 @@ confirm() {
 
 command -v firebase >/dev/null 2>&1 || die "firebase CLI not found on PATH. Install firebase-tools first."
 
+# Admin credentials for the backfill steps. Two supported shapes:
+#
+#   1. gcloud user ADC (the normal path here). `gcloud auth application-default
+#      login` writes a credential file to a well-known location, which
+#      firebase-admin's applicationDefault() accepts like any other. This is
+#      the path to use because the GCP org policy on this project
+#      (iam.disableServiceAccountKeyCreation) BLOCKS creating service-account
+#      JSON keys outright — the console refuses, so option 2 is not reachable
+#      unless someone lifts that policy.
+#   2. A service-account key, if one is ever available.
+#
+# User credentials, unlike a service-account key, carry no project — hence the
+# GOOGLE_CLOUD_PROJECT default below, without which firebase-admin cannot work
+# out which Firestore to talk to.
+ADC_DEFAULT="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}/application_default_credentials.json"
+
+if [ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "$ADC_DEFAULT" ]; then
+  log "Using gcloud Application Default Credentials ($ADC_DEFAULT)"
+  export GOOGLE_APPLICATION_CREDENTIALS="$ADC_DEFAULT"
+fi
+
 if [ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
-  die "GOOGLE_APPLICATION_CREDENTIALS is not set. Export it to point at the Firestore admin service-account key (see scripts/backfill_balances.mjs header). Never commit this key."
+  die "No admin credentials found. Run 'gcloud auth application-default login' followed by 'gcloud auth application-default set-quota-project $PROJECT_ID' (service-account JSON keys are blocked by org policy on this project), or export GOOGLE_APPLICATION_CREDENTIALS yourself if you do have a key."
 fi
 [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ] || die "GOOGLE_APPLICATION_CREDENTIALS points at a file that does not exist: $GOOGLE_APPLICATION_CREDENTIALS"
+
+# Harmless when the credential is a service-account key (which carries its own
+# project); required when it is a user credential, which does not.
+export GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$PROJECT_ID}"
 
 if [ ! -d "$SCRIPTS_DIR/node_modules" ]; then
   log "Installing scripts/ dependencies (firebase-admin)..."

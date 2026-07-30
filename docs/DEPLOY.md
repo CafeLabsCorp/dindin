@@ -59,9 +59,25 @@ hard gates, so a step can't be skipped or reordered by accident:
 Run it from the repo root:
 
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/serviceAccount.json  # never commit this
+gcloud auth application-default login
+gcloud auth application-default set-quota-project dindin-cafelabs
 scripts/deploy.sh
 ```
+
+`deploy.sh` picks those credentials up on its own — nothing to export.
+
+**Why ADC rather than a service-account key:** the org policy on this project
+(`iam.disableServiceAccountKeyCreation`) **blocks** creating service-account
+JSON keys. The console refuses with "Key creation is not allowed on this
+service account", so the key path isn't available unless someone lifts that
+policy. A user credential via ADC works the same for `firebase-admin`, with
+one difference: it carries no project of its own, so `GOOGLE_CLOUD_PROJECT`
+is required — the script handles that. If you do have a key from elsewhere,
+`export GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/serviceAccount.json`
+still works (never commit it).
+
+The org also enforces periodic reauthentication: if you see `invalid_rapt` or
+`invalid_grant`, just re-run `gcloud auth application-default login`.
 
 This script is meant for interactive, by-hand use during a release — it is
 not run in CI. If you only need to publish a hosting-only change (no rules/
