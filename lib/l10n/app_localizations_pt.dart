@@ -294,7 +294,8 @@ class AppLocalizationsPt extends AppLocalizations {
   String get installmentPurchasesListTitle => 'Parcelamentos cadastrados';
 
   @override
-  String get installmentPurchasesEmptyState => 'Nenhum parcelamento cadastrado ainda.';
+  String get installmentPurchasesEmptyState =>
+      'Nenhum parcelamento cadastrado ainda.';
 
   @override
   String installmentSummaryLabel(String count, String amount) {
@@ -307,10 +308,43 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get removeInstallmentPurchaseConfirmTitle => 'Remover esse parcelamento?';
+  String get removeInstallmentPurchaseConfirmTitle =>
+      'Remover esse parcelamento?';
 
   @override
   String get removeInstallmentPurchaseTooltip => 'Remover parcelamento';
+
+  @override
+  String pendingChargesWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count cobranças não foram lançadas porque o saldo da conta não cobriu. Elas entram sozinhas assim que houver saldo.',
+      one:
+          '1 cobrança não foi lançada porque o saldo da conta não cobriu. Ela entra sozinha assim que houver saldo.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pendingChargesRowLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cobranças pendentes',
+      one: '1 cobrança pendente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catchUpFailedWarning =>
+      'Não deu pra processar as cobranças automáticas agora. O app tenta de novo na próxima vez que você abrir.';
+
+  @override
+  String get generatedExpenseTooltip =>
+      'Lançado automaticamente por uma assinatura ou parcelamento';
 
   @override
   String get receitasTitle => 'Receitas';

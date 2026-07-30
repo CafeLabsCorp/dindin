@@ -28,6 +28,13 @@ void main() {
     required List<Expense> expenses,
     List<Subscription> subscriptions = const [],
     List<InstallmentPurchase> installmentPurchases = const [],
+    // Pinned by default so "how many charges are still pending" — a function
+    // of the current date — can't drift as real time passes. Tests that care
+    // about pending charges pass their own date.
+    DateTime? today,
+    // Simulates catch-up itself blowing up, which the page reports
+    // differently from "catch-up finished and these didn't fit the balance".
+    bool catchUpFailed = false,
   }) async {
     // GastosPage's ListView now has 4 cards (gasto, lista, assinaturas,
     // parcelamentos) — taller than the default 600px test surface, and a
@@ -44,6 +51,11 @@ void main() {
           expensesProvider.overrideWith((ref) => Stream.value(expenses)),
           subscriptionsProvider.overrideWith((ref) => Stream.value(subscriptions)),
           installmentPurchasesProvider.overrideWith((ref) => Stream.value(installmentPurchases)),
+          todayProvider.overrideWithValue(today ?? DateTime(2026, 1, 1)),
+          if (catchUpFailed)
+            recurringChargesCatchUpProvider.overrideWith(
+              (ref) => Future<void>.error(Exception('firestore unavailable')),
+            ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -172,6 +184,142 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Informe um nome.'), findsOneWidget);
+    });
+  });
+
+  group('cobranças pendentes (catch-up que não coube no saldo)', () {
+    // Uma assinatura de 5 de janeiro, com o app aberto em 20 de março e nada
+    // cobrado ainda: jan/fev/mar venceram e não entraram.
+    const atrasada = Subscription(
+      id: 's1',
+      name: 'Netflix',
+      amount: 39.90,
+      dueDay: 5,
+      createdAt: '2026-01-01',
+    );
+
+    testWidgets('assinatura com cobranças que não entraram mostra o aviso e a contagem na linha', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        subscriptions: const [atrasada],
+        today: DateTime(2026, 3, 20),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('3 cobranças pendentes'), findsOneWidget);
+      expect(
+        find.textContaining('3 cobranças não foram lançadas porque o saldo da conta não cobriu'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('o texto fica no singular com uma única cobrança pendente', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        subscriptions: const [atrasada],
+        today: DateTime(2026, 1, 20),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 cobrança pendente'), findsOneWidget);
+      expect(
+        find.textContaining('1 cobrança não foi lançada porque o saldo da conta não cobriu'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sem nada pendente não mostra aviso nenhum', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        subscriptions: const [
+          Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 39.90,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            lastChargedDate: '2026-03-05',
+          ),
+        ],
+        today: DateTime(2026, 3, 20),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('cobrança pendente'), findsNothing);
+      expect(find.textContaining('cobranças pendentes'), findsNothing);
+      expect(find.textContaining('não foram lançadas'), findsNothing);
+    });
+
+    testWidgets('parcelamento atrasado também conta as parcelas pendentes', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        installmentPurchases: const [
+          InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 300,
+            installments: 3,
+            purchaseDate: '2026-01-10',
+            firstChargeDate: '2026-02-05',
+            createdAt: '2026-01-10',
+            chargedInstallments: 1,
+          ),
+        ],
+        today: DateTime(2026, 4, 20),
+      );
+      await tester.pumpAndSettle();
+
+      // Parcelas 2/3 (05/03) e 3/3 (05/04) venceram e não foram cobradas.
+      expect(find.text('2 cobranças pendentes'), findsOneWidget);
+    });
+
+    testWidgets('quando o catch-up falha, culpa a falha em vez do saldo', (tester) async {
+      await pump(
+        tester,
+        expenses: [],
+        subscriptions: const [atrasada],
+        today: DateTime(2026, 3, 20),
+        catchUpFailed: true,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Não deu pra processar as cobranças automáticas agora'), findsWidgets);
+      // "Pendente" não significa nada enquanto o catch-up não terminou: não
+      // dá pra dizer que o saldo é o culpado.
+      expect(find.textContaining('não foram lançadas'), findsNothing);
+      expect(find.text('3 cobranças pendentes'), findsNothing);
+    });
+  });
+
+  group('gasto gerado automaticamente', () {
+    testWidgets('gasto vindo de assinatura aparece com o marcador de automático', (tester) async {
+      await pump(
+        tester,
+        expenses: const [
+          Expense(
+            id: 'e1',
+            date: '2026-01-05',
+            amount: 39.90,
+            description: 'Netflix',
+            sourceType: 'subscription',
+            sourceId: 's1',
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Lançado automaticamente por uma assinatura ou parcelamento'), findsOneWidget);
+    });
+
+    testWidgets('gasto digitado à mão não ganha o marcador', (tester) async {
+      await pump(tester, expenses: const [expense]);
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Lançado automaticamente por uma assinatura ou parcelamento'), findsNothing);
     });
   });
 

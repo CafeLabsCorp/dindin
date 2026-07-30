@@ -644,6 +644,30 @@ abstract class AppLocalizations {
   /// **'Remover parcelamento'**
   String get removeInstallmentPurchaseTooltip;
 
+  /// No description provided for @pendingChargesWarning.
+  ///
+  /// In pt, this message translates to:
+  /// **'{count, plural, =1{1 cobrança não foi lançada porque o saldo da conta não cobriu. Ela entra sozinha assim que houver saldo.} other{{count} cobranças não foram lançadas porque o saldo da conta não cobriu. Elas entram sozinhas assim que houver saldo.}}'**
+  String pendingChargesWarning(int count);
+
+  /// No description provided for @pendingChargesRowLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'{count, plural, =1{1 cobrança pendente} other{{count} cobranças pendentes}}'**
+  String pendingChargesRowLabel(int count);
+
+  /// No description provided for @catchUpFailedWarning.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não deu pra processar as cobranças automáticas agora. O app tenta de novo na próxima vez que você abrir.'**
+  String get catchUpFailedWarning;
+
+  /// No description provided for @generatedExpenseTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lançado automaticamente por uma assinatura ou parcelamento'**
+  String get generatedExpenseTooltip;
+
   /// No description provided for @receitasTitle.
   ///
   /// In pt, this message translates to:

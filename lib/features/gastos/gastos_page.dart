@@ -8,6 +8,7 @@ import '../../models/expense.dart';
 import '../../models/installment_purchase.dart';
 import '../../models/subscription.dart';
 import '../../providers/providers.dart';
+import '../../services/recurring_schedule.dart' as schedule;
 import '../../theme/theme.dart';
 import '../../utils/date_range.dart';
 import '../../utils/errors.dart';
@@ -259,6 +260,24 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final categories = ref.watch(categoriesProvider).value ?? [];
     final summary = ref.watch(summaryProvider);
 
+    // Pending charges only mean something once catch-up has actually finished
+    // for this session: before that, everything due looks "pending" simply
+    // because nothing has run yet. `hasValue` is the finished-clean signal,
+    // `hasError` the finished-broken one — see recurringChargesCatchUpProvider.
+    final catchUpState = ref.watch(recurringChargesCatchUpProvider);
+    final showPending = catchUpState.hasValue;
+    final today = ref.watch(todayProvider);
+    // Counted with the very same functions catch-up bills from, so the badge
+    // can't claim something catch-up disagrees with.
+    final pendingSubscriptionCharges = showPending
+        ? (subscriptionsAsync.value ?? const <Subscription>[])
+              .fold(0, (sum, s) => sum + schedule.pendingDueDates(s, today).length)
+        : 0;
+    final pendingInstallmentCharges = showPending
+        ? (installmentPurchasesAsync.value ?? const <InstallmentPurchase>[])
+              .fold(0, (sum, p) => sum + schedule.pendingInstallmentIndexes(p, today).length)
+        : 0;
+
     final categoryName = {for (final c in categories) c.id: c.name};
     final availableBalance = _selection == _accountOption
         ? (summary?.accountBalance ?? 0)
@@ -457,6 +476,10 @@ class _GastosPageState extends ConsumerState<GastosPage> {
               ),
               const SizedBox(height: 4),
               Text(l10n.subscriptionsSubtitle, style: TextStyle(color: context.tokens.muted)),
+              if (catchUpState.hasError)
+                _CatchUpWarning(l10n.catchUpFailedWarning)
+              else if (pendingSubscriptionCharges > 0)
+                _CatchUpWarning(l10n.pendingChargesWarning(pendingSubscriptionCharges)),
               const SizedBox(height: 16),
               ResponsiveFormRow(
                 fields: [
@@ -516,6 +539,9 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       for (var i = 0; i < subscriptions.length; i++)
                         _SubscriptionRow(
                           subscription: subscriptions[i],
+                          pendingCharges: showPending
+                              ? schedule.pendingDueDates(subscriptions[i], today).length
+                              : 0,
                           onDelete: () => _deleteSubscription(subscriptions[i].id),
                           divider: i > 0,
                         ),
@@ -539,6 +565,10 @@ class _GastosPageState extends ConsumerState<GastosPage> {
               ),
               const SizedBox(height: 4),
               Text(l10n.installmentPurchasesSubtitle, style: TextStyle(color: context.tokens.muted)),
+              if (catchUpState.hasError)
+                _CatchUpWarning(l10n.catchUpFailedWarning)
+              else if (pendingInstallmentCharges > 0)
+                _CatchUpWarning(l10n.pendingChargesWarning(pendingInstallmentCharges)),
               const SizedBox(height: 16),
               ResponsiveFormRow(
                 fields: [
@@ -640,6 +670,9 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       for (var i = 0; i < purchases.length; i++)
                         _InstallmentPurchaseRow(
                           purchase: purchases[i],
+                          pendingCharges: showPending
+                              ? schedule.pendingInstallmentIndexes(purchases[i], today).length
+                              : 0,
                           onDelete: () => _deleteInstallmentPurchase(purchases[i].id),
                           divider: i > 0,
                         ),
@@ -719,7 +752,29 @@ class _ExpenseRow extends StatelessWidget {
                     ),
                   ),
                   if (expense.description != null)
-                    Text(expense.description!, style: TextStyle(fontSize: 12, color: context.tokens.subtle)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            expense.description!,
+                            style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                          ),
+                        ),
+                        // Marks a row a subscription/installment catch-up
+                        // created, so it reads as "the app posted this"
+                        // rather than as a manual entry the user forgot
+                        // making — only possible now that the expense
+                        // carries its origin (see Expense.sourceId).
+                        if (expense.isGenerated) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: l10n.generatedExpenseTooltip,
+                            child: Icon(Icons.autorenew, size: 13, color: context.tokens.subtle),
+                          ),
+                        ],
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -741,12 +796,50 @@ String _originLabel(AppLocalizations l10n, String? categoryId, Map<String, Strin
   return categoryName[categoryId] ?? l10n.removedCategoryLabel;
 }
 
+/// Warning strip inside the Assinaturas / Compras parceladas cards.
+///
+/// Catch-up stops (and retries later) when the account can't cover a charge —
+/// correct, but until this existed it was completely silent, so a subscription
+/// quietly not charging for months looked exactly like one that was paid.
+class _CatchUpWarning extends StatelessWidget {
+  final String message;
+
+  const _CatchUpWarning(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.error;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message, style: TextStyle(fontSize: 13, color: color)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SubscriptionRow extends StatelessWidget {
   final Subscription subscription;
+
+  /// Due dates catch-up has not managed to charge yet (0 while catch-up is
+  /// still running or has failed — see GastosPage.build).
+  final int pendingCharges;
   final VoidCallback onDelete;
   final bool divider;
 
-  const _SubscriptionRow({required this.subscription, required this.onDelete, required this.divider});
+  const _SubscriptionRow({
+    required this.subscription,
+    required this.pendingCharges,
+    required this.onDelete,
+    required this.divider,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -783,6 +876,11 @@ class _SubscriptionRow extends StatelessWidget {
                   l10n.subscriptionChargedOnLabel('${subscription.dueDay}'),
                   style: TextStyle(fontSize: 12, color: context.tokens.subtle),
                 ),
+                if (pendingCharges > 0)
+                  Text(
+                    l10n.pendingChargesRowLabel(pendingCharges),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
+                  ),
               ],
             ),
           ),
@@ -800,16 +898,25 @@ class _SubscriptionRow extends StatelessWidget {
 
 class _InstallmentPurchaseRow extends StatelessWidget {
   final InstallmentPurchase purchase;
+
+  /// Installments catch-up has not managed to charge yet (0 while catch-up is
+  /// still running or has failed — see GastosPage.build).
+  final int pendingCharges;
   final VoidCallback onDelete;
   final bool divider;
 
-  const _InstallmentPurchaseRow({required this.purchase, required this.onDelete, required this.divider});
+  const _InstallmentPurchaseRow({
+    required this.purchase,
+    required this.pendingCharges,
+    required this.onDelete,
+    required this.divider,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     // Display-only approximation (Nx de R$Y): the actual last Expense may be
-    // a cent higher to absorb rounding, see FirestoreService._installmentAmounts.
+    // a cent higher to absorb rounding, see recurring_schedule.installmentAmounts.
     final perInstallment = purchase.totalAmount / purchase.installments;
 
     return Container(
@@ -844,6 +951,11 @@ class _InstallmentPurchaseRow extends StatelessWidget {
                   l10n.installmentProgressLabel('${purchase.chargedInstallments}', '${purchase.installments}'),
                   style: TextStyle(fontSize: 12, color: context.tokens.subtle),
                 ),
+                if (pendingCharges > 0)
+                  Text(
+                    l10n.pendingChargesRowLabel(pendingCharges),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
+                  ),
               ],
             ),
           ),
