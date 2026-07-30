@@ -156,8 +156,6 @@
   "@recurringEntryCommitted": {
     "placeholders": { "amount": { "type": "String" } }
   },
-  "openSubscriptionsButton": "Assinaturas",
-  "openInstallmentPurchasesButton": "Parcelamentos",
   "installmentOutstandingLabel": "Faltam {amount}",
   "@installmentOutstandingLabel": {
     "placeholders": { "amount": { "type": "String" } }
@@ -301,8 +299,11 @@
   "navDashboard": "Dashboard",
   "navReceitas": "Receitas",
   "navGastos": "Gastos",
+  "navAssinaturas": "Assinaturas",
+  "navParcelamentos": "Parcelas",
   "navCategorias": "Categorias",
   "navAjustes": "Ajustes",
+  "navMore": "Mais",
 
   "errorNotFound": "Esse lançamento não existe mais.",
   "errorUnsupportedEdit": "Essa alteração não é suportada — remova e lance de novo.",

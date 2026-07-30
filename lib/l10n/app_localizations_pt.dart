@@ -383,12 +383,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get openSubscriptionsButton => 'Assinaturas';
-
-  @override
-  String get openInstallmentPurchasesButton => 'Parcelamentos';
-
-  @override
   String installmentOutstandingLabel(String amount) {
     return 'Faltam $amount';
   }
@@ -682,10 +676,19 @@ class AppLocalizationsPt extends AppLocalizations {
   String get navGastos => 'Gastos';
 
   @override
+  String get navAssinaturas => 'Assinaturas';
+
+  @override
+  String get navParcelamentos => 'Parcelas';
+
+  @override
   String get navCategorias => 'Categorias';
 
   @override
   String get navAjustes => 'Ajustes';
+
+  @override
+  String get navMore => 'Mais';
 
   @override
   String get errorNotFound => 'Esse lançamento não existe mais.';

@@ -385,12 +385,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get openSubscriptionsButton => 'Subscriptions';
-
-  @override
-  String get openInstallmentPurchasesButton => 'Installments';
-
-  @override
   String installmentOutstandingLabel(String amount) {
     return '$amount left';
   }
@@ -684,10 +678,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navGastos => 'Expenses';
 
   @override
+  String get navAssinaturas => 'Subscriptions';
+
+  @override
+  String get navParcelamentos => 'Installments';
+
+  @override
   String get navCategorias => 'Categories';
 
   @override
   String get navAjustes => 'Settings';
+
+  @override
+  String get navMore => 'More';
 
   @override
   String get errorNotFound => 'This entry no longer exists.';

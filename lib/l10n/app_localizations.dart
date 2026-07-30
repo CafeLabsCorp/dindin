@@ -716,18 +716,6 @@ abstract class AppLocalizations {
   /// **'{amount} comprometidos neste mês'**
   String recurringEntryCommitted(String amount);
 
-  /// No description provided for @openSubscriptionsButton.
-  ///
-  /// In pt, this message translates to:
-  /// **'Assinaturas'**
-  String get openSubscriptionsButton;
-
-  /// No description provided for @openInstallmentPurchasesButton.
-  ///
-  /// In pt, this message translates to:
-  /// **'Parcelamentos'**
-  String get openInstallmentPurchasesButton;
-
   /// No description provided for @installmentOutstandingLabel.
   ///
   /// In pt, this message translates to:
@@ -1208,6 +1196,18 @@ abstract class AppLocalizations {
   /// **'Gastos'**
   String get navGastos;
 
+  /// No description provided for @navAssinaturas.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinaturas'**
+  String get navAssinaturas;
+
+  /// No description provided for @navParcelamentos.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelas'**
+  String get navParcelamentos;
+
   /// No description provided for @navCategorias.
   ///
   /// In pt, this message translates to:
@@ -1219,6 +1219,12 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Ajustes'**
   String get navAjustes;
+
+  /// No description provided for @navMore.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mais'**
+  String get navMore;
 
   /// No description provided for @errorNotFound.
   ///

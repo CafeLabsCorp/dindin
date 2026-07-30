@@ -1,7 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
@@ -138,9 +137,8 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final summary = ref.watch(summaryProvider);
 
     // How much of this month is already spoken for before the user spends
-    // anything. Doubles as the entry point to the two screens that used to be
-    // cards at the bottom of this one, below the (unbounded) expense list —
-    // which is what made them unreachable.
+    // anything — context that belongs next to the form where they're about to
+    // spend more.
     final today = ref.watch(todayProvider);
     final committed = schedule.committedThisMonth(
       subscriptionsAsync.value ?? const <Subscription>[],
@@ -170,26 +168,14 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
+              // Informational only now. It started life as the entry point to
+              // Assinaturas/Parcelamentos, but both are top-level destinations
+              // since — so the buttons would just duplicate the nav bar. What
+              // stays is the number, which is real context while you're
+              // logging a gasto: this much of the month is already spoken for.
               Text(
                 l10n.recurringEntryCommitted(formatCurrency(committed)),
                 style: TextStyle(color: context.tokens.muted),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/gastos/assinaturas'),
-                    icon: const Icon(Icons.autorenew, size: 18),
-                    label: Text(l10n.openSubscriptionsButton),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/gastos/parcelamentos'),
-                    icon: const Icon(Icons.credit_card, size: 18),
-                    label: Text(l10n.openInstallmentPurchasesButton),
-                  ),
-                ],
               ),
             ],
           ),
