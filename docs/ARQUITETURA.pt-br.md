@@ -21,6 +21,9 @@ lib/
     auth_service.dart          login email/senha + Google (web e nativo divergem)
     firestore_service.dart     CRUD + integridade de dinheiro (transactions)
     aggregation_service.dart   funções puras: saldos, resumos mensais
+    recurring_schedule.dart    funções puras: quais cobranças de assinatura/
+                               parcelamento estão vencidas (usado pelo
+                               catch-up e pela tela, pra não divergirem)
     import_export_service.dart backup/restore em JSON
   providers/providers.dart     providers Riverpod, ligam services -> UI
   features/<nome>/<nome>_page.dart   uma pasta por tela
@@ -83,6 +86,9 @@ users/{uid}
     date: string (ISO), amount: number
     categoryId: string?        # null = gasto direto da conta, não de uma caixinha
     description: string?
+    sourceType: string?        # 'subscription' | 'installment' — ausente = digitado à mão
+    sourceId: string?          # id do doc que gerou esse gasto; anda junto com
+                                # sourceType (os dois presentes ou os dois ausentes)
 
   subscriptions/{subscriptionId}
     name: string, amount: number, dueDay: int (1-31)
@@ -118,6 +124,9 @@ schema original — um backup JSON antigo, sem eles, continua importável sem
 alterações. `subscriptions` é uma coleção inteira nova adicionada do mesmo
 jeito — um backup antigo sem a chave `subscriptions` importa como lista
 vazia. `installmentPurchases` é uma segunda adição assim, logo em seguida.
+`Expense.sourceType`/`sourceId` seguem a mesma regra: um gasto exportado
+antes deles importa como gasto manual, sem os campos serem inventados na
+volta.
 
 ## Decisões técnicas e por quê
 
@@ -140,14 +149,53 @@ vazia. `installmentPurchases` é uma segunda adição assim, logo em seguida.
 
 - **Um parcelamento reaproveita exatamente o mesmo mecanismo de catch-up de
   uma assinatura, só que limitado.** `catchUpInstallmentPurchases` compartilha
-  o clamp de mês do `_dueDateFor` com `catchUpSubscriptions` e segue o mesmo
+  o clamp de mês do `dueDateFor` com `catchUpSubscriptions` e segue o mesmo
   modelo disparado-pelo-cliente-ao-abrir-o-app — a única diferença estrutural
   é que ele para quando `chargedInstallments` chega em `installments`, em vez
   de rodar pra sempre. O resto do arredondamento ao dividir `totalAmount` em
   parcelas iguais sempre cai na ÚLTIMA parcela (igual fatura de cartão de
-  verdade), calculado uma vez por parcelamento via `_installmentAmounts`,
+  verdade), calculado uma vez por parcelamento via `installmentAmounts`,
   nunca recalculado por cobrança (pra nunca divergir entre execuções do
   catch-up).
+
+- **Toda a matemática de datas do catch-up mora fora do `FirestoreService`,
+  em `lib/services/recurring_schedule.dart`.** São funções puras (sem
+  Firestore, sem I/O), como `aggregation_service.dart`. Motivo: existem dois
+  consumidores da mesma resposta e eles não podem divergir — o catch-up, que
+  transforma cada ocorrência vencida em `Expense`, e a tela de Gastos, que
+  mostra quantas ocorrências continuam PENDENTES. Se a tela recalculasse
+  "pendente" com uma cópia própria dessa conta, o aviso poderia afirmar algo
+  que o catch-up não faria.
+
+- **O catch-up relê o doc DENTRO da transação antes de cobrar.** Sem isso,
+  duas sessões simultâneas (celular + web, ou duas abas) cobram a mesma
+  ocorrência duas vezes: o `get()` que lista as assinaturas acontece fora da
+  transação, e um retry do Firestore só reexecuta o corpo com os dados que a
+  própria transação leu — o objeto capturado de fora continua velho, então o
+  retry rebilla o mês que o outro dispositivo acabou de billar. Reler ali
+  dentro resolve os dois lados: põe o doc no read set (a corrida vira
+  conflito detectado) e o retry enxerga `lastChargedDate`/
+  `chargedInstallments` já atualizados e desiste. O resultado da tentativa é
+  devolvido como `_ChargeOutcome` em vez de exceção, pra que "já foi cobrado"
+  e "não coube no saldo" sejam transações no-op em vez de controle de fluxo
+  por `StateError` — o mesmo tipo que as validações de verdade usam.
+
+- **Uma cobrança que não coube no saldo é visível na tela, não silenciosa.**
+  O catch-up para naquela ocorrência e tenta de novo depois (nunca deixa a
+  conta negativa), mas até isso existir, uma assinatura que não cobrava por
+  meses era indistinguível de uma paga. A tela de Gastos conta as pendências
+  com as funções de `recurring_schedule.dart` e mostra por linha e por card —
+  e só depois do catch-up ter terminado, porque antes disso "pendente" ainda
+  não significa nada (ver `recurringChargesCatchUpProvider`, que agora
+  propaga a falha como `AsyncError` em vez de engolir).
+
+- **Um gasto gerado sabe de onde veio (`sourceType`/`sourceId`).** Mesma
+  ideia do `Allocation.transferId`: parear as linhas por um id em vez de
+  criar uma coleção nova. Sem isso, um gasto gerado por assinatura é
+  indistinguível de um manual com a mesma descrição — o app não consegue
+  dizer quanto uma assinatura já custou, nem perceber que o usuário apagou
+  uma cobrança na mão. Os dois campos são imutáveis nas rules depois de
+  criados: uma edição não pode plantar, remover nem repontar o vínculo.
 
 - **Transferência entre caixinhas = duas `Allocation`s pareadas por
   `transferId`, não uma coleção nova.** Uma perna negativa na caixinha de

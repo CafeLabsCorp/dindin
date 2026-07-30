@@ -85,9 +85,24 @@ Before onboarding real users there is a working path for both:
   "Subscriptions (recurring expenses)" below — it shares that section's
   client-triggered catch-up model verbatim.
 
+- `expenses/{id}.sourceType` + `sourceId` — two optional fields that travel
+  together (both present or both absent) linking an expense to the doc that
+  generated it: `'subscription'`/`'installment'` plus the id. Absent = the
+  user typed it in. Same idea as `Allocation.transferId`, and the same
+  no-money-invariant-of-its-own posture — a generated expense debits the
+  account exactly like a manual one, so the balance-delta rules already cover
+  the money side. What the rules add is that the link is **immutable** once
+  created: an edit can't plant, strip, or repoint it (`sameExpenseSource`).
+  Why they exist: without them a generated expense is indistinguishable from
+  a manual one with the same description — there's no way to say what a
+  subscription has cost so far, nor to notice a charge was deleted by hand.
+  `sourceType` is stored as a raw string (not an enum) so a value written by
+  a newer build survives an export/import cycle instead of vanishing on the
+  way back out.
+
 Old JSON backups (no `monthlyBudget`, no `transferId`, no `kind`/`goalAmount`,
-no `allowNegative`, no `subscriptions`, no `installmentPurchases`) import
-unchanged.
+no `allowNegative`, no `subscriptions`, no `installmentPurchases`, no
+`sourceType`/`sourceId`) import unchanged.
 
 ### Denormalized balance docs (Option B — see below)
 
@@ -145,6 +160,46 @@ client-triggered once subscriptions settled that question.
 If this ever needs to become "charges even if you never open the app",
 revisit alongside Option A — the two decisions share the same Blaze
 enablement step.
+
+### Two sessions at once do not double-charge
+
+Because catch-up is client-triggered, nothing stops two sessions from running
+together — phone and web open at the same time, or two tabs. The
+`subscriptions.get()` that lists the work happens OUTSIDE the transaction, so
+both sides can see the same charge as still owed.
+
+The fix is the re-read inside the transaction: before writing, each charge
+re-reads its own doc via `tx.get` and only proceeds if it's still where it
+expected (`lastChargedDate` earlier than the due date in question, or
+`chargedInstallments` exactly at the installment being billed). That covers
+both halves of the problem:
+
+1. The doc joins the transaction's read set, so the other device's concurrent
+   write becomes a detected conflict rather than a blind overwrite.
+2. The retry that conflict triggers re-runs the body — and since Firestore
+   only refreshes what the transaction itself read, without this re-read it
+   would re-run against the stale object captured outside and bill again the
+   month the other device just billed.
+
+The same path covers a doc deleted mid-run (it's skipped, not resurrected).
+All reads precede all writes, as Firestore requires.
+
+### A pending charge is shown, not hidden
+
+When the account balance can't cover a charge, catch-up stops at that
+occurrence and retries on the next run — the account never goes negative.
+That's correct, but it used to be invisible: a subscription that hadn't
+charged in months looked exactly like a paid one.
+
+The Gastos screen now counts what's left pending with the SAME functions
+catch-up bills from (`lib/services/recurring_schedule.dart`), and shows it in
+two places: a warning at the top of the card and the count on each
+subscription/purchase row. The count only appears once catch-up has finished
+— before that everything due looks "pending" simply because nothing has run
+yet. And if catch-up itself fails, the warning says so instead of blaming the
+balance: `recurringChargesCatchUpProvider` logs and surfaces the failure as
+an `AsyncError` instead of swallowing it, and the screen tells the two states
+apart.
 
 ## Money-integrity enforcement: DECIDED — Option B (rules-only, free Spark tier)
 

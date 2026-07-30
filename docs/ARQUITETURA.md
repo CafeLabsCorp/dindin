@@ -21,6 +21,9 @@ lib/
     auth_service.dart          email/password login + Google (web and native diverge)
     firestore_service.dart     CRUD + money integrity (transactions)
     aggregation_service.dart   pure functions: balances, monthly summaries
+    recurring_schedule.dart    pure functions: which subscription/installment
+                               charges are due (shared by catch-up and the
+                               screen, so the two can't disagree)
     import_export_service.dart JSON backup/restore
   providers/providers.dart     Riverpod providers, wire services -> UI
   features/<name>/<name>_page.dart   one folder per screen
@@ -83,6 +86,9 @@ users/{uid}
     date: string (ISO), amount: number
     categoryId: string?        # null = expense straight from the account, not an envelope
     description: string?
+    sourceType: string?        # 'subscription' | 'installment' — absent = typed in by hand
+    sourceId: string?          # id of the doc that generated this expense; travels
+                                # with sourceType (both present or both absent)
 
   subscriptions/{subscriptionId}
     name: string, amount: number, dueDay: int (1-31)
@@ -118,7 +124,9 @@ rationale, the guaranteed invariants, and this design's known limitations.
 schema — an old JSON backup without them still imports unchanged.
 `subscriptions` is a whole new collection added the same way — an old backup
 with no `subscriptions` key imports as an empty list. `installmentPurchases`
-is a second such addition, right after it.
+is a second such addition, right after it. `Expense.sourceType`/`sourceId`
+follow the same rule: an expense exported before they existed imports as a
+manual expense, with neither field invented on the way back in.
 
 ## Technical decisions and why
 
@@ -141,14 +149,54 @@ is a second such addition, right after it.
 
 - **An installment purchase reuses the exact same catch-up machinery as a
   subscription, just bounded.** `catchUpInstallmentPurchases` shares
-  `_dueDateFor`'s month-clamping with `catchUpSubscriptions` and follows the
+  `dueDateFor`'s month-clamping with `catchUpSubscriptions` and follows the
   identical client-triggered-on-app-open model — the only structural
   difference is that it stops once `chargedInstallments` reaches
   `installments`, instead of running forever. The rounding remainder from
   splitting `totalAmount` into equal slices always lands on the LAST
   installment (matches a real card bill), computed once per purchase via
-  `_installmentAmounts`, never re-derived per charge (so a value never drifts
+  `installmentAmounts`, never re-derived per charge (so a value never drifts
   across catch-up runs).
+
+- **All of catch-up's date math lives outside `FirestoreService`, in
+  `lib/services/recurring_schedule.dart`.** Pure functions (no Firestore, no
+  I/O), like `aggregation_service.dart`. The reason: two consumers need the
+  same answer and must not disagree — catch-up, which turns each due
+  occurrence into an `Expense`, and the Gastos screen, which shows how many
+  occurrences are still PENDING. If the screen re-derived "pending" with its
+  own copy of that math, the warning could claim something catch-up would
+  never do.
+
+- **Catch-up re-reads the doc INSIDE the transaction before charging.**
+  Without it, two simultaneous sessions (phone + web, or two tabs) bill the
+  same occurrence twice: the `get()` that lists subscriptions happens outside
+  the transaction, and a Firestore retry only re-runs the body against what
+  the transaction itself read — the object captured outside stays stale, so
+  the retry re-bills the month the other device just billed. Re-reading in
+  there fixes both halves: it puts the doc in the read set (so the race is
+  detected as a conflict) and the retry then sees the already-bumped
+  `lastChargedDate`/`chargedInstallments` and backs off. The attempt's result
+  comes back as a `_ChargeOutcome` rather than an exception, so "already
+  charged" and "didn't fit the balance" are no-op transactions instead of
+  control flow through `StateError` — the same type the real validation
+  failures use.
+
+- **A charge that didn't fit the balance is visible on screen, not silent.**
+  Catch-up stops at that occurrence and retries later (it never overdraws the
+  account), but until this existed, a subscription that hadn't charged for
+  months was indistinguishable from a paid one. The Gastos screen counts what
+  is pending with `recurring_schedule.dart`'s functions and shows it per row
+  and per card — and only once catch-up has finished, because before that
+  "pending" doesn't mean anything yet (see `recurringChargesCatchUpProvider`,
+  which now surfaces a failure as an `AsyncError` instead of swallowing it).
+
+- **A generated expense knows where it came from (`sourceType`/`sourceId`).**
+  Same idea as `Allocation.transferId`: pair the rows by an id instead of
+  adding a new collection. Without it, an expense generated by a subscription
+  is indistinguishable from a manual one with the same description — the app
+  can't say what a subscription has cost so far, nor notice that the user
+  deleted a charge by hand. Both fields are immutable in the rules once
+  created: an edit can't plant, strip, or repoint the link.
 
 - **A transfer between envelopes is two `Allocation`s paired by
   `transferId`, not a new collection.** A negative leg on the source
