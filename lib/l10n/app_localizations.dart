@@ -1199,13 +1199,13 @@ abstract class AppLocalizations {
   /// No description provided for @navAssinaturas.
   ///
   /// In pt, this message translates to:
-  /// **'Fixos'**
+  /// **'Assinaturas'**
   String get navAssinaturas;
 
   /// No description provided for @navParcelamentos.
   ///
   /// In pt, this message translates to:
-  /// **'Parcelas'**
+  /// **'Parcelamentos'**
   String get navParcelamentos;
 
   /// No description provided for @navCategorias.
@@ -1220,11 +1220,11 @@ abstract class AppLocalizations {
   /// **'Ajustes'**
   String get navAjustes;
 
-  /// No description provided for @navMore.
+  /// No description provided for @navMenu.
   ///
   /// In pt, this message translates to:
-  /// **'Mais'**
-  String get navMore;
+  /// **'Menu'**
+  String get navMenu;
 
   /// No description provided for @errorNotFound.
   ///

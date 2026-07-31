@@ -68,106 +68,78 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('a barra mostra exatamente os 5 destinos de dinheiro', (tester) async {
+  testWidgets('no mobile não existe barra de baixo — tudo mora no menu', (tester) async {
     await pump(tester);
 
-    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.destinations, hasLength(5), reason: 'o logo NÃO ocupa slot da barra');
-
-    for (final label in ['Dashboard', 'Receitas', 'Gastos', 'Fixos', 'Parcelas']) {
-      expect(find.text(label), findsWidgets, reason: '$label deve estar na barra');
-    }
-    // Categorias e Ajustes saíram da barra — são gerenciamento, não rotina.
-    expect(find.text('Categorias'), findsNothing);
-    expect(find.text('Ajustes'), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+    // Nada de destino solto na tela: a única porta é o botão do menu.
+    expect(find.byTooltip('Menu'), findsOneWidget);
   });
 
-  testWidgets('nenhum rótulo destoa em altura num celular estreito', (tester) async {
-    // Regressão real: com o logo ocupando um sexto slot, cada um ficava com
-    // ~63px e "Assinaturas" quebrava no meio da palavra ("Assinatura" / "s").
-    //
-    // A comparação é RELATIVA de propósito. A fonte do flutter_test é
-    // sintética (glifos de largura fixa), então altura absoluta aqui não diz
-    // nada sobre o navegador — o que diz é um rótulo ficar mais alto que os
-    // outros, que foi exatamente como o bug apareceu.
-    await pump(tester, size: const Size(360, 780));
+  testWidgets('o menu lista TODOS os sete destinos, sem subconjunto escondido', (tester) async {
+    await pump(tester);
 
-    final heights = <String, double>{};
-    for (final label in ['Dashboard', 'Receitas', 'Gastos', 'Fixos', 'Parcelas']) {
-      final finder = find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text(label),
-      );
-      expect(finder, findsOneWidget, reason: '$label deve estar na barra');
-      heights[label] = tester.renderObject<RenderBox>(finder).size.height;
-    }
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
 
-    final shortest = heights.values.reduce((a, b) => a < b ? a : b);
-    for (final entry in heights.entries) {
+    for (final label in [
+      'Dashboard',
+      'Receitas',
+      'Gastos',
+      'Assinaturas',
+      'Parcelamentos',
+      'Categorias',
+      'Ajustes',
+    ]) {
       expect(
-        entry.value,
-        lessThanOrEqualTo(shortest * 2),
-        reason: '"${entry.key}" ficou desproporcionalmente alto — indício de quebra',
+        find.descendant(of: find.byType(ListTile), matching: find.text(label)),
+        findsOneWidget,
+        reason: '$label precisa estar no menu',
       );
     }
   });
 
-  testWidgets('tocar num destino da barra troca de página', (tester) async {
+  testWidgets('a app bar diz em qual tela você está', (tester) async {
     await pump(tester);
-    expect(find.text('page:dashboard'), findsOneWidget);
+    // Sem barra de baixo, esse título é o único indicador de posição.
+    expect(find.text('Dashboard'), findsOneWidget);
 
-    await tester.tap(find.text('Fixos'));
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Parcelamentos'));
     await tester.pumpAndSettle();
 
-    expect(find.text('page:assinaturas'), findsOneWidget);
-    expect(find.text('page:dashboard'), findsNothing);
+    expect(find.text('page:parcelamentos'), findsOneWidget);
+    expect(find.text('Parcelamentos'), findsOneWidget, reason: 'agora é o título da app bar');
   });
 
-  testWidgets('o logo abre a folha com Categorias e Ajustes', (tester) async {
+  testWidgets('escolher no menu navega e fecha o menu', (tester) async {
     await pump(tester);
 
-    await tester.tap(find.byTooltip('Mais'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Categorias'), findsOneWidget);
-    expect(find.text('Ajustes'), findsOneWidget);
-  });
-
-  testWidgets('escolher na folha navega e fecha a folha', (tester) async {
-    await pump(tester);
-
-    await tester.tap(find.byTooltip('Mais'));
+    await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ajustes'));
     await tester.pumpAndSettle();
 
     expect(find.text('page:ajustes'), findsOneWidget);
-    expect(find.byType(ListTile), findsNothing, reason: 'a folha fechou');
+    expect(find.byType(ListTile), findsNothing, reason: 'o menu fechou');
   });
 
-  testWidgets('estando numa tela de trás do logo, é o logo que aparece selecionado', (tester) async {
+  testWidgets('o menu marca a tela atual', (tester) async {
     await pump(tester);
-    await tester.tap(find.byTooltip('Mais'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Categorias'));
+    await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
 
-    // A branch de Categorias é a 5 (de 7), fora da faixa da barra de 5 slots:
-    // sem o clamp o NavigationBar estouraria. Quem sinaliza onde você está de
-    // verdade é o chevron do logo, que fica na cor primária.
-    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.selectedIndex, lessThan(5));
-    expect(find.text('page:categorias'), findsOneWidget);
+    final tiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+    expect(tiles.where((t) => t.selected), hasLength(1));
+    expect(tiles.first.selected, isTrue, reason: 'Dashboard é a tela inicial');
   });
 
-  testWidgets('em tela larga o rail mostra os 7 destinos, sem botão de "Mais"', (tester) async {
+  testWidgets('em tela larga o rail mostra os 7 destinos, sem menu', (tester) async {
     await pump(tester, size: const Size(1200, 900));
 
-    expect(find.byType(NavigationBar), findsNothing);
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
     expect(rail.destinations, hasLength(7), reason: 'uma lista vertical comporta todos');
-    expect(find.text('Categorias'), findsWidgets);
-    expect(find.text('Ajustes'), findsWidgets);
-    expect(find.byTooltip('Mais'), findsNothing, reason: 'sem overflow em tela larga');
+    expect(find.byTooltip('Menu'), findsNothing, reason: 'o rail já é a navegação');
   });
 }

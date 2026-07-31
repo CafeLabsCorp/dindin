@@ -676,10 +676,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get navGastos => 'Gastos';
 
   @override
-  String get navAssinaturas => 'Fixos';
+  String get navAssinaturas => 'Assinaturas';
 
   @override
-  String get navParcelamentos => 'Parcelas';
+  String get navParcelamentos => 'Parcelamentos';
 
   @override
   String get navCategorias => 'Categorias';
@@ -688,7 +688,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get navAjustes => 'Ajustes';
 
   @override
-  String get navMore => 'Mais';
+  String get navMenu => 'Menu';
 
   @override
   String get errorNotFound => 'Esse lançamento não existe mais.';
