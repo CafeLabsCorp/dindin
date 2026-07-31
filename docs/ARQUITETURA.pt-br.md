@@ -208,7 +208,12 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   cinco telas de dinheiro (Dashboard, Receitas, Gastos, Assinaturas,
   Parcelamentos) são rotina, enquanto Categorias (você cria uma caixinha uma
   vez) e Ajustes são gerenciamento — essas duas abrem numa folha inferior a
-  partir do símbolo do Dindin, no último slot da barra.
+  partir do símbolo do Dindin, que fica na APP BAR e não na barra de baixo.
+  Colocá-lo na barra dava seis slots, e seis é um a mais do que cabe: a ~380px
+  cada slot fica com ~63px e "Assinaturas" quebrava no meio da palavra. Os
+  rótulos da barra também são formas curtas dos títulos ("Fixos", "Parcelas")
+  pelo mesmo motivo — precisam sobreviver a tela estreita e a texto ampliado
+  por acessibilidade.
 
   Uma roleta girando a partir do logo foi cogitada e recusada: não tem
   affordance dizendo que gira, é estranha no mouse (a plataforma no ar é a

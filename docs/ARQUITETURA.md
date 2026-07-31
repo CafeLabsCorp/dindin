@@ -210,7 +210,11 @@ which is exactly how the older docs already behaved.
   five money screens (Dashboard, Receitas, Gastos, Assinaturas,
   Parcelamentos) are daily, while Categorias (you create an envelope once)
   and Ajustes are management — those two open in a bottom sheet from the
-  Dindin logo, in the bar's last slot.
+  Dindin logo, which sits in the APP BAR rather than the bottom bar. Putting
+  it in the bar made six slots, and six is one too many: at ~380px each slot
+  gets ~63px and "Assinaturas" wrapped mid-word. The bar's labels are short
+  forms of the page titles ("Fixos", "Parcelas") for the same reason — they
+  have to survive a narrow screen and accessibility text scaling.
 
   A wheel spun from the logo was considered and declined: nothing about it
   says it spins, it's awkward with a mouse (the live platform is the web),

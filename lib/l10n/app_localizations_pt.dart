@@ -676,7 +676,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get navGastos => 'Gastos';
 
   @override
-  String get navAssinaturas => 'Assinaturas';
+  String get navAssinaturas => 'Fixos';
 
   @override
   String get navParcelamentos => 'Parcelas';
