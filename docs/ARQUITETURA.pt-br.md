@@ -213,13 +213,23 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
      arbitrária entre telas "do dia a dia" e "de gerenciamento", e o usuário
      tinha que aprender de que lado cada uma estava.
 
-  A forma atual não tem essa costura: em tela estreita não existe barra
-  inferior, e o símbolo do Dindin na app bar abre um menu com os SETE
-  destinos. Como bônus, acaba de vez o problema de rótulo — uma lista
+  3. Sem barra, com o menu na app bar. Resolvia a costura, mas a app bar
+     mostrava o nome da tela e o corpo da página mostrava o MESMO nome uma
+     linha abaixo — "Dashboard" duas vezes.
+
+  A forma atual não tem nem costura nem repetição: em tela estreita não
+  existe barra inferior NEM app bar. O próprio título da página (`PageHeader`)
+  ganha um chevron e abre um menu com os SETE destinos, que desce do topo
+  sobre um fundo escurecido — a direção aponta de volta pro que você tocou.
+  O que você lê é o que você toca, e o nome da tela aparece uma vez só. Como bônus, acaba de vez o problema de rótulo — uma lista
   vertical dá largura cheia pra cada nome, então nada trunca nem precisa de
-  abreviação ("Assinaturas" e "Parcelamentos" voltaram por inteiro). O título
-  ao lado do logo passa a dizer em qual tela você está, papel que era do slot
-  selecionado da barra. O custo é honesto: navegar vira dois toques.
+  abreviação ("Assinaturas" e "Parcelamentos" voltaram por inteiro). O custo é
+  honesto: navegar vira dois toques.
+
+  O `AppShell` entrega o menu às telas por um `InheritedWidget`
+  (`AppNavigation`), pra que o título de cada página seja o gatilho sem que
+  cada página precise saber como a navegação funciona. Em tela larga esse
+  callback é nulo e o mesmo `PageHeader` vira um título comum.
 
   Uma roleta girando a partir do logo foi cogitada e recusada: nada nela diz
   que gira, é estranha no mouse (a plataforma no ar é a web), e precisaria de

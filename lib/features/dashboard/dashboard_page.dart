@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
@@ -59,9 +61,12 @@ class DashboardPage extends ConsumerWidget {
 
     return ListView(
       children: [
-        Text(l10n.dashboardTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(l10n.dashboardSubtitle, style: TextStyle(color: context.tokens.muted)),
+        PageHeader(
+          title: l10n.dashboardTitle,
+          subtitle: l10n.dashboardSubtitle,
+          onOpenMenu: AppNavigation.of(context)?.openMenu,
+          menuLabel: l10n.navMenu,
+        ),
         const SizedBox(height: 24),
         StatTile(label: l10n.totalBalanceLabel, value: formatCurrency(summary.total)),
         const SizedBox(height: 16),

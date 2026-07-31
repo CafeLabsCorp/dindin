@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../models/expense.dart';
 import '../../models/installment_purchase.dart';
@@ -155,9 +157,12 @@ class _GastosPageState extends ConsumerState<GastosPage> {
 
     return ListView(
       children: [
-        Text(l10n.gastosTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(l10n.gastosSubtitle, style: TextStyle(color: context.tokens.muted)),
+        PageHeader(
+          title: l10n.gastosTitle,
+          subtitle: l10n.gastosSubtitle,
+          onOpenMenu: AppNavigation.of(context)?.openMenu,
+          menuLabel: l10n.navMenu,
+        ),
         const SizedBox(height: 24),
         AppCard(
           child: Column(

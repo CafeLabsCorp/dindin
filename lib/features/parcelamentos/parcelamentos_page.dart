@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../models/installment_purchase.dart';
 import '../../providers/providers.dart';
@@ -111,12 +113,12 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
 
     return ListView(
       children: [
-        Text(
-          l10n.installmentPurchasesTitle,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+        PageHeader(
+          title: l10n.installmentPurchasesTitle,
+          subtitle: l10n.installmentPurchasesSubtitle,
+          onOpenMenu: AppNavigation.of(context)?.openMenu,
+          menuLabel: l10n.navMenu,
         ),
-        const SizedBox(height: 4),
-        Text(l10n.installmentPurchasesSubtitle, style: TextStyle(color: context.tokens.muted)),
         const SizedBox(height: 24),
         AppCard(
           child: Column(

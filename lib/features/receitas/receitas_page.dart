@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../models/income.dart';
 import '../../models/income_source.dart';
 import '../../providers/providers.dart';
@@ -104,11 +106,11 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
 
     return ListView(
       children: [
-        Text(l10n.receitasTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(
-          l10n.receitasSubtitle,
-          style: TextStyle(color: context.tokens.muted),
+        PageHeader(
+          title: l10n.receitasTitle,
+          subtitle: l10n.receitasSubtitle,
+          onOpenMenu: AppNavigation.of(context)?.openMenu,
+          menuLabel: l10n.navMenu,
         ),
         const SizedBox(height: 24),
         AppCard(
