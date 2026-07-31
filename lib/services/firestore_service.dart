@@ -711,17 +711,60 @@ class FirestoreService {
     });
   }
 
+  /// Reads whichever balance funds a recurring charge — the account, or a
+  /// caixinha when [categoryId] is set — and works out what that balance
+  /// would become after [amount] leaves it.
+  ///
+  /// Reads only: it stages no writes, so the caller can call this while still
+  /// inside a transaction's read phase and then do all its `tx.set`s
+  /// together (Firestore requires every read to precede every write).
+  ///
+  /// The two branches deliberately mirror [createExpense]'s exactly — a
+  /// generated charge must be allowed if and only if the same expense typed
+  /// in by hand would be. That includes `allowNegative`: a `spend` caixinha
+  /// configured for debt can go negative here too, via [_catDeltaOk].
+  ///
+  /// Returns the outcome plus, when it can go through, the balance doc to
+  /// write and its new value.
+  Future<
+    (_ChargeOutcome, ({DocumentReference<Map<String, dynamic>> ref, double newBalance})?)
+  >
+  _readChargeSource(Transaction tx, String? categoryId, double amount) async {
+    if (categoryId == null) {
+      final acct = await _readBalance(tx, _account);
+      if (amount > acct + _eps) return (_ChargeOutcome.insufficientBalance, null);
+      return (_ChargeOutcome.charged, (ref: _account, newBalance: acct - amount));
+    }
+    final catSnap = await tx.get(_categories.doc(categoryId));
+    final catData = catSnap.data();
+    // The caixinha was deleted out from under this subscription/purchase.
+    // Reported separately from "no balance" because the fix is different:
+    // no amount of money makes this charge work, the user has to repoint it.
+    // Never silently falls back to the account — that would take money from
+    // somewhere the user didn't choose.
+    if (catData == null) return (_ChargeOutcome.missingCategory, null);
+    final category = Category.fromMap(categoryId, catData);
+    final catBal = await _readBalance(tx, _balance(categoryId));
+    final newCat = catBal - amount;
+    if (!_catDeltaOk(category, catBal, newCat)) {
+      return (_ChargeOutcome.insufficientBalance, null);
+    }
+    return (_ChargeOutcome.charged, (ref: _balance(categoryId), newBalance: newCat));
+  }
+
   // -------------------------------------------------------------------------
-  // Subscriptions (fixed recurring monthly expense, e.g. "Netflix"). Always
-  // charged straight from the account — no categoryId, unlike a plain
-  // expense. The doc itself carries no money invariant (creating/editing/
-  // deleting it never touches a balance); only the Expense docs it produces
-  // via [catchUpSubscriptions] go through the normal account-balance gate.
+  // Subscriptions (fixed recurring monthly expense, e.g. "Netflix"). Charged
+  // out of the account by default, or out of a caixinha when the
+  // subscription carries a categoryId. The doc itself carries no money
+  // invariant (creating/editing/deleting it never touches a balance); only
+  // the Expense docs it produces via [catchUpSubscriptions] move money, and
+  // those go through the same balance gate as a hand-typed expense.
   // -------------------------------------------------------------------------
   Future<Subscription> createSubscription({
     required String name,
     required double amount,
     required int dueDay,
+    String? categoryId,
   }) async {
     if (amount <= 0) throw StateError('subscription amount must be positive');
     if (dueDay < 1 || dueDay > 31) {
@@ -734,6 +777,7 @@ class FirestoreService {
       amount: amount,
       dueDay: dueDay,
       createdAt: DateTime.now().toIso8601String(),
+      categoryId: categoryId,
     );
     await doc.set(subscription.toMap());
     return subscription;
@@ -758,13 +802,19 @@ class FirestoreService {
   /// account" guarantee) and is retried from the same due date next time this
   /// runs; other subscriptions are unaffected. The Gastos screen surfaces
   /// whatever is left pending — see `recurring_schedule.dart`.
-  Future<void> catchUpSubscriptions() async {
+  Future<RecurringChargeReport> catchUpSubscriptions() async {
     final snap = await _subscriptions.get();
     final today = _now();
+    var charged = 0;
+    var chargedTotal = 0.0;
     for (final doc in snap.docs) {
       final subscription = Subscription.fromMap(doc.id, doc.data());
       for (final due in schedule.pendingDueDates(subscription, today)) {
         final dueIso = schedule.isoDate(due);
+        // Written by the transaction body with the amount it actually billed
+        // (read fresh inside), not the possibly-stale one captured above. A
+        // retry simply overwrites it, so what survives is what committed.
+        var billed = 0.0;
         final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
           // Re-read the subscription INSIDE the transaction. Two things
           // depend on this, and both break without it:
@@ -792,15 +842,22 @@ class FirestoreService {
               ).isBefore(due);
           if (alreadyCharged) return _ChargeOutcome.superseded;
 
-          final acct = await _readBalance(tx, _account);
-          if (current.amount > acct + _eps) {
-            return _ChargeOutcome.insufficientBalance;
-          }
+          final (sourceOutcome, source) = await _readChargeSource(
+            tx,
+            current.categoryId,
+            current.amount,
+          );
+          if (source == null) return sourceOutcome;
+
           final expenseDoc = _expenses.doc();
           final expense = Expense(
             id: expenseDoc.id,
             date: dueIso,
             amount: current.amount,
+            // Same funding source as the subscription: null = account, a
+            // caixinha id = that caixinha. The expense is an ordinary one in
+            // every other respect.
+            categoryId: current.categoryId,
             description: current.name,
             // Links the generated expense back to the subscription that
             // produced it, so the app can tell it apart from a manual entry
@@ -809,7 +866,7 @@ class FirestoreService {
             sourceId: current.id,
           );
           tx.set(expenseDoc, expense.toMap());
-          tx.set(_account, {'balance': acct - current.amount});
+          tx.set(source.ref, {'balance': source.newBalance});
           // A full overwrite (not a merge) — every other field is copied
           // from the just-read [current] unchanged, so this never depends
           // on transactional merge support.
@@ -822,24 +879,30 @@ class FirestoreService {
               dueDay: current.dueDay,
               createdAt: current.createdAt,
               lastChargedDate: dueIso,
+              categoryId: current.categoryId,
             ).toMap(),
           );
+          billed = current.amount;
           return _ChargeOutcome.charged;
         });
-        // Insufficient balance -> retry this same due date next run.
+        // Insufficient balance / missing caixinha -> retry next run, and stay
+        // visible as pending meanwhile.
         // Superseded -> another runner owns this subscription's catch-up.
         if (outcome != _ChargeOutcome.charged) break;
+        charged++;
+        chargedTotal += billed;
       }
     }
+    return RecurringChargeReport(count: charged, total: agg.round2(chargedTotal));
   }
 
   // -------------------------------------------------------------------------
   // Installment purchases (a card purchase split into N fixed monthly
-  // charges, e.g. "Notebook Dell, 12x"). Always charged straight from the
-  // account, same as a subscription — but bounded: it stops generating
+  // charges, e.g. "Notebook Dell, 12x"). Charged out of the account or out of
+  // a caixinha, same as a subscription — but bounded: it stops generating
   // charges once every installment has been billed. No money invariant of
-  // its own; only the Expense docs [catchUpInstallmentPurchases] produces go
-  // through the normal account-balance gate.
+  // its own; only the Expense docs [catchUpInstallmentPurchases] produces
+  // move money, through the same balance gate as a hand-typed expense.
   // -------------------------------------------------------------------------
   Future<InstallmentPurchase> createInstallmentPurchase({
     required String name,
@@ -847,6 +910,7 @@ class FirestoreService {
     required int installments,
     required String purchaseDate,
     required String firstChargeDate,
+    String? categoryId,
   }) async {
     if (totalAmount <= 0) {
       throw StateError('installment purchase amount must be positive');
@@ -863,6 +927,7 @@ class FirestoreService {
       purchaseDate: purchaseDate,
       firstChargeDate: firstChargeDate,
       createdAt: DateTime.now().toIso8601String(),
+      categoryId: categoryId,
     );
     await doc.set(purchase.toMap());
     return purchase;
@@ -870,6 +935,87 @@ class FirestoreService {
 
   Future<void> deleteInstallmentPurchase(String id) async {
     await _installmentPurchases.doc(id).delete();
+  }
+
+  /// Pays [amount] toward [id] on top of its scheduled installments — one
+  /// month you had more cash, or you settled the whole thing at once.
+  ///
+  /// Money leaves NOW, out of [categoryId]'s caixinha or the account when
+  /// null (independently of where the monthly charges come from — you can
+  /// settle a card purchase with money from anywhere). It creates an ordinary
+  /// [Expense], linked back to the purchase like every generated charge, and
+  /// adds to [InstallmentPurchase.amortizedAmount].
+  ///
+  /// The effect is on the SCHEDULE, not the installment: what remains keeps
+  /// its size and the purchase ends sooner. Catch-up simply stops once
+  /// nothing is owed.
+  ///
+  /// [amount] is clamped to what is actually still owed, read inside the
+  /// transaction — so "settle it" can pass the outstanding it last saw
+  /// without risking an overpayment if a scheduled charge landed in between.
+  /// Throws [StateError] if the purchase is gone, or already settled.
+  Future<void> payInstallmentPurchase(
+    String id, {
+    required double amount,
+    required String date,
+    String? categoryId,
+    String? description,
+  }) async {
+    if (amount <= 0) throw StateError('payment amount must be positive');
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(_installmentPurchases.doc(id));
+      final data = snap.data();
+      if (data == null) throw StateError('installment purchase not found');
+      final purchase = InstallmentPurchase.fromMap(id, data);
+      final outstanding = schedule.outstandingAmount(purchase);
+      if (outstanding <= _eps) {
+        throw StateError('installment purchase is already settled');
+      }
+      final applied = amount <= outstanding ? amount : outstanding;
+
+      final (sourceOutcome, source) = await _readChargeSource(
+        tx,
+        categoryId,
+        applied,
+      );
+      if (source == null) {
+        throw StateError(
+          sourceOutcome == _ChargeOutcome.missingCategory
+              ? 'category not found'
+              : 'amount exceeds available balance',
+        );
+      }
+
+      final expenseDoc = _expenses.doc();
+      tx.set(
+        expenseDoc,
+        Expense(
+          id: expenseDoc.id,
+          date: date,
+          amount: applied,
+          categoryId: categoryId,
+          description: description ?? purchase.name,
+          sourceType: ExpenseSource.installment.value,
+          sourceId: purchase.id,
+        ).toMap(),
+      );
+      tx.set(source.ref, {'balance': source.newBalance});
+      tx.set(
+        _installmentPurchases.doc(id),
+        InstallmentPurchase(
+          id: purchase.id,
+          name: purchase.name,
+          totalAmount: purchase.totalAmount,
+          installments: purchase.installments,
+          purchaseDate: purchase.purchaseDate,
+          firstChargeDate: purchase.firstChargeDate,
+          createdAt: purchase.createdAt,
+          chargedInstallments: purchase.chargedInstallments,
+          categoryId: purchase.categoryId,
+          amortizedAmount: agg.round2(purchase.amortizedAmount + applied),
+        ).toMap(),
+      );
+    });
   }
 
   /// Catches up every installment purchase's missed charges since it was last
@@ -884,21 +1030,23 @@ class FirestoreService {
   /// catch-up stops there (mirrors [createExpense]'s "never overdraw the
   /// account" guarantee) and is retried from the same installment next time
   /// this runs; other purchases are unaffected.
-  Future<void> catchUpInstallmentPurchases() async {
+  Future<RecurringChargeReport> catchUpInstallmentPurchases() async {
     final snap = await _installmentPurchases.get();
     final today = _now();
+    var charged = 0;
+    var chargedTotal = 0.0;
     for (final doc in snap.docs) {
       final purchase = InstallmentPurchase.fromMap(doc.id, doc.data());
-      if (purchase.isFullyCharged) continue;
-      final amounts = schedule.installmentAmounts(
-        purchase.totalAmount,
-        purchase.installments,
-      );
+      // Settled, not merely "all occurrences billed": an early payoff ends
+      // the purchase with occurrences still on the calendar.
+      if (schedule.isSettled(purchase)) continue;
       for (final index in schedule.pendingInstallmentIndexes(purchase, today)) {
-        final amount = amounts[index];
         final dueIso = schedule.isoDate(
           schedule.installmentDueDate(purchase, index),
         );
+        // See [catchUpSubscriptions]: the amount actually billed, read fresh
+        // inside the transaction (an early payoff can shrink the final one).
+        var billed = 0.0;
         final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
           // Re-read inside the transaction, for the same two reasons spelled
           // out in [catchUpSubscriptions]: it puts the doc in the read set so
@@ -914,16 +1062,26 @@ class FirestoreService {
           if (current.chargedInstallments != index) {
             return _ChargeOutcome.superseded;
           }
+          // Recomputed from the FRESH doc, so an early payoff committed
+          // between the planning pass above and this transaction cancels the
+          // charge instead of billing a debt that no longer exists.
+          final outstanding = schedule.outstandingAmount(current);
+          if (outstanding <= _eps) return _ChargeOutcome.superseded;
+          final amount = schedule.installmentChargeAmount(current, index, outstanding);
 
-          final acct = await _readBalance(tx, _account);
-          if (amount > acct + _eps) {
-            return _ChargeOutcome.insufficientBalance;
-          }
+          final (sourceOutcome, source) = await _readChargeSource(
+            tx,
+            current.categoryId,
+            amount,
+          );
+          if (source == null) return sourceOutcome;
+
           final expenseDoc = _expenses.doc();
           final expense = Expense(
             id: expenseDoc.id,
             date: dueIso,
             amount: amount,
+            categoryId: current.categoryId,
             description: '${current.name} (${index + 1}/${current.installments})',
             // Links the generated expense back to the purchase that produced
             // it — see [catchUpSubscriptions].
@@ -931,7 +1089,7 @@ class FirestoreService {
             sourceId: current.id,
           );
           tx.set(expenseDoc, expense.toMap());
-          tx.set(_account, {'balance': acct - amount});
+          tx.set(source.ref, {'balance': source.newBalance});
           // A full overwrite (not a merge) — every other field is copied
           // from the just-read [current] unchanged.
           tx.set(
@@ -945,15 +1103,22 @@ class FirestoreService {
               firstChargeDate: current.firstChargeDate,
               createdAt: current.createdAt,
               chargedInstallments: index + 1,
+              categoryId: current.categoryId,
+              amortizedAmount: current.amortizedAmount,
             ).toMap(),
           );
+          billed = amount;
           return _ChargeOutcome.charged;
         });
-        // Insufficient balance -> retry this same installment next run.
+        // Insufficient balance / missing caixinha -> retry next run, and stay
+        // visible as pending meanwhile.
         // Superseded -> another runner owns this purchase's catch-up.
         if (outcome != _ChargeOutcome.charged) break;
+        charged++;
+        chargedTotal += billed;
       }
     }
+    return RecurringChargeReport(count: charged, total: agg.round2(chargedTotal));
   }
 
   // -------------------------------------------------------------------------
@@ -1072,6 +1237,32 @@ class FirestoreService {
   }
 }
 
+/// What a catch-up run actually billed.
+///
+/// Returned instead of `void` so the app can tell the user money left their
+/// account. Catch-up posts charges silently by design (it runs on app open,
+/// not on a schedule), and without this the only evidence was rows appearing
+/// in a list the user might not be looking at.
+class RecurringChargeReport {
+  /// How many [Expense] docs this run created.
+  final int count;
+
+  /// Their total — what actually left the account and the caixinhas.
+  final double total;
+
+  const RecurringChargeReport({this.count = 0, this.total = 0});
+
+  bool get isEmpty => count == 0;
+
+  /// Merges two runs (subscriptions + installment purchases) into the single
+  /// figure the user cares about: what today's open cost them.
+  RecurringChargeReport operator +(RecurringChargeReport other) =>
+      RecurringChargeReport(
+        count: count + other.count,
+        total: agg.round2(total + other.total),
+      );
+}
+
 /// How one occurrence's charge attempt ended, inside
 /// [FirestoreService.catchUpSubscriptions] /
 /// [FirestoreService.catchUpInstallmentPurchases].
@@ -1089,10 +1280,18 @@ enum _ChargeOutcome {
   /// The expense was created and the source doc's progress bumped.
   charged,
 
-  /// The account couldn't cover it. Nothing was written; the same occurrence
-  /// is retried on the next run, and stays visible as pending in the UI
-  /// meanwhile.
+  /// The funding balance (the account, or the caixinha) couldn't cover it.
+  /// Nothing was written; the same occurrence is retried on the next run, and
+  /// stays visible as pending in the UI meanwhile.
   insufficientBalance,
+
+  /// The caixinha this charge was configured to come out of no longer
+  /// exists. Also retried (and shown as pending), but unlike
+  /// [insufficientBalance] no amount of money fixes it — the user has to
+  /// point the subscription/purchase somewhere else. Deliberately never falls
+  /// back to the account: that would move money out of a place the user
+  /// didn't choose.
+  missingCategory,
 
   /// Another runner (a second device or tab) already charged this occurrence,
   /// or the source doc was deleted mid-run. Nothing to do and nothing wrong.

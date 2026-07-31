@@ -1335,3 +1335,112 @@ describe('expenses: origin link (sourceType/sourceId)', () => {
     await assertFails(forged.commit());
   });
 });
+
+// -----------------------------------------------------------------------
+// 13. Charge source (categoryId) and early payoff (amortizedAmount)
+//
+// A subscription/purchase can name the caixinha its charges come out of, and
+// a purchase tracks money paid ahead of schedule. Neither field moves money
+// by itself — the balance only changes when catch-up (or the pay-ahead flow)
+// writes the Expense in the same commit, which the `expenses` rules already
+// check. What these tests pin down is the shape, and that amortizedAmount can
+// never claim more was paid than the purchase is worth.
+// -----------------------------------------------------------------------
+
+describe('recurring charges: source caixinha and early payoff', () => {
+  const subBase = {
+    name: 'Netflix',
+    amount: 39.9,
+    dueDay: 5,
+    createdAt: '2026-01-01',
+  };
+  const purchaseBase = {
+    name: 'Notebook',
+    totalAmount: 1000,
+    installments: 10,
+    purchaseDate: '2026-01-01',
+    firstChargeDate: '2026-01-10',
+    createdAt: '2026-01-01',
+    chargedInstallments: 0,
+  };
+
+  test('a subscription may name the caixinha it comes out of', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), { ...subBase, categoryId: 'c1' }),
+    );
+  });
+
+  test('a non-string categoryId is rejected', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), { ...subBase, categoryId: 42 }),
+    );
+  });
+
+  test('repointing a subscription at another caixinha is allowed', async () => {
+    await seed(async (sdb) =>
+      setDoc(subscriptionDoc(sdb, 'alice', 's1'), { ...subBase, categoryId: 'c1' }),
+    );
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), { ...subBase, categoryId: 'c2' }),
+    );
+    // ...and back to the account, by dropping the field.
+    await assertSucceeds(setDoc(subscriptionDoc(db, 'alice', 's1'), subBase));
+  });
+
+  test('an installment purchase accepts amortizedAmount up to its total', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        ...purchaseBase,
+        amortizedAmount: 250,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p2'), {
+        ...purchaseBase,
+        amortizedAmount: 1000, // settled in full
+      }),
+    );
+  });
+
+  test('amortizedAmount cannot exceed the purchase total or go negative', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        ...purchaseBase,
+        amortizedAmount: 1000.01,
+      }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p2'), {
+        ...purchaseBase,
+        amortizedAmount: -1,
+      }),
+    );
+  });
+
+  test('paying ahead updates amortizedAmount while the immutable fields hold', async () => {
+    await seed(async (sdb) =>
+      setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), purchaseBase),
+    );
+    const db = aliceDb();
+
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        ...purchaseBase,
+        amortizedAmount: 300,
+      }),
+    );
+    // Rewriting the total to "absorb" the payment is still refused — that is
+    // exactly what amortizedAmount exists to avoid.
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        ...purchaseBase,
+        totalAmount: 700,
+      }),
+    );
+  });
+});

@@ -394,12 +394,19 @@ service cloud.firestore {
     // through the ordinary `expenses` rules above, which already enforce the
     // account-balance floor. Only shape + ownership + immutable `createdAt`
     // are validated here, same posture as `categories`.
+    // categoryId (optional) is the caixinha the charge comes out of; absent
+    // means the general account, exactly as on an expense. It carries no
+    // money invariant HERE — the balance only moves when catch-up writes the
+    // Expense, and that write is checked by the `expenses` rules above
+    // against whichever balance doc it targets. So this is shape-only, same
+    // as every other field on this doc.
     function validSubscription(d) {
       return d.name is string
           && d.amount is number && d.amount > 0
           && d.dueDay is int && d.dueDay >= 1 && d.dueDay <= 31
           && isIsoDate(d.createdAt)
-          && (!('lastChargedDate' in d.keys()) || isIsoDate(d.lastChargedDate));
+          && (!('lastChargedDate' in d.keys()) || isIsoDate(d.lastChargedDate))
+          && (!('categoryId' in d.keys()) || d.categoryId is string);
     }
 
     match /users/{uid}/subscriptions/{subscriptionId} {
@@ -433,7 +440,18 @@ service cloud.firestore {
           && isIsoDate(d.createdAt)
           && d.chargedInstallments is int
           && d.chargedInstallments >= 0
-          && d.chargedInstallments <= d.installments;
+          && d.chargedInstallments <= d.installments
+          && (!('categoryId' in d.keys()) || d.categoryId is string)
+          // Money paid ahead of the schedule. Mutable (it only grows, as the
+          // user pays), but never negative and never more than the purchase
+          // is worth — a value above totalAmount would mean the app collected
+          // more than the debt. It carries no balance delta of its own: the
+          // money moves in the Expense written in the same commit, which the
+          // `expenses` rules check.
+          && (!('amortizedAmount' in d.keys())
+                || (d.amortizedAmount is number
+                    && d.amortizedAmount >= 0
+                    && d.amortizedAmount <= d.totalAmount));
     }
 
     match /users/{uid}/installmentPurchases/{purchaseId} {
