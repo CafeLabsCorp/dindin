@@ -140,7 +140,55 @@
     "placeholders": { "count": { "type": "int" } }
   },
   "catchUpFailedWarning": "Não deu pra processar as cobranças automáticas agora. O app tenta de novo na próxima vez que você abrir.",
+  "recurringChargesPosted": "{count, plural, =1{1 cobrança lançada agora · {amount}} other{{count} cobranças lançadas agora · {amount}}}",
+  "@recurringChargesPosted": {
+    "placeholders": { "count": { "type": "int" }, "amount": { "type": "String" } }
+  },
   "generatedExpenseTooltip": "Lançado automaticamente por uma assinatura ou parcelamento",
+
+  "chargeSourceLabel": "Sai de",
+  "chargeSourceMissingWarning": "A caixinha dessa cobrança foi removida — escolha outra origem pra ela voltar a ser lançada.",
+  "editSubscriptionTooltip": "Editar assinatura",
+  "editSubscriptionTitle": "Editar assinatura",
+  "editSubscriptionHint": "Mudar o valor ou o dia vale a partir do próximo mês ainda não cobrado — meses já lançados não mudam.",
+  "recurringEntryTitle": "Assinaturas e parcelamentos",
+  "recurringEntryCommitted": "{amount} comprometidos neste mês",
+  "@recurringEntryCommitted": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "openSubscriptionsButton": "Assinaturas",
+  "openInstallmentPurchasesButton": "Parcelamentos",
+  "installmentOutstandingLabel": "Faltam {amount}",
+  "@installmentOutstandingLabel": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "installmentSettledLabel": "Quitado",
+  "installmentPaidAheadLabel": "{amount} pagos adiantado",
+  "@installmentPaidAheadLabel": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "payInstallmentTooltip": "Pagar adiantado ou quitar",
+  "payInstallmentTitle": "Pagar {name}",
+  "@payInstallmentTitle": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "payInstallmentHint": "Pagar mais que a parcela reduz o que falta e encurta o prazo — a parcela continua do mesmo tamanho. Saldo devedor: {amount}.",
+  "@payInstallmentHint": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "payInstallmentButton": "Pagar esse valor",
+  "settleInstallmentButton": "Quitar tudo ({amount})",
+  "@settleInstallmentButton": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "installmentPayAheadDescription": "{name} (adiantamento)",
+  "@installmentPayAheadDescription": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "installmentSettleDescription": "{name} (quitação)",
+  "@installmentSettleDescription": {
+    "placeholders": { "name": { "type": "String" } }
+  },
 
   "receitasTitle": "Receitas",
   "receitasSubtitle": "Lance o quanto entrou e de onde veio. O valor cai direto na sua conta —\naloque em caixinhas quando quiser, no Dashboard.",

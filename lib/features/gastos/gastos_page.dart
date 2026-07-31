@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/category.dart';
@@ -39,28 +40,10 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   DateTime? _filterFrom;
   DateTime? _filterTo;
 
-  final _subNameController = TextEditingController();
-  final _subAmountController = TextEditingController();
-  int _subDueDay = 5;
-  String? _subError;
-  bool _subSubmitting = false;
-
-  final _instNameController = TextEditingController();
-  final _instTotalController = TextEditingController();
-  DateTime _instPurchaseDate = DateTime.now();
-  DateTime _instFirstChargeDate = DateTime.now();
-  int _instInstallments = 2;
-  String? _instError;
-  bool _instSubmitting = false;
-
   @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
-    _subNameController.dispose();
-    _subAmountController.dispose();
-    _instNameController.dispose();
-    _instTotalController.dispose();
     super.dispose();
   }
 
@@ -129,112 +112,6 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     await ref.read(firestoreServiceProvider)!.deleteExpense(id);
   }
 
-  Future<void> _submitSubscription() async {
-    final l10n = AppLocalizations.of(context)!;
-    final name = _subNameController.text.trim();
-    if (name.isEmpty) {
-      setState(() => _subError = l10n.nameRequiredError);
-      return;
-    }
-    final value = double.tryParse(_subAmountController.text.replaceAll(',', '.'));
-    if (value == null || value <= 0) {
-      setState(() => _subError = l10n.invalidAmountError);
-      return;
-    }
-    if (_subDueDay < 1 || _subDueDay > 31) {
-      setState(() => _subError = l10n.invalidDueDayError);
-      return;
-    }
-    final firestore = ref.read(firestoreServiceProvider);
-    if (firestore == null) return;
-    setState(() {
-      _subSubmitting = true;
-      _subError = null;
-    });
-    try {
-      await firestore.createSubscription(name: name, amount: value, dueDay: _subDueDay);
-      _subNameController.clear();
-      _subAmountController.clear();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _subError = friendlyErrorMessage(l10n, e));
-    } finally {
-      if (mounted) setState(() => _subSubmitting = false);
-    }
-  }
-
-  Future<void> _deleteSubscription(String id) async {
-    final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.removeSubscriptionConfirmTitle),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await ref.read(firestoreServiceProvider)!.deleteSubscription(id);
-  }
-
-  Future<void> _submitInstallmentPurchase() async {
-    final l10n = AppLocalizations.of(context)!;
-    final name = _instNameController.text.trim();
-    if (name.isEmpty) {
-      setState(() => _instError = l10n.nameRequiredError);
-      return;
-    }
-    final value = double.tryParse(_instTotalController.text.replaceAll(',', '.'));
-    if (value == null || value <= 0) {
-      setState(() => _instError = l10n.invalidAmountError);
-      return;
-    }
-    if (_instInstallments < 2 || _instInstallments > 36) {
-      setState(() => _instError = l10n.invalidInstallmentsError);
-      return;
-    }
-    final firestore = ref.read(firestoreServiceProvider);
-    if (firestore == null) return;
-    setState(() {
-      _instSubmitting = true;
-      _instError = null;
-    });
-    try {
-      await firestore.createInstallmentPurchase(
-        name: name,
-        totalAmount: value,
-        installments: _instInstallments,
-        purchaseDate: isoDateFrom(_instPurchaseDate),
-        firstChargeDate: isoDateFrom(_instFirstChargeDate),
-      );
-      _instNameController.clear();
-      _instTotalController.clear();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _instError = friendlyErrorMessage(l10n, e));
-    } finally {
-      if (mounted) setState(() => _instSubmitting = false);
-    }
-  }
-
-  Future<void> _deleteInstallmentPurchase(String id) async {
-    final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.removeInstallmentPurchaseConfirmTitle),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await ref.read(firestoreServiceProvider)!.deleteInstallmentPurchase(id);
-  }
-
   void _editExpense(Expense expense, List<Category> categories) {
     showEditTransactionSheet(
       context,
@@ -260,23 +137,16 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final categories = ref.watch(categoriesProvider).value ?? [];
     final summary = ref.watch(summaryProvider);
 
-    // Pending charges only mean something once catch-up has actually finished
-    // for this session: before that, everything due looks "pending" simply
-    // because nothing has run yet. `hasValue` is the finished-clean signal,
-    // `hasError` the finished-broken one — see recurringChargesCatchUpProvider.
-    final catchUpState = ref.watch(recurringChargesCatchUpProvider);
-    final showPending = catchUpState.hasValue;
+    // How much of this month is already spoken for before the user spends
+    // anything. Doubles as the entry point to the two screens that used to be
+    // cards at the bottom of this one, below the (unbounded) expense list —
+    // which is what made them unreachable.
     final today = ref.watch(todayProvider);
-    // Counted with the very same functions catch-up bills from, so the badge
-    // can't claim something catch-up disagrees with.
-    final pendingSubscriptionCharges = showPending
-        ? (subscriptionsAsync.value ?? const <Subscription>[])
-              .fold(0, (sum, s) => sum + schedule.pendingDueDates(s, today).length)
-        : 0;
-    final pendingInstallmentCharges = showPending
-        ? (installmentPurchasesAsync.value ?? const <InstallmentPurchase>[])
-              .fold(0, (sum, p) => sum + schedule.pendingInstallmentIndexes(p, today).length)
-        : 0;
+    final committed = schedule.committedThisMonth(
+      subscriptionsAsync.value ?? const <Subscription>[],
+      installmentPurchasesAsync.value ?? const <InstallmentPurchase>[],
+      today,
+    );
 
     final categoryName = {for (final c in categories) c.id: c.name};
     final availableBalance = _selection == _accountOption
@@ -291,6 +161,40 @@ class _GastosPageState extends ConsumerState<GastosPage> {
         const SizedBox(height: 4),
         Text(l10n.gastosSubtitle, style: TextStyle(color: context.tokens.muted)),
         const SizedBox(height: 24),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.recurringEntryTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.recurringEntryCommitted(formatCurrency(committed)),
+                style: TextStyle(color: context.tokens.muted),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/gastos/assinaturas'),
+                    icon: const Icon(Icons.autorenew, size: 18),
+                    label: Text(l10n.openSubscriptionsButton),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/gastos/parcelamentos'),
+                    icon: const Icon(Icons.credit_card, size: 18),
+                    label: Text(l10n.openInstallmentPurchasesButton),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -465,226 +369,6 @@ class _GastosPageState extends ConsumerState<GastosPage> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.subscriptionsTitle,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(l10n.subscriptionsSubtitle, style: TextStyle(color: context.tokens.muted)),
-              if (catchUpState.hasError)
-                _CatchUpWarning(l10n.catchUpFailedWarning)
-              else if (pendingSubscriptionCharges > 0)
-                _CatchUpWarning(l10n.pendingChargesWarning(pendingSubscriptionCharges)),
-              const SizedBox(height: 16),
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 200.0,
-                    child: TextField(
-                      controller: _subNameController,
-                      enabled: !_subSubmitting,
-                      decoration: InputDecoration(
-                        labelText: l10n.subscriptionNameLabel,
-                        hintText: l10n.subscriptionNameHint,
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _subDueDay,
-                      isExpanded: true,
-                      decoration: InputDecoration(labelText: l10n.subscriptionDueDayLabel),
-                      items: [for (var d = 1; d <= 31; d++) DropdownMenuItem(value: d, child: Text('$d'))],
-                      onChanged: _subSubmitting ? null : (v) => setState(() => _subDueDay = v ?? _subDueDay),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: TextField(
-                      controller: _subAmountController,
-                      enabled: !_subSubmitting,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _subSubmitting ? null : _submitSubscription,
-                child: Text(l10n.submitSubscriptionButton),
-              ),
-              if (_subError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_subError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-              const SizedBox(height: 16),
-              Text(
-                l10n.subscriptionsListTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              subscriptionsAsync.when(
-                data: (subscriptions) {
-                  if (subscriptions.isEmpty) return EmptyState(l10n.subscriptionsEmptyState);
-                  return Column(
-                    children: [
-                      for (var i = 0; i < subscriptions.length; i++)
-                        _SubscriptionRow(
-                          subscription: subscriptions[i],
-                          pendingCharges: showPending
-                              ? schedule.pendingDueDates(subscriptions[i], today).length
-                              : 0,
-                          onDelete: () => _deleteSubscription(subscriptions[i].id),
-                          divider: i > 0,
-                        ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.installmentPurchasesTitle,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(l10n.installmentPurchasesSubtitle, style: TextStyle(color: context.tokens.muted)),
-              if (catchUpState.hasError)
-                _CatchUpWarning(l10n.catchUpFailedWarning)
-              else if (pendingInstallmentCharges > 0)
-                _CatchUpWarning(l10n.pendingChargesWarning(pendingInstallmentCharges)),
-              const SizedBox(height: 16),
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 200.0,
-                    child: TextField(
-                      controller: _instNameController,
-                      enabled: !_instSubmitting,
-                      decoration: InputDecoration(
-                        labelText: l10n.installmentNameLabel,
-                        hintText: l10n.installmentNameHint,
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: _instSubmitting
-                          ? null
-                          : () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _instPurchaseDate,
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) setState(() => _instPurchaseDate = picked);
-                            },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.purchaseDateLabel),
-                        child: Text(formatDate(isoDateFrom(_instPurchaseDate))),
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: TextField(
-                      controller: _instTotalController,
-                      enabled: !_instSubmitting,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
-                    ),
-                  ),
-                  (
-                    width: 120.0,
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _instInstallments,
-                      isExpanded: true,
-                      decoration: InputDecoration(labelText: l10n.installmentsCountLabel),
-                      items: [for (var n = 2; n <= 36; n++) DropdownMenuItem(value: n, child: Text('${n}x'))],
-                      onChanged: _instSubmitting
-                          ? null
-                          : (v) => setState(() => _instInstallments = v ?? _instInstallments),
-                    ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: _instSubmitting
-                          ? null
-                          : () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _instFirstChargeDate,
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) setState(() => _instFirstChargeDate = picked);
-                            },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.firstChargeDateLabel),
-                        child: Text(formatDate(isoDateFrom(_instFirstChargeDate))),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _instSubmitting ? null : _submitInstallmentPurchase,
-                child: Text(l10n.submitInstallmentPurchaseButton),
-              ),
-              if (_instError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_instError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-              const SizedBox(height: 16),
-              Text(
-                l10n.installmentPurchasesListTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              installmentPurchasesAsync.when(
-                data: (purchases) {
-                  if (purchases.isEmpty) return EmptyState(l10n.installmentPurchasesEmptyState);
-                  return Column(
-                    children: [
-                      for (var i = 0; i < purchases.length; i++)
-                        _InstallmentPurchaseRow(
-                          purchase: purchases[i],
-                          pendingCharges: showPending
-                              ? schedule.pendingInstallmentIndexes(purchases[i], today).length
-                              : 0,
-                          onDelete: () => _deleteInstallmentPurchase(purchases[i].id),
-                          divider: i > 0,
-                        ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -794,179 +478,4 @@ class _ExpenseRow extends StatelessWidget {
 String _originLabel(AppLocalizations l10n, String? categoryId, Map<String, String> categoryName) {
   if (categoryId == null) return l10n.accountLabel;
   return categoryName[categoryId] ?? l10n.removedCategoryLabel;
-}
-
-/// Warning strip inside the Assinaturas / Compras parceladas cards.
-///
-/// Catch-up stops (and retries later) when the account can't cover a charge —
-/// correct, but until this existed it was completely silent, so a subscription
-/// quietly not charging for months looked exactly like one that was paid.
-class _CatchUpWarning extends StatelessWidget {
-  final String message;
-
-  const _CatchUpWarning(this.message);
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.error;
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, size: 18, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: TextStyle(fontSize: 13, color: color)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubscriptionRow extends StatelessWidget {
-  final Subscription subscription;
-
-  /// Due dates catch-up has not managed to charge yet (0 while catch-up is
-  /// still running or has failed — see GastosPage.build).
-  final int pendingCharges;
-  final VoidCallback onDelete;
-  final bool divider;
-
-  const _SubscriptionRow({
-    required this.subscription,
-    required this.pendingCharges,
-    required this.onDelete,
-    required this.divider,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: formatCurrency(subscription.amount),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' · ${subscription.name}',
-                        style: TextStyle(color: context.tokens.subtle),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  l10n.subscriptionChargedOnLabel('${subscription.dueDay}'),
-                  style: TextStyle(fontSize: 12, color: context.tokens.subtle),
-                ),
-                if (pendingCharges > 0)
-                  Text(
-                    l10n.pendingChargesRowLabel(pendingCharges),
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
-                  ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: l10n.removeSubscriptionTooltip,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InstallmentPurchaseRow extends StatelessWidget {
-  final InstallmentPurchase purchase;
-
-  /// Installments catch-up has not managed to charge yet (0 while catch-up is
-  /// still running or has failed — see GastosPage.build).
-  final int pendingCharges;
-  final VoidCallback onDelete;
-  final bool divider;
-
-  const _InstallmentPurchaseRow({
-    required this.purchase,
-    required this.pendingCharges,
-    required this.onDelete,
-    required this.divider,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    // Display-only approximation (Nx de R$Y): the actual last Expense may be
-    // a cent higher to absorb rounding, see recurring_schedule.installmentAmounts.
-    final perInstallment = purchase.totalAmount / purchase.installments;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: formatCurrency(purchase.totalAmount),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      TextSpan(
-                        text:
-                            ' · ${purchase.name} · ${l10n.installmentSummaryLabel('${purchase.installments}', formatCurrency(perInstallment))}',
-                        style: TextStyle(color: context.tokens.subtle),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  l10n.installmentProgressLabel('${purchase.chargedInstallments}', '${purchase.installments}'),
-                  style: TextStyle(fontSize: 12, color: context.tokens.subtle),
-                ),
-                if (pendingCharges > 0)
-                  Text(
-                    l10n.pendingChargesRowLabel(pendingCharges),
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
-                  ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: l10n.removeInstallmentPurchaseTooltip,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ],
-      ),
-    );
-  }
 }
