@@ -151,15 +151,16 @@ void main() {
     expect(find.text('Nenhum gasto lançado ainda.'), findsOneWidget);
   });
 
-  group('entrada pra assinaturas e parcelamentos', () {
-    testWidgets('mostra os dois atalhos no topo, acima da lista de gastos', (tester) async {
+  group('resumo do comprometido do mês', () {
+    testWidgets('mostra o comprometido do mês sem duplicar a barra de navegação', (tester) async {
       await pump(tester, expenses: [expense]);
       await tester.pumpAndSettle();
 
-      // O motivo de existirem: antes as duas seções ficavam DEPOIS da lista
-      // de gastos, que é ilimitada — na prática, inalcançáveis.
-      expect(find.widgetWithText(OutlinedButton, 'Assinaturas'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, 'Parcelamentos'), findsOneWidget);
+      expect(find.text('Assinaturas e parcelamentos'), findsOneWidget);
+      // Assinaturas e Parcelamentos são destinos de navegação agora, então
+      // botões aqui só repetiriam a barra de baixo. O que fica é o número.
+      expect(find.widgetWithText(OutlinedButton, 'Assinaturas'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, 'Parcelamentos'), findsNothing);
     });
 
     testWidgets('soma o quanto do mês já está comprometido', (tester) async {

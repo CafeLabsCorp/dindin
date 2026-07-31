@@ -27,8 +27,8 @@ lib/
     import_export_service.dart backup/restore em JSON
   providers/providers.dart     providers Riverpod, ligam services -> UI
   features/<nome>/<nome>_page.dart   uma pasta por tela
-                       (assinaturas/ e parcelamentos/ são sub-rotas de
-                        /gastos, não destinos do bottom nav — ver abaixo)
+                       (assinaturas/ e parcelamentos/ são destinos de topo,
+                        ver a decisão de navegação abaixo)
   widgets/              componentes compartilhados entre telas
 ```
 
@@ -197,15 +197,32 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   não significa nada (ver `recurringChargesCatchUpProvider`, que agora
   propaga a falha como `AsyncError` em vez de engolir).
 
-- **Assinaturas e parcelamentos têm tela própria, como sub-rotas de
-  `/gastos`.** Eram dois cards no fim da `GastosPage`, DEPOIS da lista de
-  gastos — que é ilimitada, então na prática eram inalcançáveis. Cadastrar
-  uma cobrança recorrente é configuração que se faz uma vez; a lista de
-  gastos é rotina diária. Não são sub-rotas por acaso: cinco já é o teto
-  prático de um `NavigationBar` de baixo, então virar destino de navegação
-  não era opção. No lugar delas, o topo de Gastos ganhou um card de entrada
-  que mostra **quanto do mês já está comprometido** (`committedThisMonth`) —
-  o atalho e a informação útil no mesmo lugar.
+- **Assinaturas e parcelamentos são destinos de topo, e a barra de baixo
+  guarda cinco deles mais o logo.** Eram dois cards no fim da `GastosPage`,
+  DEPOIS da lista de gastos — que é ilimitada, então na prática eram
+  inalcançáveis.
+
+  Com sete destinos, a barra não comporta todos: cinco é o teto prático de um
+  `NavigationBar` (passando disso os rótulos truncam e os alvos de toque
+  encolhem). O corte é por **frequência de uso**, não por importância: as
+  cinco telas de dinheiro (Dashboard, Receitas, Gastos, Assinaturas,
+  Parcelamentos) são rotina, enquanto Categorias (você cria uma caixinha uma
+  vez) e Ajustes são gerenciamento — essas duas abrem numa folha inferior a
+  partir do símbolo do Dindin, no último slot da barra.
+
+  Uma roleta girando a partir do logo foi cogitada e recusada: não tem
+  affordance dizendo que gira, é estranha no mouse (a plataforma no ar é a
+  web), e precisaria de bastante trabalho pra ser alcançável por leitor de
+  tela. Uma lista numa folha é as três coisas de graça, e ainda abre do logo.
+
+  A ORDEM das branches em `app.dart` é contrato com o `AppShell`: as cinco
+  primeiras são a barra, o resto fica atrás do logo (`_bottomDestinationCount`).
+  Estando numa tela de trás do logo, é o slot do logo que aparece selecionado
+  — além de honesto, é o que mantém o `selectedIndex` dentro da faixa.
+
+  Em tela larga nada disso se aplica: o `NavigationRail` é uma lista vertical
+  e comporta os sete. O topo de Gastos manteve o número de **quanto do mês já
+  está comprometido** (`committedThisMonth`), agora só como informação.
 
 - **A cobrança pode sair da conta ou de uma caixinha (`categoryId`).**
   `_readChargeSource` espelha exatamente os dois ramos do `createExpense`,

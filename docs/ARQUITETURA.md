@@ -27,8 +27,8 @@ lib/
     import_export_service.dart JSON backup/restore
   providers/providers.dart     Riverpod providers, wire services -> UI
   features/<name>/<name>_page.dart   one folder per screen
-                       (assinaturas/ and parcelamentos/ are sub-routes of
-                        /gastos, not bottom-nav destinations — see below)
+                       (assinaturas/ and parcelamentos/ are top-level
+                        destinations — see the navigation decision below)
   widgets/              components shared across screens
 ```
 
@@ -199,15 +199,33 @@ which is exactly how the older docs already behaved.
   "pending" doesn't mean anything yet (see `recurringChargesCatchUpProvider`,
   which now surfaces a failure as an `AsyncError` instead of swallowing it).
 
-- **Subscriptions and installment purchases get their own screens, as
-  sub-routes of `/gastos`.** They used to be two cards at the bottom of
-  `GastosPage`, AFTER the expense list — which is unbounded, so in practice
-  they were unreachable. Setting up a recurring charge is configuration you
-  do once; the expense list is a daily routine. Sub-routes rather than nav
-  destinations because five is already the practical ceiling for a bottom
-  `NavigationBar`. In their place, the top of Gastos gained an entry card
-  showing **how much of the month is already committed**
-  (`committedThisMonth`) — the shortcut and the useful number in one spot.
+- **Subscriptions and installment purchases are top-level destinations, and
+  the bottom bar holds five of them plus the logo.** They used to be two
+  cards at the bottom of `GastosPage`, AFTER the expense list — which is
+  unbounded, so in practice they were unreachable.
+
+  With seven destinations the bar can't hold them all: five is the practical
+  ceiling for a `NavigationBar` (past it labels truncate and touch targets
+  shrink). The split is by **how often you go there**, not by importance: the
+  five money screens (Dashboard, Receitas, Gastos, Assinaturas,
+  Parcelamentos) are daily, while Categorias (you create an envelope once)
+  and Ajustes are management — those two open in a bottom sheet from the
+  Dindin logo, in the bar's last slot.
+
+  A wheel spun from the logo was considered and declined: nothing about it
+  says it spins, it's awkward with a mouse (the live platform is the web),
+  and it would need considerable work to be reachable by a screen reader. A
+  list in a sheet is all three for free, and still opens from the logo.
+
+  Branch ORDER in `app.dart` is a contract with `AppShell`: the first five
+  are the bar, the rest live behind the logo (`_bottomDestinationCount`).
+  While on a screen behind the logo, the logo slot is what reads as selected
+  — honest, and what keeps `selectedIndex` in range.
+
+  None of this applies on wide screens: the `NavigationRail` is a vertical
+  list and fits all seven. The top of Gastos kept the **how much of the month
+  is already committed** figure (`committedThisMonth`), now as information
+  only.
 
 - **A charge can come out of the account or an envelope (`categoryId`).**
   `_readChargeSource` mirrors `createExpense`'s two branches exactly,
