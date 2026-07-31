@@ -200,31 +200,33 @@ which is exactly how the older docs already behaved.
   which now surfaces a failure as an `AsyncError` instead of swallowing it).
 
 - **Subscriptions and installment purchases are top-level destinations, and
-  the bottom bar holds five of them plus the logo.** They used to be two
+  on mobile ALL navigation lives in a single menu.** They used to be two
   cards at the bottom of `GastosPage`, AFTER the expense list — which is
   unbounded, so in practice they were unreachable.
 
-  With seven destinations the bar can't hold them all: five is the practical
-  ceiling for a `NavigationBar` (past it labels truncate and touch targets
-  shrink). The split is by **how often you go there**, not by importance: the
-  five money screens (Dashboard, Receitas, Gastos, Assinaturas,
-  Parcelamentos) are daily, while Categorias (you create an envelope once)
-  and Ajustes are management — those two open in a bottom sheet from the
-  Dindin logo, which sits in the APP BAR rather than the bottom bar. Putting
-  it in the bar made six slots, and six is one too many: at ~380px each slot
-  gets ~63px and "Assinaturas" wrapped mid-word. The bar's labels are short
-  forms of the page titles ("Fixos", "Parcelas") for the same reason — they
-  have to survive a narrow screen and accessibility text scaling.
+  Promoting them made seven destinations, and seven don't fit a
+  `NavigationBar` (five is the ceiling: past it labels truncate and targets
+  shrink). Two attempts preceded the current shape, both recorded here
+  because they explain it:
+
+  1. Bar with five plus the logo in a sixth slot. Six slots gave ~63px each
+     and "Assinaturas" wrapped mid-word on a real phone.
+  2. Bar with five plus the logo in the app bar. It fit, but it drew an
+     arbitrary line between "daily" and "management" screens, and the user
+     had to learn which side each one was on.
+
+  The current shape has no such seam: on narrow screens there is no bottom
+  bar at all, and the Dindin logo in the app bar opens a menu with all SEVEN
+  destinations. As a bonus it ends the label problem outright — a vertical
+  list gives every name full width, so nothing truncates or needs abbreviating
+  ("Assinaturas" and "Parcelamentos" went back to their full forms). The
+  title beside the logo now says which screen you're on, the job the selected
+  bar slot used to do. The cost is honest: navigating is two taps.
 
   A wheel spun from the logo was considered and declined: nothing about it
   says it spins, it's awkward with a mouse (the live platform is the web),
   and it would need considerable work to be reachable by a screen reader. A
   list in a sheet is all three for free, and still opens from the logo.
-
-  Branch ORDER in `app.dart` is a contract with `AppShell`: the first five
-  are the bar, the rest live behind the logo (`_bottomDestinationCount`).
-  While on a screen behind the logo, the logo slot is what reads as selected
-  — honest, and what keeps `selectedIndex` in range.
 
   None of this applies on wide screens: the `NavigationRail` is a vertical
   list and fits all seven. The top of Gastos kept the **how much of the month
@@ -296,7 +298,7 @@ which is exactly how the older docs already behaved.
 
 - **A single breakpoint (720px) reused across all responsive
   navigation/forms**, instead of a per-screen value: `AppShell` (side rail
-  vs. bottom nav), `showAdaptiveFormSheet` (dialog vs. bottom sheet for
+  vs. single menu), `showAdaptiveFormSheet` (dialog vs. bottom sheet for
   edit/transfer forms), and `ResponsiveFormRow` (side-by-side vs. stacked
   fields) all use the same constant. A user learns the pattern once.
 

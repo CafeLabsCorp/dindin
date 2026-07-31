@@ -678,10 +678,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navGastos => 'Expenses';
 
   @override
-  String get navAssinaturas => 'Recurring';
+  String get navAssinaturas => 'Subscriptions';
 
   @override
-  String get navParcelamentos => 'Financing';
+  String get navParcelamentos => 'Installments';
 
   @override
   String get navCategorias => 'Categories';
@@ -690,7 +690,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navAjustes => 'Settings';
 
   @override
-  String get navMore => 'More';
+  String get navMenu => 'Menu';
 
   @override
   String get errorNotFound => 'This entry no longer exists.';

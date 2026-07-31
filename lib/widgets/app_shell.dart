@@ -13,10 +13,9 @@ import '../utils/format.dart';
 /// `app.dart` — the index is what `goBranch` takes, so the two lists are one
 /// contract, not two coincidences.
 ///
-/// The first [_bottomDestinationCount] are the bottom bar on narrow screens;
-/// the rest open from the logo button. The split is by how often you go
-/// there, not by importance: the five money screens are daily, while
-/// Categorias (you create a caixinha once) and Ajustes are management.
+/// On narrow screens all of them live in one menu behind the logo; on wide
+/// screens they're the side rail. Either way it's this one list — no subset
+/// is treated specially.
 List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLocalizations l10n) => [
   (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: l10n.navDashboard),
   (icon: Icons.arrow_downward, selectedIcon: Icons.arrow_downward, label: l10n.navReceitas),
@@ -27,14 +26,9 @@ List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLo
   (icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: l10n.navAjustes),
 ];
 
-/// How many destinations fit the bottom bar. Five is Material's ceiling for a
-/// `NavigationBar` — past it labels truncate and touch targets shrink — and
-/// it's why the remaining destinations moved behind the logo instead of the
-/// bar simply growing.
-const _bottomDestinationCount = 5;
-
-/// App-wide nav: bottom bar on narrow (mobile) screens, a side rail on wide
-/// (web/desktop) screens — per §4 of FLUTTER_MIGRATION.md.
+/// App-wide nav: a single menu behind the logo on narrow (mobile) screens, a
+/// side rail on wide (web/desktop) screens. The 720px breakpoint is the same
+/// one the responsive forms use — see §4 of FLUTTER_MIGRATION.md.
 class AppShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
@@ -103,20 +97,25 @@ class AppShell extends ConsumerWidget {
       );
     }
 
-    final onMoreScreen = navigationShell.currentIndex >= _bottomDestinationCount;
+    final current = destinations[navigationShell.currentIndex];
 
+    // No bottom bar on narrow screens: ONE menu holds every destination.
+    //
+    // The earlier split — five in the bar, the rest behind the logo — forced
+    // an arbitrary line between "daily" and "management" screens, and the
+    // user had to learn which side each one was on. A single menu has no such
+    // seam, and it also ends the label problem for good: a vertical list
+    // gives each name the full width, so nothing truncates, wraps, or has to
+    // be abbreviated to fit a ~63px slot.
+    //
+    // The cost is honest: every navigation is two taps instead of one. That
+    // is the trade the single menu buys consistency with.
     return Scaffold(
-      // The logo is the overflow button, and it lives UP HERE rather than in
-      // the bottom bar. Putting it in the bar made six slots on a phone, and
-      // six is one too many: at ~380px each slot gets ~63px and "Assinaturas"
-      // wrapped mid-word. The bar now holds exactly the five destinations it
-      // can fit, and the logo — which was already in this app bar anyway —
-      // does double duty.
       appBar: AppBar(
         title: Tooltip(
-          message: l10n.navMore,
+          message: l10n.navMenu,
           child: InkWell(
-            onTap: () => _openMoreMenu(context, l10n, destinations),
+            onTap: () => _openMenu(context, destinations),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -124,15 +123,21 @@ class AppShell extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SvgPicture.asset('assets/logo.svg', height: 28),
-                  // A logo alone gives no hint that it opens anything; the
-                  // chevron is what makes it read as a menu.
-                  Icon(
-                    Icons.expand_more,
-                    size: 20,
-                    color: onMoreScreen
-                        ? Theme.of(context).colorScheme.primary
-                        : context.tokens.subtle,
+                  const SizedBox(width: 10),
+                  // With the bar gone, this label is the only thing saying
+                  // where you are — the job the selected bar slot used to do.
+                  Flexible(
+                    child: Text(
+                      current.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
+                  // A logo and a title alone give no hint that any of this
+                  // opens; the chevron is what makes it read as a menu.
+                  Icon(Icons.expand_more, size: 22, color: context.tokens.subtle),
                 ],
               ),
             ),
@@ -142,34 +147,18 @@ class AppShell extends ConsumerWidget {
       body: SafeArea(
         child: Padding(padding: const EdgeInsets.all(16), child: navigationShell),
       ),
-      bottomNavigationBar: NavigationBar(
-        // On a screen reached from the logo menu, no bar slot is the right
-        // answer — but NavigationBar demands an in-range index, so it keeps
-        // showing the last bar destination. The app bar chevron is what turns
-        // primary-coloured to say where you actually are.
-        selectedIndex: navigationShell.currentIndex < _bottomDestinationCount
-            ? navigationShell.currentIndex
-            : _bottomDestinationCount - 1,
-        onDestinationSelected: (i) =>
-            navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
-        destinations: [
-          for (final d in destinations.take(_bottomDestinationCount))
-            NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: d.label),
-        ],
-      ),
     );
   }
 
-  /// The overflow destinations, as a plain list in a bottom sheet.
+  /// Every destination, as a plain list in a bottom sheet.
   ///
   /// A sheet rather than the radial wheel that was floated: a wheel you
   /// rotate has no affordance saying so, is awkward with a mouse (this app's
   /// live platform is the web), and would need a lot of custom work to be
   /// reachable by a screen reader. A list is all three for free, and still
   /// opens from the logo — which was the point.
-  void _openMoreMenu(
+  void _openMenu(
     BuildContext context,
-    AppLocalizations l10n,
     List<({IconData icon, IconData selectedIcon, String label})> destinations,
   ) {
     showModalBottomSheet<void>(
@@ -179,7 +168,7 @@ class AppShell extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (var i = _bottomDestinationCount; i < destinations.length; i++)
+            for (var i = 0; i < destinations.length; i++)
               ListTile(
                 leading: Icon(
                   navigationShell.currentIndex == i

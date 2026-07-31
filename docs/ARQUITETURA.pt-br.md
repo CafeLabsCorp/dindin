@@ -197,33 +197,34 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   não significa nada (ver `recurringChargesCatchUpProvider`, que agora
   propaga a falha como `AsyncError` em vez de engolir).
 
-- **Assinaturas e parcelamentos são destinos de topo, e a barra de baixo
-  guarda cinco deles mais o logo.** Eram dois cards no fim da `GastosPage`,
+- **Assinaturas e parcelamentos são destinos de topo, e no mobile TODA a
+  navegação mora num menu só.** Eram dois cards no fim da `GastosPage`,
   DEPOIS da lista de gastos — que é ilimitada, então na prática eram
   inalcançáveis.
 
-  Com sete destinos, a barra não comporta todos: cinco é o teto prático de um
-  `NavigationBar` (passando disso os rótulos truncam e os alvos de toque
-  encolhem). O corte é por **frequência de uso**, não por importância: as
-  cinco telas de dinheiro (Dashboard, Receitas, Gastos, Assinaturas,
-  Parcelamentos) são rotina, enquanto Categorias (você cria uma caixinha uma
-  vez) e Ajustes são gerenciamento — essas duas abrem numa folha inferior a
-  partir do símbolo do Dindin, que fica na APP BAR e não na barra de baixo.
-  Colocá-lo na barra dava seis slots, e seis é um a mais do que cabe: a ~380px
-  cada slot fica com ~63px e "Assinaturas" quebrava no meio da palavra. Os
-  rótulos da barra também são formas curtas dos títulos ("Fixos", "Parcelas")
-  pelo mesmo motivo — precisam sobreviver a tela estreita e a texto ampliado
-  por acessibilidade.
+  Promovê-los levou a sete destinos, e sete não cabem numa `NavigationBar`
+  (cinco é o teto: passando disso os rótulos truncam e os alvos encolhem).
+  Duas tentativas antes da atual, ambas registradas porque explicam a forma
+  final:
 
-  Uma roleta girando a partir do logo foi cogitada e recusada: não tem
-  affordance dizendo que gira, é estranha no mouse (a plataforma no ar é a
-  web), e precisaria de bastante trabalho pra ser alcançável por leitor de
-  tela. Uma lista numa folha é as três coisas de graça, e ainda abre do logo.
+  1. Barra com cinco + logo num sexto slot. Seis slots deram ~63px cada e
+     "Assinaturas" quebrou no meio da palavra num celular real.
+  2. Barra com cinco + logo na app bar. Coube, mas criava uma linha
+     arbitrária entre telas "do dia a dia" e "de gerenciamento", e o usuário
+     tinha que aprender de que lado cada uma estava.
 
-  A ORDEM das branches em `app.dart` é contrato com o `AppShell`: as cinco
-  primeiras são a barra, o resto fica atrás do logo (`_bottomDestinationCount`).
-  Estando numa tela de trás do logo, é o slot do logo que aparece selecionado
-  — além de honesto, é o que mantém o `selectedIndex` dentro da faixa.
+  A forma atual não tem essa costura: em tela estreita não existe barra
+  inferior, e o símbolo do Dindin na app bar abre um menu com os SETE
+  destinos. Como bônus, acaba de vez o problema de rótulo — uma lista
+  vertical dá largura cheia pra cada nome, então nada trunca nem precisa de
+  abreviação ("Assinaturas" e "Parcelamentos" voltaram por inteiro). O título
+  ao lado do logo passa a dizer em qual tela você está, papel que era do slot
+  selecionado da barra. O custo é honesto: navegar vira dois toques.
+
+  Uma roleta girando a partir do logo foi cogitada e recusada: nada nela diz
+  que gira, é estranha no mouse (a plataforma no ar é a web), e precisaria de
+  bastante trabalho pra ser alcançável por leitor de tela. Uma lista numa
+  folha é as três coisas de graça, e ainda abre do logo.
 
   Em tela larga nada disso se aplica: o `NavigationRail` é uma lista vertical
   e comporta os sete. O topo de Gastos manteve o número de **quanto do mês já
@@ -290,7 +291,7 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
 
 - **Um único breakpoint (720px) reaproveitado em toda a navegação/formulários
   responsivos**, em vez de um valor por tela: `AppShell` (rail lateral vs.
-  bottom nav), `showAdaptiveFormSheet` (dialog vs. bottom sheet pros
+  menu único), `showAdaptiveFormSheet` (dialog vs. bottom sheet pros
   formulários de edição/transferência) e `ResponsiveFormRow` (campos lado a
   lado vs. empilhados) todos usam a mesma constante. Um usuário aprende o
   padrão uma vez.
