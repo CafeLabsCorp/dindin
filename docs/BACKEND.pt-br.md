@@ -75,10 +75,11 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   `false` — a única semântica que existia antes.
 - `subscriptions/{id}` — uma coleção nova (não um campo numa existente): um
   gasto fixo recorrente mensal (name, amount, dueDay, createdAt,
-  lastChargedDate?), sempre cobrado direto da conta. Não carrega nenhum
+  lastChargedDate?, categoryId?), cobrado da conta ou de uma caixinha (ver
+  `categoryId` abaixo). Não carrega nenhum
   invariante de dinheiro próprio — `FirestoreService.catchUpSubscriptions` é
   o único escritor dos docs de `expenses` que ela gera, e esses passam pelo
-  mesmo portão de saldo da conta de qualquer outro gasto. Ver "Assinaturas
+  mesmo portão de saldo de qualquer outro gasto. Ver "Assinaturas
   (gastos recorrentes)" abaixo pro modelo de catch-up disparado pelo cliente
   que isso implica. Um backup antigo sem a chave `subscriptions` importa como
   lista vazia.
@@ -107,9 +108,25 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   escrito por uma versão mais nova do app sobreviva a um ciclo de
   exportar/importar em vez de sumir na volta.
 
+- `subscriptions/{id}.categoryId` e `installmentPurchases/{id}.categoryId` —
+  a caixinha de onde a cobrança sai; ausente = a conta geral, mesmo
+  significado que num gasto. Não carrega invariante próprio: o saldo só se
+  move quando o catch-up escreve o `Expense`, e essa escrita é validada pelas
+  regras de `expenses` contra o doc de saldo que ela mirar. O cliente
+  (`_readChargeSource`) espelha os dois ramos do `createExpense`, inclusive
+  `allowNegative`. Caixinha apagada = cobrança pendente com aviso, nunca
+  queda silenciosa pra conta.
+- `installmentPurchases/{id}.amortizedAmount` — quanto já foi pago além das
+  parcelas agendadas (pagar mais num mês, ou quitar). Mutável, mas só cresce,
+  nunca negativo e nunca maior que `totalAmount` — acima disso significaria
+  ter cobrado mais que a dívida. Existe pra não precisar reescrever
+  `totalAmount`/`installments`, que continuam imutáveis porque são a
+  referência de `chargedInstallments`. Ausente = 0.
+
 Backups JSON antigos (sem `monthlyBudget`, sem `transferId`, sem
 `kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`, sem
-`installmentPurchases`, sem `sourceType`/`sourceId`) importam sem alterações.
+`installmentPurchases`, sem `sourceType`/`sourceId`, sem `categoryId` nas
+coleções recorrentes, sem `amortizedAmount`) importam sem alterações.
 
 ### Docs de saldo denormalizados (Option B — ver abaixo)
 
@@ -197,6 +214,31 @@ lados do problema:
 
 O mesmo caminho cobre o doc apagado no meio da execução (some, não
 ressuscita). Todo leitura vem antes de toda escrita, como o Firestore exige.
+
+### Pagar adiantado e quitar
+
+Um parcelamento não é só um cronograma fixo: dá pra pagar mais num mês, ou
+quitar tudo. `FirestoreService.payInstallmentPurchase` cria um `Expense`
+comum (saindo da conta ou de uma caixinha, à escolha na hora — não
+necessariamente a mesma origem das parcelas mensais) e soma o valor em
+`amortizedAmount`.
+
+O efeito é no PRAZO, não na parcela: o saldo devedor é
+`totalAmount − parcelas já cobradas − amortizado`, e o catch-up simplesmente
+para quando ele zera. Um parcelamento pode estar quitado com ocorrências
+ainda no calendário — por isso o que decide se acabou é o saldo devedor
+(`isSettled`), não o contador `chargedInstallments`.
+
+Dois cuidados que valem registro:
+
+- O valor pago é **limitado ao que ainda se deve**, lido dentro da transação.
+  Isso é o que faz o botão "quitar tudo" funcionar sem risco: ele manda o
+  saldo que viu por último, e se uma parcela agendada entrou nesse meio-tempo,
+  o clamp evita o pagamento a mais.
+- A última cobrança agendada também é limitada ao que resta
+  (`installmentChargeAmount`), pra nunca cobrar além da dívida depois de uma
+  amortização. Sem nenhum pagamento adiantado isso é no-op — reproduz o
+  comportamento original de "o resto do arredondamento cai na última parcela".
 
 ### Cobrança pendente é mostrada, não escondida
 

@@ -27,6 +27,8 @@ lib/
     import_export_service.dart JSON backup/restore
   providers/providers.dart     Riverpod providers, wire services -> UI
   features/<name>/<name>_page.dart   one folder per screen
+                       (assinaturas/ and parcelamentos/ are sub-routes of
+                        /gastos, not bottom-nav destinations — see below)
   widgets/              components shared across screens
 ```
 
@@ -95,6 +97,7 @@ users/{uid}
     createdAt: string (ISO date)
     lastChargedDate: string?   # ISO date of the last due date already turned
                                 # into an expense by catchUpSubscriptions
+    categoryId: string?        # envelope the charge comes out of; absent = account
 
   installmentPurchases/{purchaseId}
     name: string, totalAmount: number, installments: int (2-36)
@@ -104,6 +107,9 @@ users/{uid}
     chargedInstallments: int  # 0..installments; how many have already been
                                 # turned into an expense by
                                 # catchUpInstallmentPurchases
+    categoryId: string?        # envelope the charges come out of; absent = account
+    amortizedAmount: number?   # paid ahead of the schedule; absent = 0.
+                                # Shortens the TERM, not the installment
 
   meta/account            { balance: number }   # overall account balance (derived)
   balances/{categoryId}   { balance: number }   # each envelope's balance (derived)
@@ -126,7 +132,10 @@ schema — an old JSON backup without them still imports unchanged.
 with no `subscriptions` key imports as an empty list. `installmentPurchases`
 is a second such addition, right after it. `Expense.sourceType`/`sourceId`
 follow the same rule: an expense exported before they existed imports as a
-manual expense, with neither field invented on the way back in.
+manual expense, with neither field invented on the way back in. `categoryId`
+(on both new collections) and `amortizedAmount` are the most recent additions,
+same design: absent means "comes out of the account" and "nothing paid ahead",
+which is exactly how the older docs already behaved.
 
 ## Technical decisions and why
 
@@ -189,6 +198,38 @@ manual expense, with neither field invented on the way back in.
   and per card — and only once catch-up has finished, because before that
   "pending" doesn't mean anything yet (see `recurringChargesCatchUpProvider`,
   which now surfaces a failure as an `AsyncError` instead of swallowing it).
+
+- **Subscriptions and installment purchases get their own screens, as
+  sub-routes of `/gastos`.** They used to be two cards at the bottom of
+  `GastosPage`, AFTER the expense list — which is unbounded, so in practice
+  they were unreachable. Setting up a recurring charge is configuration you
+  do once; the expense list is a daily routine. Sub-routes rather than nav
+  destinations because five is already the practical ceiling for a bottom
+  `NavigationBar`. In their place, the top of Gastos gained an entry card
+  showing **how much of the month is already committed**
+  (`committedThisMonth`) — the shortcut and the useful number in one spot.
+
+- **A charge can come out of the account or an envelope (`categoryId`).**
+  `_readChargeSource` mirrors `createExpense`'s two branches exactly,
+  `allowNegative` via `_catDeltaOk` included: a generated charge is allowed
+  if and only if the same expense typed by hand would be. Only `spend`
+  envelopes are offered — a `save` one is a savings goal, and draining it
+  monthly works against the reason it exists (it also can't go negative, so
+  it would just fail at charge time). If the envelope is deleted the charge
+  stays pending with a warning and **never** silently falls back to the
+  account: taking money from somewhere the user didn't choose would be worse
+  than not charging.
+
+- **Paying ahead shortens the TERM, not the installment
+  (`amortizedAmount`).** Paying extra one month, or settling in full, cuts
+  the outstanding balance and the purchase simply ends sooner — the
+  installment keeps its size. The amount paid ahead is its own running total
+  rather than a rewrite of `totalAmount`/`installments`, which are immutable
+  in the rules on purpose (they are what `chargedInstallments` is counted
+  against; rewriting them would desync progress from what was actually
+  billed). The outstanding balance — not the installment counter — is what
+  says whether it's over, and the final charge is clamped to what remains so
+  it can never bill past the debt.
 
 - **A generated expense knows where it came from (`sourceType`/`sourceId`).**
   Same idea as `Allocation.transferId`: pair the rows by an id instead of

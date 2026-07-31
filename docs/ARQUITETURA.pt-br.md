@@ -27,6 +27,8 @@ lib/
     import_export_service.dart backup/restore em JSON
   providers/providers.dart     providers Riverpod, ligam services -> UI
   features/<nome>/<nome>_page.dart   uma pasta por tela
+                       (assinaturas/ e parcelamentos/ são sub-rotas de
+                        /gastos, não destinos do bottom nav — ver abaixo)
   widgets/              componentes compartilhados entre telas
 ```
 
@@ -95,6 +97,7 @@ users/{uid}
     createdAt: string (ISO date)
     lastChargedDate: string?   # data ISO da última cobrança já virada gasto
                                 # por catchUpSubscriptions
+    categoryId: string?        # caixinha de onde a cobrança sai; ausente = conta
 
   installmentPurchases/{purchaseId}
     name: string, totalAmount: number, installments: int (2-36)
@@ -103,6 +106,9 @@ users/{uid}
     createdAt: string (ISO date)
     chargedInstallments: int  # 0..installments; quantas já viraram gasto
                                 # por catchUpInstallmentPurchases
+    categoryId: string?        # caixinha de onde as parcelas saem; ausente = conta
+    amortizedAmount: number?   # pago adiantado, além das parcelas agendadas;
+                                # ausente = 0. Encurta o PRAZO, não a parcela
 
   meta/account            { balance: number }   # saldo geral da conta (derivado)
   balances/{categoryId}   { balance: number }   # saldo de cada caixinha (derivado)
@@ -126,7 +132,9 @@ jeito — um backup antigo sem a chave `subscriptions` importa como lista
 vazia. `installmentPurchases` é uma segunda adição assim, logo em seguida.
 `Expense.sourceType`/`sourceId` seguem a mesma regra: um gasto exportado
 antes deles importa como gasto manual, sem os campos serem inventados na
-volta.
+volta. `categoryId` (nas duas coleções novas) e `amortizedAmount` são as
+adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
+"nada adiantado", que é exatamente como os docs antigos já se comportavam.
 
 ## Decisões técnicas e por quê
 
@@ -188,6 +196,36 @@ volta.
   e só depois do catch-up ter terminado, porque antes disso "pendente" ainda
   não significa nada (ver `recurringChargesCatchUpProvider`, que agora
   propaga a falha como `AsyncError` em vez de engolir).
+
+- **Assinaturas e parcelamentos têm tela própria, como sub-rotas de
+  `/gastos`.** Eram dois cards no fim da `GastosPage`, DEPOIS da lista de
+  gastos — que é ilimitada, então na prática eram inalcançáveis. Cadastrar
+  uma cobrança recorrente é configuração que se faz uma vez; a lista de
+  gastos é rotina diária. Não são sub-rotas por acaso: cinco já é o teto
+  prático de um `NavigationBar` de baixo, então virar destino de navegação
+  não era opção. No lugar delas, o topo de Gastos ganhou um card de entrada
+  que mostra **quanto do mês já está comprometido** (`committedThisMonth`) —
+  o atalho e a informação útil no mesmo lugar.
+
+- **A cobrança pode sair da conta ou de uma caixinha (`categoryId`).**
+  `_readChargeSource` espelha exatamente os dois ramos do `createExpense`,
+  inclusive o `allowNegative` via `_catDeltaOk`: uma cobrança gerada só é
+  aceita se o mesmo gasto digitado à mão também fosse. Só caixinha do tipo
+  `spend` é oferecida — uma `save` é meta de poupança, e drená-la todo mês
+  contraria o motivo dela existir (além de não poder ficar negativa, então
+  falharia na hora de cobrar). Se a caixinha for apagada, a cobrança fica
+  pendente com aviso e **nunca** cai de volta pra conta em silêncio: tirar
+  dinheiro de um lugar que o usuário não escolheu seria pior que não cobrar.
+
+- **Pagar adiantado encurta o PRAZO, não a parcela (`amortizedAmount`).**
+  Pagar mais num mês, ou quitar de uma vez, abate o saldo devedor e o
+  parcelamento simplesmente acaba antes — a parcela continua do mesmo
+  tamanho. O valor pago adiantado é um total próprio em vez de reescrever
+  `totalAmount`/`installments`, que são imutáveis nas rules de propósito
+  (são contra eles que `chargedInstallments` é contado; reescrevê-los
+  dessincronizaria o progresso do que foi cobrado de verdade). O saldo
+  devedor — não o contador de parcelas — é o que diz se acabou, e a última
+  cobrança é limitada ao que resta pra nunca cobrar além da dívida.
 
 - **Um gasto gerado sabe de onde veio (`sourceType`/`sourceId`).** Mesma
   ideia do `Allocation.transferId`: parear as linhas por um id em vez de
