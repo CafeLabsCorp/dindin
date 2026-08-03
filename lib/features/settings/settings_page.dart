@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../widgets/page_header.dart';
-import '../../widgets/app_shell.dart';
-import '../../providers/locale_provider.dart';
 import '../../providers/providers.dart';
+import '../../providers/settings_provider.dart';
 import '../../theme/theme.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/app_shell.dart';
+import '../../widgets/page_header.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -109,10 +109,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(l10n.themeSectionLabel, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              // Same control and same "Sistema" default as the language
+              // selector right below, so the two read as one pair of
+              // look-and-feel choices rather than two unrelated widgets.
+              SegmentedButton<ThemeMode>(
+                segments: [
+                  ButtonSegment(value: ThemeMode.system, label: Text(l10n.themeSystemOption)),
+                  ButtonSegment(value: ThemeMode.light, label: Text(l10n.themeLightOption)),
+                  ButtonSegment(value: ThemeMode.dark, label: Text(l10n.themeDarkOption)),
+                ],
+                selected: {ref.watch(themeModeProvider)},
+                onSelectionChanged: (set) =>
+                    ref.read(themeModeProvider.notifier).set(set.first),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(l10n.languageSectionLabel, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               // localeProvider is null by default ("follow system") — see
-              // lib/providers/locale_provider.dart. 'Português'/'English' are
+              // lib/providers/settings_provider.dart. 'Português'/'English' are
               // language endonyms, kept as literal labels (not routed through
               // AppLocalizations) same as Domo's precedent for this control.
               SegmentedButton<Locale?>(
@@ -122,7 +145,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   const ButtonSegment(value: Locale('en'), label: Text('English')),
                 ],
                 selected: {ref.watch(localeProvider)},
-                onSelectionChanged: (set) => ref.read(localeProvider.notifier).state = set.first,
+                onSelectionChanged: (set) => ref.read(localeProvider.notifier).set(set.first),
               ),
             ],
           ),
