@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../widgets/page_header.dart';
-import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../models/expense.dart';
 import '../../models/installment_purchase.dart';
@@ -16,7 +14,9 @@ import '../../utils/date_range.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/app_shell.dart';
 import '../../widgets/edit_transaction_sheet.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/responsive_form_row.dart';
 
 /// Sentinel for the "Conta" dropdown entry — an expense charged directly

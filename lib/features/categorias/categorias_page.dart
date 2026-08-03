@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../widgets/page_header.dart';
-import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
@@ -11,8 +9,10 @@ import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../widgets/adaptive_form_sheet.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/app_shell.dart';
 import '../../widgets/caixinha_budget_bar.dart';
 import '../../widgets/caixinha_color_dot.dart';
+import '../../widgets/page_header.dart';
 
 class CategoriasPage extends ConsumerStatefulWidget {
   const CategoriasPage({super.key});
