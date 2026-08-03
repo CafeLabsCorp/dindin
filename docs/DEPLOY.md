@@ -76,8 +76,22 @@ is required — the script handles that. If you do have a key from elsewhere,
 `export GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/serviceAccount.json`
 still works (never commit it).
 
-The org also enforces periodic reauthentication: if you see `invalid_rapt` or
-`invalid_grant`, just re-run `gcloud auth application-default login`.
+The org also enforces periodic reauthentication, and it expires TWO
+independent credentials. Worth telling apart, because only one of them fails
+with an error that explains itself:
+
+- **gcloud ADC** (backfill/preflight): you get `invalid_rapt` or
+  `invalid_grant`. Fix with `gcloud auth application-default login`.
+- **`firebase login`** (rules and hosting deploys): you get
+  `Authentication Error: Your credentials are no longer valid`. Fix with
+  `firebase login --reauth`.
+
+Watch out for the second one: when the Firebase credential expires mid
+hosting-deploy, the first message is usually `Error: Assertion failed:
+resolving hosting target of a site with no site name or target name` — which
+mentions authentication nowhere. It's a symptom, not the cause; running the
+same command again surfaces the real error. And `firebase login:list` is NO
+help here: it reads a local cache and keeps reporting you as logged in.
 
 This script is meant for interactive, by-hand use during a release — it is
 not run in CI. If you only need to publish a hosting-only change (no rules/
