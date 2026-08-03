@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
@@ -144,16 +146,11 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
 
     return ListView(
       children: [
-        Text(
-          l10n.categoriasTitle,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          l10n.categoriasSubtitle,
-          style: TextStyle(color: context.tokens.muted),
+        PageHeader(
+          title: l10n.categoriasTitle,
+          subtitle: l10n.categoriasSubtitle,
+          onOpenMenu: AppNavigation.of(context)?.openMenu,
+          menuLabel: l10n.navMenu,
         ),
         const SizedBox(height: 24),
         AppCard(

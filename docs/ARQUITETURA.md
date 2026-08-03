@@ -215,13 +215,23 @@ which is exactly how the older docs already behaved.
      arbitrary line between "daily" and "management" screens, and the user
      had to learn which side each one was on.
 
-  The current shape has no such seam: on narrow screens there is no bottom
-  bar at all, and the Dindin logo in the app bar opens a menu with all SEVEN
-  destinations. As a bonus it ends the label problem outright — a vertical
+  3. No bar, with the menu in the app bar. That fixed the seam, but the app
+     bar showed the screen's name and the page body showed the SAME name one
+     line below — "Dashboard" twice.
+
+  The current shape has neither seam nor repetition: on narrow screens there
+  is no bottom bar AND no app bar. The page's own title (`PageHeader`) grows
+  a chevron and opens a menu with all SEVEN destinations, dropping down from
+  the top over a dimmed background — the motion points back at what you
+  tapped. What you read is what you tap, and the screen's name appears once. As a bonus it ends the label problem outright — a vertical
   list gives every name full width, so nothing truncates or needs abbreviating
-  ("Assinaturas" and "Parcelamentos" went back to their full forms). The
-  title beside the logo now says which screen you're on, the job the selected
-  bar slot used to do. The cost is honest: navigating is two taps.
+  ("Assinaturas" and "Parcelamentos" went back to their full forms). The cost
+  is honest: navigating is two taps.
+
+  `AppShell` hands the menu to the screens through an `InheritedWidget`
+  (`AppNavigation`), so each page's title can be the trigger without the page
+  knowing how navigation works. On wide screens that callback is null and the
+  same `PageHeader` renders as a plain title.
 
   A wheel spun from the logo was considered and declined: nothing about it
   says it spins, it's awkward with a mouse (the live platform is the web),

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../services/firestore_service.dart';
-import '../theme/theme.dart';
 import '../utils/format.dart';
 
 /// Every top-level destination, in the SAME order as the branches in
@@ -97,97 +96,111 @@ class AppShell extends ConsumerWidget {
       );
     }
 
-    final current = destinations[navigationShell.currentIndex];
-
-    // No bottom bar on narrow screens: ONE menu holds every destination.
-    //
-    // The earlier split — five in the bar, the rest behind the logo — forced
-    // an arbitrary line between "daily" and "management" screens, and the
-    // user had to learn which side each one was on. A single menu has no such
-    // seam, and it also ends the label problem for good: a vertical list
-    // gives each name the full width, so nothing truncates, wraps, or has to
-    // be abbreviated to fit a ~63px slot.
-    //
-    // The cost is honest: every navigation is two taps instead of one. That
-    // is the trade the single menu buys consistency with.
+    // No app bar and no bottom bar on narrow screens. The app bar showed the
+    // current screen's name, which every page ALSO prints as its own title —
+    // the same word twice, one line apart. Instead of dropping one of them,
+    // the page title took the app bar's job: PageHeader grows a chevron and
+    // opens this menu. One name on screen, and what you tap is what you read.
     return Scaffold(
-      appBar: AppBar(
-        title: Tooltip(
-          message: l10n.navMenu,
-          child: InkWell(
-            onTap: () => _openMenu(context, destinations),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SvgPicture.asset('assets/logo.svg', height: 28),
-                  const SizedBox(width: 10),
-                  // With the bar gone, this label is the only thing saying
-                  // where you are — the job the selected bar slot used to do.
-                  Flexible(
-                    child: Text(
-                      current.label,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  // A logo and a title alone give no hint that any of this
-                  // opens; the chevron is what makes it read as a menu.
-                  Icon(Icons.expand_more, size: 22, color: context.tokens.subtle),
-                ],
-              ),
-            ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AppNavigation(
+            openMenu: () => _openMenu(context, destinations),
+            child: navigationShell,
           ),
         ),
-      ),
-      body: SafeArea(
-        child: Padding(padding: const EdgeInsets.all(16), child: navigationShell),
       ),
     );
   }
 
-  /// Every destination, as a plain list in a bottom sheet.
+  /// Every destination, as a list that drops down from the top over a dimmed
+  /// background.
   ///
-  /// A sheet rather than the radial wheel that was floated: a wheel you
-  /// rotate has no affordance saying so, is awkward with a mouse (this app's
-  /// live platform is the web), and would need a lot of custom work to be
-  /// reachable by a screen reader. A list is all three for free, and still
-  /// opens from the logo — which was the point.
+  /// It descends from where you tapped (the title, at the top of the screen)
+  /// rather than rising from the bottom, so the motion points back at its
+  /// trigger. The scrim is what says "this is modal — the page is still
+  /// there, behind".
+  ///
+  /// A list, and not the radial wheel that was floated: a wheel you rotate
+  /// has no affordance saying so, is awkward with a mouse (this app's live
+  /// platform is the web), and would need a lot of custom work to be
+  /// reachable by a screen reader. A list is all three for free.
   void _openMenu(
     BuildContext context,
     List<({IconData icon, IconData selectedIcon, String label})> destinations,
   ) {
-    showModalBottomSheet<void>(
+    showGeneralDialog<void>(
       context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < destinations.length; i++)
-              ListTile(
-                leading: Icon(
-                  navigationShell.currentIndex == i
-                      ? destinations[i].selectedIcon
-                      : destinations[i].icon,
-                ),
-                title: Text(destinations[i].label),
-                selected: navigationShell.currentIndex == i,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  navigationShell.goBranch(
-                    i,
-                    initialLocation: i == navigationShell.currentIndex,
-                  );
-                },
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (dialogContext, _, _) {
+        final theme = Theme.of(dialogContext);
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            clipBehavior: Clip.antiAlias,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < destinations.length; i++)
+                    ListTile(
+                      leading: Icon(
+                        navigationShell.currentIndex == i
+                            ? destinations[i].selectedIcon
+                            : destinations[i].icon,
+                      ),
+                      title: Text(destinations[i].label),
+                      selected: navigationShell.currentIndex == i,
+                      onTap: () {
+                        Navigator.pop(dialogContext);
+                        navigationShell.goBranch(
+                          i,
+                          initialLocation: i == navigationShell.currentIndex,
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 8),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, _, child) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, -1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: child,
       ),
     );
   }
+}
+
+/// Hands the navigation menu down to the screens, so a page's own title can
+/// be what opens it (see [PageHeader]).
+///
+/// [openMenu] is null on wide screens — the side rail is the navigation
+/// there, and a title that opened a redundant menu would just be noise.
+class AppNavigation extends InheritedWidget {
+  final VoidCallback? openMenu;
+
+  const AppNavigation({super.key, required this.openMenu, required super.child});
+
+  static AppNavigation? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppNavigation>();
+
+  // Compares only whether a menu EXISTS: `openMenu` is a fresh closure on
+  // every build, so comparing it directly would rebuild every screen on every
+  // frame for no reason.
+  @override
+  bool updateShouldNotify(AppNavigation oldWidget) =>
+      (openMenu == null) != (oldWidget.openMenu == null);
 }

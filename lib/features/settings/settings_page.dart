@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
@@ -80,9 +82,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return ListView(
       children: [
-        Text(l10n.settingsTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(l10n.settingsSubtitle, style: TextStyle(color: context.tokens.muted)),
+        PageHeader(
+          title: l10n.settingsTitle,
+          subtitle: l10n.settingsSubtitle,
+          onOpenMenu: AppNavigation.of(context)?.openMenu,
+          menuLabel: l10n.navMenu,
+        ),
         const SizedBox(height: 24),
         AppCard(
           child: Column(
