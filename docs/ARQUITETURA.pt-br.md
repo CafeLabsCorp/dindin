@@ -25,7 +25,9 @@ lib/
                                parcelamento estão vencidas (usado pelo
                                catch-up e pela tela, pra não divergirem)
     import_export_service.dart backup/restore em JSON
-  providers/providers.dart     providers Riverpod, ligam services -> UI
+  providers/
+    providers.dart             providers Riverpod, ligam services -> UI
+    settings_provider.dart     tema e idioma, persistidos no dispositivo
   features/<nome>/<nome>_page.dart   uma pasta por tela
                        (assinaturas/ e parcelamentos/ são destinos de topo,
                         ver a decisão de navegação abaixo)
@@ -298,6 +300,16 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   client), o restore de backup com dívida congelada (**F1**, corrigido) e a
   pendência conhecida: não há hoje guard no app contra converter uma
   caixinha `spend` negativa em `save`, ou apagá-la, com a dívida ainda aberta.
+
+- **Tema e idioma são preferências do DISPOSITIVO, não do usuário no
+  Firestore.** Descrevem como esta tela deve parecer, não o dinheiro de
+  ninguém — e guardá-los no ledger significaria não poder aplicá-los antes do
+  login, que é exatamente quando o tema errado incomoda mais. Ficam em
+  `shared_preferences`, lidos em `main()` ANTES do `runApp`: um provider
+  assíncrono pintaria o padrão e trocaria depois, que é o flash que esse
+  desenho existe pra evitar. Valor desconhecido (nunca escolhido, ou escrito
+  por uma versão futura) degrada pra "seguir o sistema", que é sempre uma
+  resposta sensata.
 
 - **Um único breakpoint (720px) reaproveitado em toda a navegação/formulários
   responsivos**, em vez de um valor por tela: `AppShell` (rail lateral vs.

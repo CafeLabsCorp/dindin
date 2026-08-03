@@ -49,6 +49,7 @@ dependencies:
   collection: ^1.19.1
   font_awesome_flutter: ^11.0.0
   flutter_svg: ^2.3.0
+  shared_preferences: ^2.5.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
