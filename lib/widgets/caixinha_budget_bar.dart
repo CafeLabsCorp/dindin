@@ -79,7 +79,16 @@ class CaixinhaGoalBar extends StatelessWidget {
   final double saved;
   final double goal;
 
-  const CaixinhaGoalBar({super.key, required this.saved, required this.goal});
+  /// Whether [saved] is this MONTH's progress (resets every calendar month —
+  /// see `Category.hasMonthlyGoal`) rather than the caixinha's all-time
+  /// balance. Only changes the caption wording ("...este mês" vs. plain) —
+  /// the bar/ratio/color logic is identical either way, and the caller is
+  /// responsible for actually passing the right number for [saved].
+  /// Defaults to `false` (the original, lifetime-goal behavior) so every
+  /// existing call site keeps its meaning unless it opts in.
+  final bool monthly;
+
+  const CaixinhaGoalBar({super.key, required this.saved, required this.goal, this.monthly = false});
 
   @override
   Widget build(BuildContext context) {
@@ -103,9 +112,13 @@ class CaixinhaGoalBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          reached
-              ? l10n.goalReached(formatCurrency(saved), formatCurrency(goal))
-              : l10n.goalProgress(formatCurrency(saved), formatCurrency(goal), pct),
+          monthly
+              ? (reached
+                    ? l10n.goalReachedMonthly(formatCurrency(saved), formatCurrency(goal))
+                    : l10n.goalProgressMonthly(formatCurrency(saved), formatCurrency(goal), pct))
+              : (reached
+                    ? l10n.goalReached(formatCurrency(saved), formatCurrency(goal))
+                    : l10n.goalProgress(formatCurrency(saved), formatCurrency(goal), pct)),
           style: TextStyle(
             fontSize: 12,
             color: reached ? context.tokens.statusGood : context.tokens.subtle,

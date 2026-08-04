@@ -19,7 +19,14 @@ enum CategoryKind {
 class Category {
   final String id;
   final String name;
+
+  /// Whether this caixinha is an ongoing thing rather than a one-off. On its
+  /// own this is purely a display label ("Recorrente"/"Pontual" in
+  /// Categorias) with no effect on any calculation — EXCEPT for a
+  /// [CategoryKind.save] caixinha that also has [goalAmount] set, where it
+  /// flips what the goal means: see [hasMonthlyGoal].
   final bool recurring;
+
   final String createdAt; // ISO date string (YYYY-MM-DD)
 
   /// Optional monthly spending limit for this caixinha, in BRL. `null` means
@@ -41,9 +48,21 @@ class Category {
   /// is the only semantics that existed before.
   final CategoryKind? kind;
 
-  /// Optional savings goal for a [CategoryKind.save] caixinha, in BRL: the
-  /// total amount the user wants to accumulate ("juntar R$ 5.000"). `null`
-  /// means no goal set. Ignored for spending caixinhas.
+  /// Optional savings goal for a [CategoryKind.save] caixinha, in BRL. `null`
+  /// means no goal set. Ignored for spending caixinhas. What it MEANS depends
+  /// on [recurring] (see [hasMonthlyGoal]):
+  ///
+  ///  - [recurring] `false` (the original, still-default behavior): a
+  ///    lifetime target — "juntar R$ 5.000 pra viagem" — tracked against the
+  ///    caixinha's all-time running balance. Keeps growing toward the goal
+  ///    forever; nothing about it resets.
+  ///  - [recurring] `true`: a MONTHLY target — "guardar R$ 800 todo mês pro
+  ///    casamento" — tracked against `savedThisMonthByCategory` instead
+  ///    (`aggregation_service.dart`), so progress starts back at zero every
+  ///    calendar month with no action needed (that function already sums
+  ///    only the current month's allocations/expenses; there's no counter
+  ///    that gets explicitly "reset"). The caixinha's all-time balance is
+  ///    untouched by this and keeps showing separately as its running total.
   final double? goalAmount;
 
   /// Whether this caixinha is allowed to hold a negative balance — a "dívida"
@@ -76,6 +95,14 @@ class Category {
   /// Effective purpose: legacy docs (null [kind]) behave as spending
   /// envelopes, preserving the only semantics that existed before the field.
   CategoryKind get effectiveKind => kind ?? CategoryKind.spend;
+
+  /// Whether [goalAmount] should be read as a MONTHLY target (resets every
+  /// calendar month, tracked against this month's net saved) rather than a
+  /// lifetime one (tracked against the all-time balance) — see [goalAmount]'s
+  /// doc for the full explanation. `false` for a caixinha with no goal at
+  /// all, or a [CategoryKind.spend] one (`recurring` there is still just the
+  /// display label, unrelated to this).
+  bool get hasMonthlyGoal => effectiveKind == CategoryKind.save && recurring && goalAmount != null;
 
   /// Whether a spend/withdrawal may currently push this caixinha (further)
   /// negative. Mirrors `catAllowsNeg` in `firestore.rules`: the toggle must be

@@ -44,6 +44,7 @@ class DashboardPage extends ConsumerWidget {
                 kind: c.effectiveKind,
                 goalAmount: c.goalAmount,
                 savedThisMonth: summary.savedThisMonthByCat[c.id] ?? 0,
+                hasMonthlyGoal: c.hasMonthlyGoal,
                 colorIndex: categories.indexOf(c),
               ),
             )
@@ -193,7 +194,11 @@ class DashboardPage extends ConsumerWidget {
                         ),
                         if (caixinhas[i].kind == CategoryKind.save && caixinhas[i].goalAmount != null) ...[
                           const SizedBox(height: 8),
-                          CaixinhaGoalBar(saved: caixinhas[i].value, goal: caixinhas[i].goalAmount!),
+                          CaixinhaGoalBar(
+                            saved: caixinhas[i].hasMonthlyGoal ? caixinhas[i].savedThisMonth : caixinhas[i].value,
+                            goal: caixinhas[i].goalAmount!,
+                            monthly: caixinhas[i].hasMonthlyGoal,
+                          ),
                         ] else if (caixinhas[i].kind == CategoryKind.save) ...[
                           const SizedBox(height: 4),
                           CaixinhaSavedThisMonth(savedThisMonth: caixinhas[i].savedThisMonth),

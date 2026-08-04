@@ -291,6 +291,31 @@ which is exactly how the older docs already behaved.
   predating this field) behaves as `spend`, preserving the only semantics
   that existed before.
 
+- **`recurring` (the "Recurring (repeats every month)" checkbox) was purely a
+  display label until it ALSO became the switch that decides what
+  `goalAmount` means on a `save` envelope.** With no goal, or with
+  `recurring: false`, nothing changes — a goal is a cumulative target (the
+  original behavior), and with no goal the envelope still shows
+  `CaixinhaSavedThisMonth`. With a goal AND `recurring: true`
+  (`Category.hasMonthlyGoal`), that same `goalAmount` is read as a MONTHLY
+  target instead: the bar (`CaixinhaGoalBar` with `monthly: true`) uses
+  `savedThisMonthByCategory` instead of the envelope's all-time balance.
+
+  There's no explicit reset — no job, no "zeroed on X" field written to
+  Firestore. `savedThisMonthByCategory` was already a live query filtered by
+  month (`monthKey(date) == currentMonthKey()`), so day 1 "resets" on its own
+  simply because no allocation is dated in the new month yet — even if the
+  user never opens the app that day. The envelope's all-time balance
+  (`categoryBalances`, the big number at the top of the row) never enters
+  that calculation and keeps accumulating underneath, untouched.
+
+  The reset day is always the calendar's day 1 — not configurable per
+  envelope (unlike a subscription's `dueDay`). Deliberate call: the original
+  ask considered a per-envelope day, but the payoff didn't seem to justify
+  the cost (a new schema field, migrating `savedThisMonthByCategory` to a
+  30-day window anchored on an arbitrary day instead of the calendar month)
+  against "fixed day 1" already covering the real use case.
+
 - **`allowNegative` deliberately loosens, and only in a narrow scope, an
   invariant that used to be absolute ("no balance ever goes negative").** A
   `spend` envelope can turn on the "Permitir saldo negativo" (allow negative

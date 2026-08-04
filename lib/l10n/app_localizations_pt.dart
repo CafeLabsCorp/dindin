@@ -531,6 +531,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get recurringLabel => 'Recorrente (repete todo mês)';
 
   @override
+  String get recurringGoalHint =>
+      'Com meta de valor, isso vira um alvo mensal: a barra reseta todo dia 1, mas o saldo total da caixinha continua acumulando à parte.';
+
+  @override
   String get categoriesEmptyState =>
       'Nenhuma categoria ainda. Crie a primeira acima.';
 
@@ -649,6 +653,16 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String goalProgress(String saved, String goal, String pct) {
     return '$saved de $goal guardados ($pct%)';
+  }
+
+  @override
+  String goalReachedMonthly(String saved, String goal) {
+    return 'Meta do mês batida: $saved de $goal guardados';
+  }
+
+  @override
+  String goalProgressMonthly(String saved, String goal, String pct) {
+    return '$saved de $goal guardados este mês ($pct%)';
   }
 
   @override

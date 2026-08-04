@@ -533,6 +533,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recurringLabel => 'Recurring (repeats every month)';
 
   @override
+  String get recurringGoalHint =>
+      'With a target amount, this becomes a monthly target: the bar resets every day 1, but the envelope\'s total balance keeps accumulating separately.';
+
+  @override
   String get categoriesEmptyState =>
       'No categories yet. Create the first one above.';
 
@@ -651,6 +655,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String goalProgress(String saved, String goal, String pct) {
     return '$saved of $goal saved ($pct%)';
+  }
+
+  @override
+  String goalReachedMonthly(String saved, String goal) {
+    return 'This month\'s goal reached: $saved of $goal saved';
+  }
+
+  @override
+  String goalProgressMonthly(String saved, String goal, String pct) {
+    return '$saved of $goal saved this month ($pct%)';
   }
 
   @override

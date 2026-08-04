@@ -228,6 +228,7 @@
   "allowNegativeLabel": "Permitir saldo negativo",
   "allowNegativeDescription": "Um gasto pode deixar essa caixinha devendo. A próxima alocação quita a dívida automaticamente.",
   "recurringLabel": "Recorrente (repete todo mês)",
+  "recurringGoalHint": "Com meta de valor, isso vira um alvo mensal: a barra reseta todo dia 1, mas o saldo total da caixinha continua acumulando à parte.",
   "categoriesEmptyState": "Nenhuma categoria ainda. Crie a primeira acima.",
   "recurringChip": "Recorrente",
   "oneTimeChip": "Pontual",
@@ -281,6 +282,14 @@
   },
   "goalProgress": "{saved} de {goal} guardados ({pct}%)",
   "@goalProgress": {
+    "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" }, "pct": { "type": "String" } }
+  },
+  "goalReachedMonthly": "Meta do mês batida: {saved} de {goal} guardados",
+  "@goalReachedMonthly": {
+    "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" } }
+  },
+  "goalProgressMonthly": "{saved} de {goal} guardados este mês ({pct}%)",
+  "@goalProgressMonthly": {
     "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" }, "pct": { "type": "String" } }
   },
   "savedThisMonthPositive": "Guardou +{amount} este mês",

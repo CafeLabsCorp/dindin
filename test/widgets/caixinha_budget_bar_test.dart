@@ -51,6 +51,63 @@ void main() {
     expect(indicator.value, 1.0); // nunca passa de 100% de largura
   });
 
+  group('CaixinhaGoalBar', () {
+    Future<void> pumpGoal(
+      WidgetTester tester, {
+      required double saved,
+      required double goal,
+      bool monthly = false,
+    }) {
+      return tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: CaixinhaGoalBar(saved: saved, goal: goal, monthly: monthly)),
+        ),
+      );
+    }
+
+    testWidgets('monthly=false (padrão): legenda não menciona mês — meta acumulada de sempre', (tester) async {
+      await pumpGoal(tester, saved: 300, goal: 1000);
+
+      expect(find.text('${formatCurrency(300)} de ${formatCurrency(1000)} guardados (30%)'), findsOneWidget);
+      expect(find.textContaining('este mês'), findsNothing);
+    });
+
+    testWidgets('monthly=false atingida: "Meta atingida", sem menção a mês', (tester) async {
+      await pumpGoal(tester, saved: 1000, goal: 1000);
+
+      expect(find.text('Meta atingida: ${formatCurrency(1000)} de ${formatCurrency(1000)} guardados'), findsOneWidget);
+    });
+
+    testWidgets('monthly=true: legenda deixa explícito que é o progresso do mês', (tester) async {
+      await pumpGoal(tester, saved: 300, goal: 800, monthly: true);
+
+      expect(
+        find.text('${formatCurrency(300)} de ${formatCurrency(800)} guardados este mês (38%)'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('monthly=true atingida: "Meta do mês batida", distinta da versão sem mês', (tester) async {
+      await pumpGoal(tester, saved: 800, goal: 800, monthly: true);
+
+      expect(
+        find.text('Meta do mês batida: ${formatCurrency(800)} de ${formatCurrency(800)} guardados'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Meta atingida:'), findsNothing);
+    });
+
+    testWidgets('a barra em si (ratio/cor) não muda com monthly — só a legenda', (tester) async {
+      await pumpGoal(tester, saved: 400, goal: 800, monthly: true);
+      final indicator = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+      expect(indicator.value, closeTo(0.5, 0.001));
+    });
+  });
+
   group('CaixinhaDebtIndicator', () {
     Future<void> pumpDebt(WidgetTester tester, {required double balance}) {
       return tester.pumpWidget(
