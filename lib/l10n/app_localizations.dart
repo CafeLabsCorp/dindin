@@ -1106,30 +1106,6 @@ abstract class AppLocalizations {
   /// **'Sistema'**
   String get languageSystemOption;
 
-  /// No description provided for @themeSectionLabel.
-  ///
-  /// In pt, this message translates to:
-  /// **'Tema'**
-  String get themeSectionLabel;
-
-  /// No description provided for @themeSystemOption.
-  ///
-  /// In pt, this message translates to:
-  /// **'Sistema'**
-  String get themeSystemOption;
-
-  /// No description provided for @themeLightOption.
-  ///
-  /// In pt, this message translates to:
-  /// **'Claro'**
-  String get themeLightOption;
-
-  /// No description provided for @themeDarkOption.
-  ///
-  /// In pt, this message translates to:
-  /// **'Escuro'**
-  String get themeDarkOption;
-
   /// No description provided for @editIncomeTitle.
   ///
   /// In pt, this message translates to:

@@ -615,18 +615,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get languageSystemOption => 'Sistema';
 
   @override
-  String get themeSectionLabel => 'Tema';
-
-  @override
-  String get themeSystemOption => 'Sistema';
-
-  @override
-  String get themeLightOption => 'Claro';
-
-  @override
-  String get themeDarkOption => 'Escuro';
-
-  @override
   String get editIncomeTitle => 'Editar receita';
 
   @override

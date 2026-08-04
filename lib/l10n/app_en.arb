@@ -183,10 +183,6 @@
   "footerBrand": "Dindin — a Café Labs product",
   "languageSectionLabel": "Language",
   "languageSystemOption": "System",
-  "themeSectionLabel": "Theme",
-  "themeSystemOption": "System",
-  "themeLightOption": "Light",
-  "themeDarkOption": "Dark",
 
   "editIncomeTitle": "Edit income",
   "editExpenseTitle": "Edit expense",
