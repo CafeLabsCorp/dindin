@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/page_header.dart';
+import '../../widgets/app_shell.dart';
 import '../../models/income.dart';
 import '../../models/income_source.dart';
 import '../../providers/providers.dart';
@@ -11,9 +13,7 @@ import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../utils/income_source_labels.dart';
 import '../../widgets/app_card.dart';
-import '../../widgets/app_shell.dart';
 import '../../widgets/edit_transaction_sheet.dart';
-import '../../widgets/page_header.dart';
 import '../../widgets/responsive_form_row.dart';
 
 class ReceitasPage extends ConsumerStatefulWidget {

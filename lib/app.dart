@@ -12,8 +12,8 @@ import 'features/parcelamentos/parcelamentos_page.dart';
 import 'features/receitas/receitas_page.dart';
 import 'features/settings/settings_page.dart';
 import 'l10n/app_localizations.dart';
+import 'providers/locale_provider.dart';
 import 'providers/providers.dart';
-import 'providers/settings_provider.dart';
 import 'theme/theme.dart';
 import 'widgets/app_shell.dart';
 
@@ -65,15 +65,10 @@ class _DindinAppState extends ConsumerState<DindinApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      // Light/dark/system, persisted per device — see settings_provider.dart.
-      // Without this the app always followed the system and Ajustes had no
-      // say in it.
-      themeMode: ref.watch(themeModeProvider),
       // localeProvider is null by default ("follow system") — pt is what
       // AppLocalizations falls back to when the system locale isn't
       // supported (see l10n.yaml), matching the product's Portuguese-first
-      // copy. An explicit choice from Ajustes overrides this, and now sticks
-      // across restarts.
+      // copy. An explicit choice from Ajustes overrides this.
       locale: ref.watch(localeProvider),
       localizationsDelegates: const [
         AppLocalizations.delegate,

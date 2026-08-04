@@ -25,9 +25,7 @@ lib/
                                charges are due (shared by catch-up and the
                                screen, so the two can't disagree)
     import_export_service.dart JSON backup/restore
-  providers/
-    providers.dart             Riverpod providers, wire services -> UI
-    settings_provider.dart     theme and language, persisted on the device
+  providers/providers.dart     Riverpod providers, wire services -> UI
   features/<name>/<name>_page.dart   one folder per screen
                        (assinaturas/ and parcelamentos/ are top-level
                         destinations — see the navigation decision below)
@@ -307,15 +305,6 @@ which is exactly how the older docs already behaved.
   debt (**F1**, fixed), and the known open item: there's currently no
   in-app guard against converting a negative `spend` envelope into `save`,
   or deleting it, while the debt is still open.
-
-- **Theme and language are DEVICE preferences, not user data in Firestore.**
-  They describe how this screen should look, not anyone's money — and keeping
-  them in the ledger would mean they couldn't apply until after sign-in,
-  which is exactly when the wrong theme is most jarring. They live in
-  `shared_preferences`, read in `main()` BEFORE `runApp`: an async provider
-  would paint the default and then swap, the flash this design exists to
-  avoid. An unknown value (never chosen, or written by a future build)
-  degrades to "follow the system", which is always a sane answer.
 
 - **A single breakpoint (720px) reused across all responsive
   navigation/forms**, instead of a per-screen value: `AppShell` (side rail

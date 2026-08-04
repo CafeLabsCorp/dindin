@@ -78,23 +78,9 @@ disso. Se você tiver uma chave vinda de outro lugar, `export
 GOOGLE_APPLICATION_CREDENTIALS=/caminho/abs/pra/serviceAccount.json` continua
 funcionando (nunca commitar isso).
 
-A organização também exige reautenticação periódica, e ela derruba DUAS
-credenciais independentes. Vale saber diferenciar, porque só uma das duas dá
-um erro que se explica sozinho:
-
-- **ADC do gcloud** (backfill/preflight): aparece `invalid_rapt` ou
-  `invalid_grant`. Resolve com `gcloud auth application-default login`.
-- **`firebase login`** (deploy de rules e hosting): aparece
-  `Authentication Error: Your credentials are no longer valid`. Resolve com
-  `firebase login --reauth`.
-
-Cuidado com o segundo: quando a credencial do Firebase expira no meio de um
-deploy de hosting, a primeira mensagem costuma ser
-`Error: Assertion failed: resolving hosting target of a site with no site
-name or target name` — que não menciona autenticação em lugar nenhum. É
-sintoma, não causa; rodar o mesmo comando de novo revela o erro real. E
-`firebase login:list` NÃO serve pra checar: ele lê cache local e continua
-dizendo que você está logado.
+A organização também exige reautenticação periódica: se aparecer
+`invalid_rapt` ou `invalid_grant`, é só repetir o
+`gcloud auth application-default login`.
 
 Esse script é pensado pra uso interativo, manual, durante um release — não
 roda em CI. Se você só precisa publicar uma mudança só de hosting (sem
