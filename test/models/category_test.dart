@@ -104,4 +104,66 @@ void main() {
       expect(updated.name, cat.name); // unrelated fields untouched
     });
   });
+
+  group('Category.hasMonthlyGoal', () {
+    test('true for a save caixinha with recurring on and a goal set', () {
+      const cat = Category(
+        id: 'c1',
+        name: 'Casamento',
+        recurring: true,
+        createdAt: '2026-01-01',
+        kind: CategoryKind.save,
+        goalAmount: 800,
+      );
+      expect(cat.hasMonthlyGoal, isTrue);
+    });
+
+    test('false for the same caixinha with recurring off — goal stays a lifetime target', () {
+      const cat = Category(
+        id: 'c1',
+        name: 'Viagem',
+        recurring: false,
+        createdAt: '2026-01-01',
+        kind: CategoryKind.save,
+        goalAmount: 5000,
+      );
+      expect(cat.hasMonthlyGoal, isFalse);
+    });
+
+    test('false when recurring is on but there is no goal at all', () {
+      const cat = Category(
+        id: 'c1',
+        name: 'Reserva',
+        recurring: true,
+        createdAt: '2026-01-01',
+        kind: CategoryKind.save,
+      );
+      expect(cat.goalAmount, isNull);
+      expect(cat.hasMonthlyGoal, isFalse);
+    });
+
+    test('false for a spend caixinha regardless of recurring/goal — recurring is just the chip there', () {
+      const cat = Category(
+        id: 'c1',
+        name: 'Mercado',
+        recurring: true,
+        createdAt: '2026-01-01',
+        kind: CategoryKind.spend,
+        goalAmount: 100, // ignored for spend anyway, but confirm it still doesn't flip this
+      );
+      expect(cat.hasMonthlyGoal, isFalse);
+    });
+
+    test('false for a legacy doc (no kind) even with recurring+goal, since effectiveKind is spend', () {
+      const cat = Category(
+        id: 'c1',
+        name: 'Legado',
+        recurring: true,
+        createdAt: '2026-01-01',
+        goalAmount: 100,
+      );
+      expect(cat.effectiveKind, CategoryKind.spend);
+      expect(cat.hasMonthlyGoal, isFalse);
+    });
+  });
 }

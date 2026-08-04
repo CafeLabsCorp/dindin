@@ -285,6 +285,30 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   este campo) se comporta como `spend`, preservando a única semântica que
   existia antes.
 
+- **`recurring` (o checkbox "Recorrente (repete todo mês)") era só uma
+  etiqueta visual até virar, também, o interruptor que decide o que
+  `goalAmount` significa numa caixinha `save`.** Sem meta ou com `recurring:
+  false`, nada muda — meta é alvo acumulado (comportamento original), e sem
+  meta a caixinha continua mostrando `CaixinhaSavedThisMonth`. Com meta E
+  `recurring: true` (`Category.hasMonthlyGoal`), a mesma `goalAmount` passa a
+  ser lida como alvo MENSAL: a barra (`CaixinhaGoalBar` com `monthly: true`)
+  passa a usar `savedThisMonthByCategory` em vez do saldo total da caixinha.
+
+  Não existe reset explícito — nenhum job, nenhum campo "zerado em X" gravado
+  no Firestore. `savedThisMonthByCategory` já era uma consulta ao vivo
+  filtrada por mês (`monthKey(date) == currentMonthKey()`), então o dia 1
+  "zera" sozinho pelo simples fato de não haver alocação nenhuma datada no
+  mês novo ainda — mesmo que o usuário não abra o app naquele dia. O saldo
+  total da caixinha (`categoryBalances`, o número grande no topo da linha)
+  nunca participa dessa conta e continua acumulando por baixo, intocado.
+
+  Dia de reset é sempre o dia 1 do calendário — não é configurável por
+  caixinha (ao contrário do `dueDay` de uma assinatura). Decisão deliberada:
+  o pedido original considerava um dia por caixinha, mas o ganho não parecia
+  justificar o esforço (schema novo, migração de `savedThisMonthByCategory`
+  pra uma janela de 30 dias ancorada num dia arbitrário em vez do mês
+  calendário) frente a "dia 1 fixo" já resolver o caso de uso real.
+
 - **`allowNegative` afrouxa de propósito, e só num escopo estreito, um
   invariante que antes era absoluto ("nenhum saldo fica negativo").** Uma
   caixinha `spend` pode ligar o toggle "Permitir saldo negativo" e passar a

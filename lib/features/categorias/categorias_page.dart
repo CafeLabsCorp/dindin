@@ -242,6 +242,18 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
+              // Only reachable when the coupling actually does something —
+              // see Category.hasMonthlyGoal. A goal amount may not be typed
+              // in yet, but the checkbox+kind combination is what the hint
+              // explains, so it shows as soon as both point that way.
+              if (_kind == CategoryKind.save && _recurring)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                  child: Text(
+                    l10n.recurringGoalHint,
+                    style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                  ),
+                ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -342,12 +354,17 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                                     categories[i].goalAmount != null) ...[
                                   const SizedBox(height: 8),
                                   CaixinhaGoalBar(
-                                    saved:
-                                        summary
-                                            ?.balancesByCategory[categories[i]
-                                            .id] ??
-                                        0,
+                                    saved: categories[i].hasMonthlyGoal
+                                        ? (summary
+                                                  ?.savedThisMonthByCat[categories[i]
+                                                  .id] ??
+                                              0)
+                                        : (summary
+                                                  ?.balancesByCategory[categories[i]
+                                                  .id] ??
+                                              0),
                                     goal: categories[i].goalAmount!,
+                                    monthly: categories[i].hasMonthlyGoal,
                                   ),
                                 ] else if (categories[i].effectiveKind ==
                                     CategoryKind.save) ...[
@@ -618,6 +635,14 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
         ),
+        if (_kind == CategoryKind.save && _recurring)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+            child: Text(
+              l10n.recurringGoalHint,
+              style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+            ),
+          ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

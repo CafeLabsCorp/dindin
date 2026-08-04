@@ -74,11 +74,13 @@ void main() {
     expect(find.text('Gasto: ${formatCurrency(30)} de ${formatCurrency(100)} este mês'), findsOneWidget);
   });
 
-  testWidgets('caixinha de guardar com meta mostra a CaixinhaGoalBar com o saldo acumulado', (tester) async {
+  testWidgets('caixinha de guardar com meta, SEM recorrente: barra usa o saldo total acumulado', (tester) async {
+    // recurring: false -> Category.hasMonthlyGoal is false, so the goal
+    // stays a lifetime target — the original, pre-existing behavior.
     const cofrinho = Category(
       id: 'c2',
       name: 'Viagem',
-      recurring: true,
+      recurring: false,
       createdAt: '2026-01-01',
       kind: CategoryKind.save,
       goalAmount: 1000,
@@ -86,8 +88,78 @@ void main() {
     await pump(tester, categories: [cofrinho]);
     await tester.pumpAndSettle();
 
-    // No allocations in the overrides → saved = 0 of 1000.
+    // No allocations in the overrides → all-time balance = 0 of 1000.
     expect(find.text('${formatCurrency(0)} de ${formatCurrency(1000)} guardados (0%)'), findsOneWidget);
+    expect(find.textContaining('este mês'), findsNothing);
+  });
+
+  testWidgets('caixinha de guardar com meta E recorrente: barra usa só o guardado NESTE mês', (tester) async {
+    // recurring: true + goalAmount -> Category.hasMonthlyGoal is true. An
+    // allocation from a PAST month must not count toward this month's bar —
+    // that's the whole point of the feature (resets automatically, no
+    // stored counter). Only the allocation dated in the current month
+    // should show.
+    const casamento = Category(
+      id: 'c3',
+      name: 'Casamento',
+      recurring: true,
+      createdAt: '2025-01-01',
+      kind: CategoryKind.save,
+      goalAmount: 800,
+    );
+    final hoje = DateTime.now().toIso8601String().substring(0, 10);
+    await pump(
+      tester,
+      categories: [casamento],
+      allocations: [
+        const Allocation(id: 'a-mes-passado', categoryId: 'c3', amount: 500, date: '2025-06-01'),
+        Allocation(id: 'a-este-mes', categoryId: 'c3', amount: 300, date: hoje),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    // 300 este mês de 800 (37%) — NÃO 800 (500+300) do saldo total.
+    expect(
+      find.text('${formatCurrency(300)} de ${formatCurrency(800)} guardados este mês (38%)'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('sem atividade nenhuma no mês, a meta recorrente mostra zero sozinha (sem ação manual)', (tester) async {
+    const casamento = Category(
+      id: 'c3',
+      name: 'Casamento',
+      recurring: true,
+      createdAt: '2025-01-01',
+      kind: CategoryKind.save,
+      goalAmount: 800,
+    );
+    // Only a past-month allocation — nothing dated in the current month.
+    await pump(
+      tester,
+      categories: [casamento],
+      allocations: [const Allocation(id: 'a-antiga', categoryId: 'c3', amount: 500, date: '2025-06-01')],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('${formatCurrency(0)} de ${formatCurrency(800)} guardados este mês (0%)'), findsOneWidget);
+  });
+
+  testWidgets('a dica sobre meta mensal aparece só quando Guardar + Recorrente estão marcados juntos', (tester) async {
+    await pump(tester, categories: []);
+    await tester.pumpAndSettle();
+
+    // Default: kind=Guardar, recorrente já marcado por padrão -> hint visível.
+    expect(find.textContaining('vira um alvo mensal'), findsOneWidget);
+
+    await tester.tap(find.text('Recorrente (repete todo mês)').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('vira um alvo mensal'), findsNothing);
+
+    await tester.tap(find.text('Recorrente (repete todo mês)').first);
+    await tester.tap(find.text('Gastar').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('vira um alvo mensal'), findsNothing);
   });
 
   testWidgets('tocar na linha abre a edição pré-preenchida (nome + limite mensal)', (tester) async {

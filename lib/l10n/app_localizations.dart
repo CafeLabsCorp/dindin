@@ -956,6 +956,12 @@ abstract class AppLocalizations {
   /// **'Recorrente (repete todo mês)'**
   String get recurringLabel;
 
+  /// No description provided for @recurringGoalHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Com meta de valor, isso vira um alvo mensal: a barra reseta todo dia 1, mas o saldo total da caixinha continua acumulando à parte.'**
+  String get recurringGoalHint;
+
   /// No description provided for @categoriesEmptyState.
   ///
   /// In pt, this message translates to:
@@ -1159,6 +1165,18 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'{saved} de {goal} guardados ({pct}%)'**
   String goalProgress(String saved, String goal, String pct);
+
+  /// No description provided for @goalReachedMonthly.
+  ///
+  /// In pt, this message translates to:
+  /// **'Meta do mês batida: {saved} de {goal} guardados'**
+  String goalReachedMonthly(String saved, String goal);
+
+  /// No description provided for @goalProgressMonthly.
+  ///
+  /// In pt, this message translates to:
+  /// **'{saved} de {goal} guardados este mês ({pct}%)'**
+  String goalProgressMonthly(String saved, String goal, String pct);
 
   /// No description provided for @savedThisMonthPositive.
   ///
