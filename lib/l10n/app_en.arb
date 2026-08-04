@@ -196,6 +196,7 @@
   "goalReached": "Goal reached: {saved} of {goal} saved",
   "goalProgress": "{saved} of {goal} saved ({pct}%)",
   "goalReachedMonthly": "This month's goal reached: {saved} of {goal} saved",
+  "caixinhaMonthlyGoalTotalCaption": "Total balance: {amount}",
   "goalProgressMonthly": "{saved} of {goal} saved this month ({pct}%)",
   "savedThisMonthPositive": "Saved +{amount} this month",
   "savedThisMonthNegative": "Withdrew {amount} this month",

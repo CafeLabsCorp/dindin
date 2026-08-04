@@ -366,6 +366,29 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                                     goal: categories[i].goalAmount!,
                                     monthly: categories[i].hasMonthlyGoal,
                                   ),
+                                  // Categorias doesn't show a plain balance
+                                  // number anywhere else in this row (unlike
+                                  // Dashboard) — for a monthly goal the bar
+                                  // above is the caixinha's ONLY visible
+                                  // figure, and it's this month's saved
+                                  // amount, not the running total. Without
+                                  // this line the total the feature promises
+                                  // to keep showing wouldn't be shown at all
+                                  // on this screen.
+                                  if (categories[i].hasMonthlyGoal) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      l10n.caixinhaMonthlyGoalTotalCaption(
+                                        formatCurrency(
+                                          summary
+                                                  ?.balancesByCategory[categories[i]
+                                                  .id] ??
+                                              0,
+                                        ),
+                                      ),
+                                      style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                                    ),
+                                  ],
                                 ] else if (categories[i].effectiveKind ==
                                     CategoryKind.save) ...[
                                   const SizedBox(height: 4),

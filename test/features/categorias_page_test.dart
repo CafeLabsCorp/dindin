@@ -91,6 +91,9 @@ void main() {
     // No allocations in the overrides → all-time balance = 0 of 1000.
     expect(find.text('${formatCurrency(0)} de ${formatCurrency(1000)} guardados (0%)'), findsOneWidget);
     expect(find.textContaining('este mês'), findsNothing);
+    // The bar itself IS the total here (that's what "not monthly" means) —
+    // a separate "Saldo total" caption would be redundant, not just unneeded.
+    expect(find.textContaining('Saldo total'), findsNothing);
   });
 
   testWidgets('caixinha de guardar com meta E recorrente: barra usa só o guardado NESTE mês', (tester) async {
@@ -123,6 +126,10 @@ void main() {
       find.text('${formatCurrency(300)} de ${formatCurrency(800)} guardados este mês (38%)'),
       findsOneWidget,
     );
+    // Categorias não mostra número de saldo em lugar nenhum da linha — a
+    // barra sozinha só mostra o guardado do MÊS (300), então sem essa
+    // legenda explícita o saldo total (800) nunca apareceria nesta tela.
+    expect(find.text('Saldo total: ${formatCurrency(800)}'), findsOneWidget);
   });
 
   testWidgets('sem atividade nenhuma no mês, a meta recorrente mostra zero sozinha (sem ação manual)', (tester) async {

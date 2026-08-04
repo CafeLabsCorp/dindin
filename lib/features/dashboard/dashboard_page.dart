@@ -199,6 +199,21 @@ class DashboardPage extends ConsumerWidget {
                             goal: caixinhas[i].goalAmount!,
                             monthly: caixinhas[i].hasMonthlyGoal,
                           ),
+                          // The monthly bar's "saved" figure is NOT the
+                          // caixinha's running total — that total is what
+                          // this feature promises to keep showing (it never
+                          // resets). The number at the top-right of this row
+                          // already IS that total, but it's quiet gray text
+                          // next to a now-bold, colored monthly bar; a
+                          // one-line explicit caption removes any doubt about
+                          // which number is which.
+                          if (caixinhas[i].hasMonthlyGoal) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              l10n.caixinhaMonthlyGoalTotalCaption(formatCurrency(caixinhas[i].value)),
+                              style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                            ),
+                          ],
                         ] else if (caixinhas[i].kind == CategoryKind.save) ...[
                           const SizedBox(height: 4),
                           CaixinhaSavedThisMonth(savedThisMonth: caixinhas[i].savedThisMonth),
