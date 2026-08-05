@@ -661,6 +661,11 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String caixinhaMonthlyGoalTotalCaption(String amount) {
+    return 'Saldo total: $amount';
+  }
+
+  @override
   String goalProgressMonthly(String saved, String goal, String pct) {
     return '$saved de $goal guardados este mês ($pct%)';
   }

@@ -1172,6 +1172,12 @@ abstract class AppLocalizations {
   /// **'Meta do mês batida: {saved} de {goal} guardados'**
   String goalReachedMonthly(String saved, String goal);
 
+  /// No description provided for @caixinhaMonthlyGoalTotalCaption.
+  ///
+  /// In pt, this message translates to:
+  /// **'Saldo total: {amount}'**
+  String caixinhaMonthlyGoalTotalCaption(String amount);
+
   /// No description provided for @goalProgressMonthly.
   ///
   /// In pt, this message translates to:

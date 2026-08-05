@@ -288,6 +288,10 @@
   "@goalReachedMonthly": {
     "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" } }
   },
+  "caixinhaMonthlyGoalTotalCaption": "Saldo total: {amount}",
+  "@caixinhaMonthlyGoalTotalCaption": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
   "goalProgressMonthly": "{saved} de {goal} guardados este mês ({pct}%)",
   "@goalProgressMonthly": {
     "placeholders": { "saved": { "type": "String" }, "goal": { "type": "String" }, "pct": { "type": "String" } }

@@ -71,9 +71,12 @@ void main() {
       find.text('${formatCurrency(300)} de ${formatCurrency(800)} guardados este mês (38%)'),
       findsOneWidget,
     );
-    // O saldo total continua visível — é o valor grande da linha da caixinha
-    // — mesmo estando fora da barra de meta.
+    // O saldo total (500+300=800) aparece duas vezes: sem rótulo, no valor
+    // grande de sempre no topo da linha, E de novo com o rótulo explícito
+    // "Saldo total" logo abaixo da barra — a barra sozinha mostra 300 (só
+    // este mês), então sem essa legenda o total nunca apareceria rotulado.
     expect(find.text(formatCurrency(800)), findsOneWidget);
+    expect(find.text('Saldo total: ${formatCurrency(800)}'), findsOneWidget);
   });
 
   testWidgets('meta não-recorrente no Dashboard continua contra o saldo total, como sempre foi', (tester) async {
