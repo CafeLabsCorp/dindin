@@ -1,7 +1,8 @@
 /// A card purchase split into fixed monthly installments (e.g. "Notebook Dell,
 /// R$ 1.200 em 12x"): the total amount is charged in equal monthly slices —
-/// see `recurring_schedule.installmentAmounts` for the exact split, which puts
-/// any rounding remainder on the LAST installment (matches a real card bill) —
+/// see `recurring_schedule.installmentAmounts` for the exact split, which
+/// spreads any rounding remainder over the FIRST installments, a cent each
+/// (matches a real card bill) —
 /// out of the account balance by default, or out of a caixinha when
 /// [categoryId] says so, same as a [Subscription].
 ///

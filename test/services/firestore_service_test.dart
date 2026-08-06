@@ -964,9 +964,9 @@ void main() {
         final exps = await expenses();
         expect(exps, hasLength(1));
         expect(exps.single.date, '2026-01-05');
-        expect(exps.single.amount, 33.33);
+        expect(exps.single.amount, 33.34);
         expect(exps.single.description, 'Notebook Dell (1/3)');
-        expect(await accountBalance(), 1000 - 33.33);
+        expect(await accountBalance(), 1000 - 33.34);
         expect((await purchase('p1'))!.chargedInstallments, 1);
       });
 
@@ -1017,13 +1017,13 @@ void main() {
             const Expense(
               id: 'other',
               date: '2026-01-05',
-              amount: 33.33,
+              amount: 33.34,
               description: 'Notebook Dell (1/3)',
               sourceType: 'installment',
               sourceId: 'p1',
             ).toMap(),
           );
-          await fake.doc('users/u1/meta/account').set({'balance': 1000 - 33.33});
+          await fake.doc('users/u1/meta/account').set({'balance': 1000 - 33.34});
           await fake.doc('users/u1/installmentPurchases/p1').set(
             const InstallmentPurchase(
               id: 'p1',
@@ -1041,7 +1041,7 @@ void main() {
         await svc.catchUpInstallmentPurchases();
 
         expect(await expenses(), hasLength(1), reason: 'installment 1/3 must not be billed twice');
-        expect(await accountBalance(), 1000 - 33.33);
+        expect(await accountBalance(), 1000 - 33.34);
         expect((await purchase('p1'))!.chargedInstallments, 1);
       });
 
@@ -1117,7 +1117,7 @@ void main() {
         expect((await purchase('p1'))!.chargedInstallments, 0);
       });
 
-      test('catches up every due installment in one run, putting the rounding remainder on the last', () async {
+      test('catches up every due installment in one run, front-loading the rounding remainder', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 5));
         await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
         await seed(
@@ -1136,7 +1136,7 @@ void main() {
 
         final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
         expect(exps.map((e) => e.date), ['2026-01-05', '2026-02-05', '2026-03-05']);
-        expect(exps.map((e) => e.amount), [33.33, 33.33, 33.34]);
+        expect(exps.map((e) => e.amount), [33.34, 33.33, 33.33]);
         expect(exps.fold<double>(0, (s, e) => s + e.amount), 100.0);
         final p = await purchase('p1');
         expect(p!.chargedInstallments, 3);
@@ -1191,7 +1191,7 @@ void main() {
 
         final exps = await expenses();
         expect(exps, hasLength(1));
-        expect(exps.single.amount, 33.33);
+        expect(exps.single.amount, 33.34);
         expect((await purchase('p1'))!.chargedInstallments, 1);
       });
 

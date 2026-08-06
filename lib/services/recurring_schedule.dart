@@ -68,19 +68,25 @@ List<DateTime> pendingDueDates(Subscription subscription, DateTime today) {
 }
 
 /// Splits [totalAmount] into [installments] equal monthly slices, rounded to
-/// the cent, with any rounding remainder absorbed into the LAST installment —
-/// matches how a real card bill splits a purchase, and guarantees the slices
-/// sum to exactly [totalAmount] (no drift from summing many rounded
-/// fractions, same `round2` discipline as `aggregation_service.dart`).
+/// the cent, with any rounding remainder spread one cent at a time over the
+/// FIRST installments — matches how a real card bill splits a purchase (e.g.
+/// R$140,90 in 6x: 23,49 · 23,49 · 23,48 · 23,48 · 23,48 · 23,48), and
+/// guarantees the slices sum to exactly [totalAmount] (no drift from summing
+/// many rounded fractions).
 ///
 /// Computed once per purchase from immutable fields, never per charge, so two
 /// catch-up runs can never disagree about what a given installment costs.
+/// Works in integer cents throughout — `totalAmount * 100` rounded once,
+/// divided with `~/`/`%` — so there's no repeated floating-point rounding to
+/// drift by a cent across many slices the way chained `round2` calls could.
 List<double> installmentAmounts(double totalAmount, int installments) {
-  final each = agg.round2(totalAmount / installments);
-  final amounts = List<double>.filled(installments, each);
-  final allButLast = agg.round2(each * (installments - 1));
-  amounts[installments - 1] = agg.round2(totalAmount - allButLast);
-  return amounts;
+  final totalCents = (totalAmount * 100).round();
+  final baseCents = totalCents ~/ installments;
+  final remainderCents = totalCents % installments;
+  return [
+    for (var i = 0; i < installments; i++)
+      (baseCents + (i < remainderCents ? 1 : 0)) / 100,
+  ];
 }
 
 /// The 0-indexed occurrence's due date: [InstallmentPurchase.firstChargeDate]'s

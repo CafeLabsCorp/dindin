@@ -126,9 +126,14 @@ void main() {
       expect(installmentAmounts(300, 3), [100, 100, 100]);
     });
 
-    test('puts the rounding remainder on the LAST installment', () {
+    test('spreads the rounding remainder over the FIRST installments', () {
       final amounts = installmentAmounts(100, 3);
-      expect(amounts, [33.33, 33.33, 33.34]);
+      expect(amounts, [33.34, 33.33, 33.33]);
+    });
+
+    test('matches the real-world Nubank example: R\$140,90 in 6x', () {
+      final amounts = installmentAmounts(140.90, 6);
+      expect(amounts, [23.49, 23.49, 23.48, 23.48, 23.48, 23.48]);
     });
 
     test('slices always sum back to exactly the total', () {
@@ -254,7 +259,7 @@ void main() {
     });
 
     test('sem amortização o comportamento é idêntico ao de antes', () {
-      // A regra do "resto na última parcela" tem que sobreviver ao clamp.
+      // A regra do "resto nas primeiras parcelas" tem que sobreviver ao clamp.
       const p = InstallmentPurchase(
         id: 'p1',
         name: 'X',
@@ -271,7 +276,7 @@ void main() {
         charges.add(amount);
         remaining -= amount;
       }
-      expect(charges, [33.33, 33.33, 33.34]);
+      expect(charges, [33.34, 33.33, 33.33]);
     });
   });
 }
