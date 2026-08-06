@@ -85,20 +85,32 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
       builder: (ctx) => AlertDialog(
         title: Text(l10n.removeInstallmentPurchaseConfirmTitle),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.remove),
+          ),
         ],
       ),
     );
     if (confirmed != true) return;
-    await ref.read(firestoreServiceProvider)!.deleteInstallmentPurchase(purchase.id);
+    await ref
+        .read(firestoreServiceProvider)!
+        .deleteInstallmentPurchase(purchase.id);
   }
 
-  Future<void> _pay(InstallmentPurchase purchase, List<Category> categories) async {
+  Future<void> _pay(
+    InstallmentPurchase purchase,
+    List<Category> categories,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _PayInstallmentSheet(purchase: purchase, categories: categories),
+      builder: (_) =>
+          _PayInstallmentSheet(purchase: purchase, categories: categories),
     );
   }
 
@@ -106,7 +118,8 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final purchasesAsync = ref.watch(installmentPurchasesProvider);
-    final categories = ref.watch(categoriesProvider).value ?? const <Category>[];
+    final categories =
+        ref.watch(categoriesProvider).value ?? const <Category>[];
     final catchUpState = ref.watch(recurringChargesCatchUpProvider);
     final showPending = catchUpState.hasValue;
     final today = ref.watch(todayProvider);
@@ -151,7 +164,9 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                     child: TextField(
                       controller: _totalController,
                       enabled: !_submitting,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
                         labelText: l10n.amountLabel,
                         hintText: l10n.amountHint,
@@ -163,14 +178,18 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                     child: DropdownButtonFormField<int>(
                       initialValue: _installments,
                       isExpanded: true,
-                      decoration: InputDecoration(labelText: l10n.installmentsCountLabel),
+                      decoration: InputDecoration(
+                        labelText: l10n.installmentsCountLabel,
+                      ),
                       items: [
                         for (var n = 2; n <= 36; n++)
                           DropdownMenuItem(value: n, child: Text('${n}x')),
                       ],
                       onChanged: _submitting
                           ? null
-                          : (v) => setState(() => _installments = v ?? _installments),
+                          : (v) => setState(
+                              () => _installments = v ?? _installments,
+                            ),
                     ),
                   ),
                   (
@@ -187,7 +206,9 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                     child: ChargeSourceField(
                       categories: categories,
                       value: _source,
-                      onChanged: _submitting ? null : (v) => setState(() => _source = v),
+                      onChanged: _submitting
+                          ? null
+                          : (v) => setState(() => _source = v),
                     ),
                   ),
                 ],
@@ -200,7 +221,12 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -212,7 +238,9 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
             children: [
               Text(
                 l10n.installmentPurchasesListTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 12),
               purchasesAsync.when(
@@ -227,7 +255,12 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                           purchase: purchases[i],
                           categories: categories,
                           pendingCharges: showPending
-                              ? schedule.pendingInstallmentIndexes(purchases[i], today).length
+                              ? schedule
+                                    .pendingInstallmentIndexes(
+                                      purchases[i],
+                                      today,
+                                    )
+                                    .length
                               : 0,
                           onPay: () => _pay(purchases[i], categories),
                           onDelete: () => _delete(purchases[i]),
@@ -282,7 +315,7 @@ class _DateField extends StatelessWidget {
   }
 }
 
-class _InstallmentPurchaseRow extends StatelessWidget {
+class _InstallmentPurchaseRow extends StatefulWidget {
   final InstallmentPurchase purchase;
   final List<Category> categories;
   final int pendingCharges;
@@ -300,9 +333,18 @@ class _InstallmentPurchaseRow extends StatelessWidget {
   });
 
   @override
+  State<_InstallmentPurchaseRow> createState() =>
+      _InstallmentPurchaseRowState();
+}
+
+class _InstallmentPurchaseRowState extends State<_InstallmentPurchaseRow> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final error = Theme.of(context).colorScheme.error;
+    final purchase = widget.purchase;
     final outstanding = schedule.outstandingAmount(purchase);
     final settled = schedule.isSettled(purchase);
     // Display-only approximation (Nx de R$Y): the actual last charge may be a
@@ -310,75 +352,213 @@ class _InstallmentPurchaseRow extends StatelessWidget {
     // see recurring_schedule.installmentChargeAmount.
     final perInstallment = purchase.totalAmount / purchase.installments;
     final missingCaixinha =
-        purchase.chargesCaixinha && !categories.any((c) => c.id == purchase.categoryId);
+        purchase.chargesCaixinha &&
+        !widget.categories.any((c) => c.id == purchase.categoryId);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null,
+        border: widget.divider
+            ? Border(top: BorderSide(color: context.tokens.border))
+            : null,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(
                       TextSpan(
-                        text: formatCurrency(purchase.totalAmount),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                        children: [
+                          TextSpan(
+                            text: formatCurrency(purchase.totalAmount),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          TextSpan(
+                            text:
+                                ' · ${purchase.name} · ${l10n.installmentSummaryLabel('${purchase.installments}', formatCurrency(perInstallment))}',
+                            style: TextStyle(color: context.tokens.subtle),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      l10n.installmentProgressLabel(
+                        '${purchase.chargedInstallments}',
+                        '${purchase.installments}',
+                      ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.tokens.subtle,
+                      ),
+                    ),
+                    Text(
+                      settled
+                          ? l10n.installmentSettledLabel
+                          : l10n.installmentOutstandingLabel(
+                              formatCurrency(outstanding),
+                            ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.tokens.subtle,
+                      ),
+                    ),
+                    if (purchase.amortizedAmount > 0)
+                      Text(
+                        l10n.installmentPaidAheadLabel(
+                          formatCurrency(purchase.amortizedAmount),
+                        ),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.tokens.subtle,
                         ),
                       ),
-                      TextSpan(
-                        text:
-                            ' · ${purchase.name} · ${l10n.installmentSummaryLabel('${purchase.installments}', formatCurrency(perInstallment))}',
-                        style: TextStyle(color: context.tokens.subtle),
+                    if (missingCaixinha)
+                      Text(
+                        l10n.chargeSourceMissingWarning,
+                        style: TextStyle(fontSize: 12, color: error),
+                      )
+                    else if (widget.pendingCharges > 0)
+                      Text(
+                        l10n.pendingChargesRowLabel(widget.pendingCharges),
+                        style: TextStyle(fontSize: 12, color: error),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
-                Text(
-                  settled
-                      ? l10n.installmentSettledLabel
-                      : l10n.installmentOutstandingLabel(formatCurrency(outstanding)),
-                  style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+              ),
+              if (!settled)
+                IconButton(
+                  onPressed: widget.onPay,
+                  icon: const Icon(Icons.payments_outlined),
+                  tooltip: l10n.payInstallmentTooltip,
                 ),
-                if (purchase.amortizedAmount > 0)
-                  Text(
-                    l10n.installmentPaidAheadLabel(formatCurrency(purchase.amortizedAmount)),
-                    style: TextStyle(fontSize: 12, color: context.tokens.subtle),
-                  ),
-                if (missingCaixinha)
-                  Text(
-                    l10n.chargeSourceMissingWarning,
-                    style: TextStyle(fontSize: 12, color: error),
-                  )
-                else if (pendingCharges > 0)
-                  Text(
-                    l10n.pendingChargesRowLabel(pendingCharges),
-                    style: TextStyle(fontSize: 12, color: error),
-                  ),
-              ],
+              IconButton(
+                onPressed: widget.onDelete,
+                icon: const Icon(Icons.delete_outline),
+                tooltip: l10n.removeInstallmentPurchaseTooltip,
+                color: error,
+              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              icon: Icon(
+                _expanded ? Icons.expand_less : Icons.expand_more,
+                size: 18,
+              ),
+              label: Text(
+                _expanded
+                    ? l10n.installmentDetailsToggleHide
+                    : l10n.installmentDetailsToggleShow,
+              ),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
             ),
           ),
-          if (!settled)
-            IconButton(
-              onPressed: onPay,
-              icon: const Icon(Icons.payments_outlined),
-              tooltip: l10n.payInstallmentTooltip,
-            ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: l10n.removeInstallmentPurchaseTooltip,
-            color: error,
-          ),
+          if (_expanded) _InstallmentDetailsList(purchase: purchase),
         ],
+      ),
+    );
+  }
+}
+
+/// Every installment's own value and paid/pending state — the concrete
+/// numbers behind the summary line's average, since front-loaded rounding
+/// (see `recurring_schedule.installmentAmounts`) means they're not all
+/// identical.
+class _InstallmentDetailsList extends StatelessWidget {
+  final InstallmentPurchase purchase;
+
+  const _InstallmentDetailsList({required this.purchase});
+
+  @override
+  Widget build(BuildContext context) {
+    final amounts = schedule.installmentAmounts(
+      purchase.totalAmount,
+      purchase.installments,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (var i = 0; i < amounts.length; i++)
+            _InstallmentChip(
+              index: i + 1,
+              amount: amounts[i],
+              paid: i < purchase.chargedInstallments,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstallmentChip extends StatelessWidget {
+  final int index;
+  final double amount;
+  final bool paid;
+
+  const _InstallmentChip({
+    required this.index,
+    required this.amount,
+    required this.paid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tokens = context.tokens;
+    final color = paid ? tokens.statusGood : tokens.subtle;
+    return Tooltip(
+      message: paid
+          ? l10n.installmentPaidTooltip
+          : l10n.installmentPendingTooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(color: paid ? color : tokens.border),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$index',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              formatCurrency(amount),
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            if (paid) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.check, size: 12, color: color),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -393,10 +573,14 @@ class _PayInstallmentSheet extends ConsumerStatefulWidget {
   final InstallmentPurchase purchase;
   final List<Category> categories;
 
-  const _PayInstallmentSheet({required this.purchase, required this.categories});
+  const _PayInstallmentSheet({
+    required this.purchase,
+    required this.categories,
+  });
 
   @override
-  ConsumerState<_PayInstallmentSheet> createState() => _PayInstallmentSheetState();
+  ConsumerState<_PayInstallmentSheet> createState() =>
+      _PayInstallmentSheetState();
 }
 
 class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
@@ -461,14 +645,21 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
     final outstanding = schedule.outstandingAmount(widget.purchase);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.viewInsetsOf(context).bottom + 16,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             l10n.payInstallmentTitle(widget.purchase.name),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
@@ -480,7 +671,10 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
             controller: _amountController,
             enabled: !_submitting,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
+            decoration: InputDecoration(
+              labelText: l10n.amountLabel,
+              hintText: l10n.amountHint,
+            ),
           ),
           const SizedBox(height: 12),
           ChargeSourceField(
@@ -491,7 +685,10 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              child: Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           const SizedBox(height: 16),
           FilledButton(
@@ -500,8 +697,12 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
           ),
           const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: _submitting ? null : () => _pay(outstanding, settling: true),
-            child: Text(l10n.settleInstallmentButton(formatCurrency(outstanding))),
+            onPressed: _submitting
+                ? null
+                : () => _pay(outstanding, settling: true),
+            child: Text(
+              l10n.settleInstallmentButton(formatCurrency(outstanding)),
+            ),
           ),
         ],
       ),

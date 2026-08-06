@@ -104,6 +104,10 @@
   "installmentProgressLabel": "{paid} of {total} installments paid",
   "removeInstallmentPurchaseConfirmTitle": "Remove this installment purchase?",
   "removeInstallmentPurchaseTooltip": "Remove installment purchase",
+  "installmentDetailsToggleShow": "View installments",
+  "installmentDetailsToggleHide": "Hide installments",
+  "installmentPaidTooltip": "Paid installment",
+  "installmentPendingTooltip": "Pending installment",
 
   "pendingChargesWarning": "{count, plural, =1{1 charge wasn't posted because the account balance didn't cover it. It goes through on its own once there's enough.} other{{count} charges weren't posted because the account balance didn't cover them. They go through on their own once there's enough.}}",
   "pendingChargesRowLabel": "{count, plural, =1{1 pending charge} other{{count} pending charges}}",

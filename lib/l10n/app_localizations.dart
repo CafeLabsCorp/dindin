@@ -662,6 +662,30 @@ abstract class AppLocalizations {
   /// **'Remover parcelamento'**
   String get removeInstallmentPurchaseTooltip;
 
+  /// No description provided for @installmentDetailsToggleShow.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ver parcelas'**
+  String get installmentDetailsToggleShow;
+
+  /// No description provided for @installmentDetailsToggleHide.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ocultar parcelas'**
+  String get installmentDetailsToggleHide;
+
+  /// No description provided for @installmentPaidTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcela paga'**
+  String get installmentPaidTooltip;
+
+  /// No description provided for @installmentPendingTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcela pendente'**
+  String get installmentPendingTooltip;
+
   /// No description provided for @pendingChargesWarning.
   ///
   /// In pt, this message translates to:

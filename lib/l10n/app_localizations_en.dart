@@ -327,6 +327,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeInstallmentPurchaseTooltip => 'Remove installment purchase';
 
   @override
+  String get installmentDetailsToggleShow => 'View installments';
+
+  @override
+  String get installmentDetailsToggleHide => 'Hide installments';
+
+  @override
+  String get installmentPaidTooltip => 'Paid installment';
+
+  @override
+  String get installmentPendingTooltip => 'Pending installment';
+
+  @override
   String pendingChargesWarning(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

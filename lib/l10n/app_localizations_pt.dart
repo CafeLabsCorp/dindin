@@ -325,6 +325,18 @@ class AppLocalizationsPt extends AppLocalizations {
   String get removeInstallmentPurchaseTooltip => 'Remover parcelamento';
 
   @override
+  String get installmentDetailsToggleShow => 'Ver parcelas';
+
+  @override
+  String get installmentDetailsToggleHide => 'Ocultar parcelas';
+
+  @override
+  String get installmentPaidTooltip => 'Parcela paga';
+
+  @override
+  String get installmentPendingTooltip => 'Parcela pendente';
+
+  @override
   String pendingChargesWarning(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

@@ -133,6 +133,10 @@
   },
   "removeInstallmentPurchaseConfirmTitle": "Remover esse parcelamento?",
   "removeInstallmentPurchaseTooltip": "Remover parcelamento",
+  "installmentDetailsToggleShow": "Ver parcelas",
+  "installmentDetailsToggleHide": "Ocultar parcelas",
+  "installmentPaidTooltip": "Parcela paga",
+  "installmentPendingTooltip": "Parcela pendente",
 
   "pendingChargesWarning": "{count, plural, =1{1 cobrança não foi lançada porque o saldo da conta não cobriu. Ela entra sozinha assim que houver saldo.} other{{count} cobranças não foram lançadas porque o saldo da conta não cobriu. Elas entram sozinhas assim que houver saldo.}}",
   "@pendingChargesWarning": {

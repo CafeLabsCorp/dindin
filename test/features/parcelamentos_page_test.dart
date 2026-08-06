@@ -13,6 +13,7 @@ import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/services/firestore_service.dart';
 import 'package:dindin/theme/theme.dart';
+import 'package:dindin/utils/format.dart';
 
 void main() {
   setUpAll(() async {
@@ -145,6 +146,56 @@ void main() {
     expect(find.textContaining('encurta o prazo'), findsOneWidget);
     expect(find.textContaining('Quitar tudo'), findsOneWidget);
     expect(find.textContaining('700,00'), findsWidgets);
+  });
+
+  testWidgets('mostra o progresso de parcelas pagas', (tester) async {
+    await pump(tester, purchases: const [emAndamento]);
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 de 10 parcelas pagas'), findsOneWidget);
+  });
+
+  testWidgets('o valor de cada parcela só aparece depois de expandir a lista', (tester) async {
+    // 140,90 em 6x -> 23,49 nas duas primeiras, 23,48 nas outras quatro
+    // (resto do arredondamento nas primeiras parcelas).
+    await pump(
+      tester,
+      purchases: const [
+        InstallmentPurchase(
+          id: 'p1',
+          name: 'Fone',
+          totalAmount: 140.90,
+          installments: 6,
+          purchaseDate: '2026-01-01',
+          firstChargeDate: '2026-01-10',
+          createdAt: '2026-01-01',
+          chargedInstallments: 2,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(formatCurrency(23.49)),
+      findsNothing,
+      reason: 'recolhido por padrão',
+    );
+
+    await tester.tap(find.text('Ver parcelas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(formatCurrency(23.49)), findsNWidgets(2));
+    expect(find.text(formatCurrency(23.48)), findsNWidgets(4));
+    expect(
+      find.byIcon(Icons.check),
+      findsNWidgets(2),
+      reason: 'as 2 primeiras parcelas já foram cobradas',
+    );
+
+    await tester.tap(find.text('Ocultar parcelas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(formatCurrency(23.49)), findsNothing);
   });
 
   testWidgets('adicionar parcelamento sem nome mostra o erro de nome obrigatório', (tester) async {
