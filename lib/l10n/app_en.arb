@@ -85,6 +85,9 @@
   "subscriptionChargedOnLabel": "Charged on day {day}",
   "removeSubscriptionConfirmTitle": "Remove this subscription?",
   "removeSubscriptionTooltip": "Remove subscription",
+  "autoChargeSwitchTooltip": "Automatic billing",
+  "chargeNowTooltip": "Charge now",
+  "chargeNowInsufficientBalance": "Charge not posted — insufficient balance.",
 
   "installmentPurchasesTitle": "Installment purchases",
   "installmentPurchasesSubtitle": "A card purchase split into installments, billed automatically over the following months starting from the first charge.",

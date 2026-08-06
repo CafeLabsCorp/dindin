@@ -110,15 +110,19 @@ class FirestoreService {
   }
 
   Stream<List<Category>> watchCategories() {
-    return _categories.orderBy('createdAt').snapshots().map(
-      (s) => s.docs.map((d) => Category.fromMap(d.id, d.data())).toList(),
-    );
+    return _categories
+        .orderBy('createdAt')
+        .snapshots()
+        .map(
+          (s) => s.docs.map((d) => Category.fromMap(d.id, d.data())).toList(),
+        );
   }
 
   Stream<List<Income>> watchIncomes() {
-    return _incomes.orderBy('date', descending: true).snapshots().map(
-      (s) => s.docs.map((d) => Income.fromMap(d.id, d.data())).toList(),
-    );
+    return _incomes
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => Income.fromMap(d.id, d.data())).toList());
   }
 
   Stream<List<Allocation>> watchAllocations() {
@@ -128,21 +132,33 @@ class FirestoreService {
   }
 
   Stream<List<Expense>> watchExpenses() {
-    return _expenses.orderBy('date', descending: true).snapshots().map(
-      (s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
-    );
+    return _expenses
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map(
+          (s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
+        );
   }
 
   Stream<List<Subscription>> watchSubscriptions() {
-    return _subscriptions.orderBy('createdAt').snapshots().map(
-      (s) => s.docs.map((d) => Subscription.fromMap(d.id, d.data())).toList(),
-    );
+    return _subscriptions
+        .orderBy('createdAt')
+        .snapshots()
+        .map(
+          (s) =>
+              s.docs.map((d) => Subscription.fromMap(d.id, d.data())).toList(),
+        );
   }
 
   Stream<List<InstallmentPurchase>> watchInstallmentPurchases() {
-    return _installmentPurchases.orderBy('createdAt').snapshots().map(
-      (s) => s.docs.map((d) => InstallmentPurchase.fromMap(d.id, d.data())).toList(),
-    );
+    return _installmentPurchases
+        .orderBy('createdAt')
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map((d) => InstallmentPurchase.fromMap(d.id, d.data()))
+              .toList(),
+        );
   }
 
   Future<AppDb> fetchAll() async {
@@ -236,8 +252,9 @@ class FirestoreService {
       name: name ?? current.name,
       recurring: recurring ?? current.recurring,
       createdAt: current.createdAt,
-      monthlyBudget:
-          clearMonthlyBudget ? null : (monthlyBudget ?? current.monthlyBudget),
+      monthlyBudget: clearMonthlyBudget
+          ? null
+          : (monthlyBudget ?? current.monthlyBudget),
       kind: kind ?? current.kind,
       goalAmount: clearGoalAmount ? null : (goalAmount ?? current.goalAmount),
       allowNegative: allowNegative ?? current.allowNegative,
@@ -435,11 +452,15 @@ class FirestoreService {
       if (!snap.exists) throw StateError('allocation not found');
       final data = snap.data()!;
       if (data['transferId'] != null) {
-        throw StateError('cannot edit a transfer leg directly; recreate the transfer');
+        throw StateError(
+          'cannot edit a transfer leg directly; recreate the transfer',
+        );
       }
       final oldCat = data['categoryId'] as String;
       if (categoryId != oldCat) {
-        throw StateError('changing an allocation\'s caixinha is not supported; delete and recreate');
+        throw StateError(
+          'changing an allocation\'s caixinha is not supported; delete and recreate',
+        );
       }
       final catSnap = await tx.get(_categories.doc(categoryId));
       if (!catSnap.exists) throw StateError('category not found');
@@ -453,7 +474,9 @@ class FirestoreService {
       }
       final newCat = catBal + amount - old;
       if (!_catDeltaOk(category, catBal, newCat)) {
-        throw StateError('reducing this allocation would overdraw the caixinha');
+        throw StateError(
+          'reducing this allocation would overdraw the caixinha',
+        );
       }
       tx.set(_allocations.doc(id), allocation.toMap());
       tx.set(_account, {'balance': newAcct});
@@ -489,7 +512,9 @@ class FirestoreService {
       final catBal = await _readBalance(tx, _balance(cat));
       final newCat = catBal - amt;
       if (!_catDeltaOk(category, catBal, newCat)) {
-        throw StateError('removing this allocation would overdraw the caixinha');
+        throw StateError(
+          'removing this allocation would overdraw the caixinha',
+        );
       }
       tx.delete(_allocations.doc(id));
       tx.set(_account, {'balance': acct + amt});
@@ -555,15 +580,18 @@ class FirestoreService {
   /// effect on its caixinha. The destination can't have already been spent
   /// below the transferred amount.
   Future<void> deleteTransfer(String transferId) async {
-    final legs =
-        await _allocations.where('transferId', isEqualTo: transferId).get();
+    final legs = await _allocations
+        .where('transferId', isEqualTo: transferId)
+        .get();
     if (legs.docs.isEmpty) return;
     final legInfos = legs.docs
-        .map((d) => (
-              ref: d.reference,
-              cat: d.data()['categoryId'] as String,
-              amt: (d.data()['amount'] as num).toDouble(),
-            ))
+        .map(
+          (d) => (
+            ref: d.reference,
+            cat: d.data()['categoryId'] as String,
+            amt: (d.data()['amount'] as num).toDouble(),
+          ),
+        )
         .toList();
     await _db.runTransaction((tx) async {
       final cats = {for (final l in legInfos) l.cat};
@@ -666,7 +694,9 @@ class FirestoreService {
       final data = snap.data()!;
       final oldCat = data['categoryId'] as String?;
       if (oldCat != categoryId) {
-        throw StateError('moving an expense between caixinha and account is not supported; delete and recreate');
+        throw StateError(
+          'moving an expense between caixinha and account is not supported; delete and recreate',
+        );
       }
       final old = (data['amount'] as num).toDouble();
       if (categoryId == null) {
@@ -727,13 +757,20 @@ class FirestoreService {
   /// Returns the outcome plus, when it can go through, the balance doc to
   /// write and its new value.
   Future<
-    (_ChargeOutcome, ({DocumentReference<Map<String, dynamic>> ref, double newBalance})?)
+    (
+      _ChargeOutcome,
+      ({DocumentReference<Map<String, dynamic>> ref, double newBalance})?,
+    )
   >
   _readChargeSource(Transaction tx, String? categoryId, double amount) async {
     if (categoryId == null) {
       final acct = await _readBalance(tx, _account);
-      if (amount > acct + _eps) return (_ChargeOutcome.insufficientBalance, null);
-      return (_ChargeOutcome.charged, (ref: _account, newBalance: acct - amount));
+      if (amount > acct + _eps)
+        return (_ChargeOutcome.insufficientBalance, null);
+      return (
+        _ChargeOutcome.charged,
+        (ref: _account, newBalance: acct - amount),
+      );
     }
     final catSnap = await tx.get(_categories.doc(categoryId));
     final catData = catSnap.data();
@@ -749,7 +786,10 @@ class FirestoreService {
     if (!_catDeltaOk(category, catBal, newCat)) {
       return (_ChargeOutcome.insufficientBalance, null);
     }
-    return (_ChargeOutcome.charged, (ref: _balance(categoryId), newBalance: newCat));
+    return (
+      _ChargeOutcome.charged,
+      (ref: _balance(categoryId), newBalance: newCat),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -822,6 +862,7 @@ class FirestoreService {
           createdAt: current.createdAt,
           lastChargedDate: current.lastChargedDate,
           categoryId: categoryId,
+          autoChargeEnabled: current.autoChargeEnabled,
         ).toMap(),
       );
     });
@@ -829,6 +870,14 @@ class FirestoreService {
 
   Future<void> deleteSubscription(String id) async {
     await _subscriptions.doc(id).delete();
+  }
+
+  /// Flips [Subscription.autoChargeEnabled] — the switch on the Assinaturas
+  /// row. A single-field update (not the full-doc-rewrite pattern
+  /// [updateSubscription] uses) since this carries no money invariant to
+  /// protect and nothing else on the doc can conflict with it.
+  Future<void> setSubscriptionAutoCharge(String id, bool enabled) async {
+    await _subscriptions.doc(id).update({'autoChargeEnabled': enabled});
   }
 
   /// Catches up every subscription's missed due dates since it was last
@@ -846,6 +895,10 @@ class FirestoreService {
   /// account" guarantee) and is retried from the same due date next time this
   /// runs; other subscriptions are unaffected. The Gastos screen surfaces
   /// whatever is left pending — see `recurring_schedule.dart`.
+  ///
+  /// Skips any subscription with [Subscription.autoChargeEnabled] `false` —
+  /// its pending due dates just sit there until the user posts them via
+  /// [chargeSubscriptionNow].
   Future<RecurringChargeReport> catchUpSubscriptions() async {
     final snap = await _subscriptions.get();
     final today = _now();
@@ -853,91 +906,126 @@ class FirestoreService {
     var chargedTotal = 0.0;
     for (final doc in snap.docs) {
       final subscription = Subscription.fromMap(doc.id, doc.data());
-      for (final due in schedule.pendingDueDates(subscription, today)) {
-        final dueIso = schedule.isoDate(due);
-        // Written by the transaction body with the amount it actually billed
-        // (read fresh inside), not the possibly-stale one captured above. A
-        // retry simply overwrites it, so what survives is what committed.
-        var billed = 0.0;
-        final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
-          // Re-read the subscription INSIDE the transaction. Two things
-          // depend on this, and both break without it:
-          //
-          //  1. It puts this doc in the transaction's read set, so a
-          //     concurrent charge of the same due date from another device
-          //     (or a second tab) is detected as a conflict.
-          //  2. On the retry that conflict triggers, the guard below runs
-          //     against the FRESH doc. The `subscription` captured above came
-          //     from a get() outside the transaction and stays stale across
-          //     retries — trusting it would re-bill a due date the other
-          //     device just billed, since the retry only refreshes what the
-          //     transaction itself read.
-          //
-          // Reads must all precede writes in a Firestore transaction, so this
-          // and the balance read below both come before any tx.set.
-          final fresh = await tx.get(doc.reference);
-          final data = fresh.data();
-          if (data == null) return _ChargeOutcome.superseded; // deleted meanwhile
-          final current = Subscription.fromMap(doc.id, data);
-          final alreadyCharged =
-              current.lastChargedDate != null &&
-              !DateTime.parse(
-                current.lastChargedDate!.substring(0, 10),
-              ).isBefore(due);
-          if (alreadyCharged) return _ChargeOutcome.superseded;
-
-          final (sourceOutcome, source) = await _readChargeSource(
-            tx,
-            current.categoryId,
-            current.amount,
-          );
-          if (source == null) return sourceOutcome;
-
-          final expenseDoc = _expenses.doc();
-          final expense = Expense(
-            id: expenseDoc.id,
-            date: dueIso,
-            amount: current.amount,
-            // Same funding source as the subscription: null = account, a
-            // caixinha id = that caixinha. The expense is an ordinary one in
-            // every other respect.
-            categoryId: current.categoryId,
-            description: current.name,
-            // Links the generated expense back to the subscription that
-            // produced it, so the app can tell it apart from a manual entry
-            // with the same description.
-            sourceType: ExpenseSource.subscription.value,
-            sourceId: current.id,
-          );
-          tx.set(expenseDoc, expense.toMap());
-          tx.set(source.ref, {'balance': source.newBalance});
-          // A full overwrite (not a merge) — every other field is copied
-          // from the just-read [current] unchanged, so this never depends
-          // on transactional merge support.
-          tx.set(
-            doc.reference,
-            Subscription(
-              id: current.id,
-              name: current.name,
-              amount: current.amount,
-              dueDay: current.dueDay,
-              createdAt: current.createdAt,
-              lastChargedDate: dueIso,
-              categoryId: current.categoryId,
-            ).toMap(),
-          );
-          billed = current.amount;
-          return _ChargeOutcome.charged;
-        });
-        // Insufficient balance / missing caixinha -> retry next run, and stay
-        // visible as pending meanwhile.
-        // Superseded -> another runner owns this subscription's catch-up.
-        if (outcome != _ChargeOutcome.charged) break;
-        charged++;
-        chargedTotal += billed;
-      }
+      if (!subscription.autoChargeEnabled) continue;
+      final result = await _chargePendingDueDates(doc.reference, today);
+      charged += result.count;
+      chargedTotal += result.total;
     }
-    return RecurringChargeReport(count: charged, total: agg.round2(chargedTotal));
+    return RecurringChargeReport(
+      count: charged,
+      total: agg.round2(chargedTotal),
+    );
+  }
+
+  /// Posts every pending due date for a single subscription right now,
+  /// ignoring [Subscription.autoChargeEnabled] — the "Cobrar agora" button
+  /// for a subscription the user turned automatic billing off for. Same
+  /// balance-gate and idempotency guarantees as [catchUpSubscriptions]: a due
+  /// date that can't be covered stops the run there and stays pending.
+  Future<RecurringChargeReport> chargeSubscriptionNow(String id) async {
+    final result = await _chargePendingDueDates(_subscriptions.doc(id), _now());
+    return RecurringChargeReport(count: result.count, total: result.total);
+  }
+
+  /// Shared by [catchUpSubscriptions] (which filters by
+  /// [Subscription.autoChargeEnabled] before calling this) and
+  /// [chargeSubscriptionNow] (which doesn't) — everything below this line is
+  /// indifferent to why a given subscription is being charged.
+  Future<({int count, double total})> _chargePendingDueDates(
+    DocumentReference<Map<String, dynamic>> ref,
+    DateTime today,
+  ) async {
+    final snap = await ref.get();
+    final data = snap.data();
+    if (data == null) return (count: 0, total: 0.0);
+    final subscription = Subscription.fromMap(ref.id, data);
+    var charged = 0;
+    var chargedTotal = 0.0;
+    for (final due in schedule.pendingDueDates(subscription, today)) {
+      final dueIso = schedule.isoDate(due);
+      // Written by the transaction body with the amount it actually billed
+      // (read fresh inside), not the possibly-stale one captured above. A
+      // retry simply overwrites it, so what survives is what committed.
+      var billed = 0.0;
+      final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
+        // Re-read the subscription INSIDE the transaction. Two things
+        // depend on this, and both break without it:
+        //
+        //  1. It puts this doc in the transaction's read set, so a
+        //     concurrent charge of the same due date from another device
+        //     (or a second tab) is detected as a conflict.
+        //  2. On the retry that conflict triggers, the guard below runs
+        //     against the FRESH doc. The `subscription` captured above came
+        //     from a get() outside the transaction and stays stale across
+        //     retries — trusting it would re-bill a due date the other
+        //     device just billed, since the retry only refreshes what the
+        //     transaction itself read.
+        //
+        // Reads must all precede writes in a Firestore transaction, so this
+        // and the balance read below both come before any tx.set.
+        final fresh = await tx.get(ref);
+        final data = fresh.data();
+        if (data == null) return _ChargeOutcome.superseded; // deleted meanwhile
+        final current = Subscription.fromMap(ref.id, data);
+        final alreadyCharged =
+            current.lastChargedDate != null &&
+            !DateTime.parse(
+              current.lastChargedDate!.substring(0, 10),
+            ).isBefore(due);
+        if (alreadyCharged) return _ChargeOutcome.superseded;
+
+        final (sourceOutcome, source) = await _readChargeSource(
+          tx,
+          current.categoryId,
+          current.amount,
+        );
+        if (source == null) return sourceOutcome;
+
+        final expenseDoc = _expenses.doc();
+        final expense = Expense(
+          id: expenseDoc.id,
+          date: dueIso,
+          amount: current.amount,
+          // Same funding source as the subscription: null = account, a
+          // caixinha id = that caixinha. The expense is an ordinary one in
+          // every other respect.
+          categoryId: current.categoryId,
+          description: current.name,
+          // Links the generated expense back to the subscription that
+          // produced it, so the app can tell it apart from a manual entry
+          // with the same description.
+          sourceType: ExpenseSource.subscription.value,
+          sourceId: current.id,
+        );
+        tx.set(expenseDoc, expense.toMap());
+        tx.set(source.ref, {'balance': source.newBalance});
+        // A full overwrite (not a merge) — every other field is copied
+        // from the just-read [current] unchanged, so this never depends
+        // on transactional merge support.
+        tx.set(
+          ref,
+          Subscription(
+            id: current.id,
+            name: current.name,
+            amount: current.amount,
+            dueDay: current.dueDay,
+            createdAt: current.createdAt,
+            lastChargedDate: dueIso,
+            categoryId: current.categoryId,
+            autoChargeEnabled: current.autoChargeEnabled,
+          ).toMap(),
+        );
+        billed = current.amount;
+        return _ChargeOutcome.charged;
+      });
+      // Insufficient balance / missing caixinha -> retry next run, and stay
+      // visible as pending meanwhile.
+      // Superseded -> another runner owns this subscription's catch-up.
+      if (outcome != _ChargeOutcome.charged) break;
+      charged++;
+      chargedTotal += billed;
+    }
+    return (count: charged, total: agg.round2(chargedTotal));
   }
 
   // -------------------------------------------------------------------------
@@ -1101,7 +1189,8 @@ class FirestoreService {
           // the next one owed.
           final fresh = await tx.get(doc.reference);
           final data = fresh.data();
-          if (data == null) return _ChargeOutcome.superseded; // deleted meanwhile
+          if (data == null)
+            return _ChargeOutcome.superseded; // deleted meanwhile
           final current = InstallmentPurchase.fromMap(doc.id, data);
           if (current.chargedInstallments != index) {
             return _ChargeOutcome.superseded;
@@ -1111,7 +1200,11 @@ class FirestoreService {
           // charge instead of billing a debt that no longer exists.
           final outstanding = schedule.outstandingAmount(current);
           if (outstanding <= _eps) return _ChargeOutcome.superseded;
-          final amount = schedule.installmentChargeAmount(current, index, outstanding);
+          final amount = schedule.installmentChargeAmount(
+            current,
+            index,
+            outstanding,
+          );
 
           final (sourceOutcome, source) = await _readChargeSource(
             tx,
@@ -1126,7 +1219,8 @@ class FirestoreService {
             date: dueIso,
             amount: amount,
             categoryId: current.categoryId,
-            description: '${current.name} (${index + 1}/${current.installments})',
+            description:
+                '${current.name} (${index + 1}/${current.installments})',
             // Links the generated expense back to the purchase that produced
             // it — see [catchUpSubscriptions].
             sourceType: ExpenseSource.installment.value,
@@ -1162,7 +1256,10 @@ class FirestoreService {
         chargedTotal += billed;
       }
     }
-    return RecurringChargeReport(count: charged, total: agg.round2(chargedTotal));
+    return RecurringChargeReport(
+      count: charged,
+      total: agg.round2(chargedTotal),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -1239,7 +1336,8 @@ class FirestoreService {
       for (final a in db.allocations) (_allocations.doc(a.id), a.toMap()),
       for (final e in db.expenses) (_expenses.doc(e.id), e.toMap()),
       for (final s in db.subscriptions) (_subscriptions.doc(s.id), s.toMap()),
-      for (final p in db.installmentPurchases) (_installmentPurchases.doc(p.id), p.toMap()),
+      for (final p in db.installmentPurchases)
+        (_installmentPurchases.doc(p.id), p.toMap()),
     ]);
 
     // 4. Write the derived balance docs last (recomputed in step 0). Only
@@ -1269,7 +1367,8 @@ class FirestoreService {
   }
 
   Future<void> _setDocs(
-    List<(DocumentReference<Map<String, dynamic>>, Map<String, dynamic>)> writes,
+    List<(DocumentReference<Map<String, dynamic>>, Map<String, dynamic>)>
+    writes,
   ) async {
     for (var i = 0; i < writes.length; i += 400) {
       final batch = _db.batch();

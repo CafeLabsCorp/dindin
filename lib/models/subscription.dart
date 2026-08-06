@@ -29,6 +29,15 @@ class Subscription {
   /// which reads as "the account" — exactly how they already behaved.
   final String? categoryId;
 
+  /// Whether [FirestoreService.catchUpSubscriptions] is allowed to bill this
+  /// subscription on its own. `false` means only
+  /// [FirestoreService.chargeSubscriptionNow] (the "Cobrar agora" button)
+  /// posts its due dates — they still pile up as pending, they just wait for
+  /// a manual tap instead of being caught up automatically on app open.
+  /// Absent (every subscription created before this field existed) reads as
+  /// `true`, exactly how they already behaved.
+  final bool autoChargeEnabled;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -37,6 +46,7 @@ class Subscription {
     required this.createdAt,
     this.lastChargedDate,
     this.categoryId,
+    this.autoChargeEnabled = true,
   });
 
   /// Whether this charge comes out of a caixinha rather than the account.
@@ -51,6 +61,7 @@ class Subscription {
       createdAt: map['createdAt'] as String,
       lastChargedDate: map['lastChargedDate'] as String?,
       categoryId: map['categoryId'] as String?,
+      autoChargeEnabled: map['autoChargeEnabled'] as bool? ?? true,
     );
   }
 
@@ -62,6 +73,7 @@ class Subscription {
       'createdAt': createdAt,
       if (lastChargedDate != null) 'lastChargedDate': lastChargedDate,
       if (categoryId != null) 'categoryId': categoryId,
+      if (!autoChargeEnabled) 'autoChargeEnabled': false,
     };
   }
 

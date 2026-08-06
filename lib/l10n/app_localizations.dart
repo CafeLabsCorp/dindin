@@ -554,6 +554,24 @@ abstract class AppLocalizations {
   /// **'Remover assinatura'**
   String get removeSubscriptionTooltip;
 
+  /// No description provided for @autoChargeSwitchTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrança automática'**
+  String get autoChargeSwitchTooltip;
+
+  /// No description provided for @chargeNowTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrar agora'**
+  String get chargeNowTooltip;
+
+  /// No description provided for @chargeNowInsufficientBalance.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrança não lançada — saldo insuficiente.'**
+  String get chargeNowInsufficientBalance;
+
   /// No description provided for @installmentPurchasesTitle.
   ///
   /// In pt, this message translates to:

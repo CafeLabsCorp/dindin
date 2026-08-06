@@ -108,6 +108,9 @@
   },
   "removeSubscriptionConfirmTitle": "Remover essa assinatura?",
   "removeSubscriptionTooltip": "Remover assinatura",
+  "autoChargeSwitchTooltip": "Cobrança automática",
+  "chargeNowTooltip": "Cobrar agora",
+  "chargeNowInsufficientBalance": "Cobrança não lançada — saldo insuficiente.",
 
   "installmentPurchasesTitle": "Compras parceladas",
   "installmentPurchasesSubtitle": "Uma compra parcelada no cartão, dividida automaticamente pelos meses seguintes a partir da primeira cobrança.",

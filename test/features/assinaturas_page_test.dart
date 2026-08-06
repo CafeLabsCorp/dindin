@@ -167,6 +167,74 @@ void main() {
     expect(find.text('Informe um nome.'), findsOneWidget);
   });
 
+  testWidgets('switch reflete o autoChargeEnabled de cada assinatura', (tester) async {
+    await pump(
+      tester,
+      subscriptions: const [
+        Subscription(id: 's1', name: 'Netflix', amount: 39.90, dueDay: 5, createdAt: '2026-01-01'),
+        Subscription(
+          id: 's2',
+          name: 'Spotify',
+          amount: 19.90,
+          dueDay: 5,
+          createdAt: '2026-01-01',
+          autoChargeEnabled: false,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
+    expect(switches, hasLength(2));
+    expect(switches[0].value, isTrue);
+    expect(switches[1].value, isFalse);
+  });
+
+  testWidgets('botão de cobrar agora só aparece quando a cobrança automática está desligada', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      subscriptions: const [
+        Subscription(id: 's1', name: 'Netflix', amount: 39.90, dueDay: 5, createdAt: '2026-01-01'),
+        Subscription(
+          id: 's2',
+          name: 'Spotify',
+          amount: 19.90,
+          dueDay: 5,
+          createdAt: '2026-01-01',
+          autoChargeEnabled: false,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Cobrar agora'), findsOneWidget);
+  });
+
+  testWidgets('botão de cobrar agora fica desabilitado sem cobrança pendente', (tester) async {
+    await pump(
+      tester,
+      subscriptions: const [
+        Subscription(
+          id: 's1',
+          name: 'Netflix',
+          amount: 39.90,
+          dueDay: 20,
+          createdAt: '2026-01-01',
+          autoChargeEnabled: false,
+        ),
+      ],
+      today: DateTime(2026, 1, 1),
+    );
+    await tester.pumpAndSettle();
+
+    final button = tester.widget<IconButton>(
+      find.ancestor(of: find.byTooltip('Cobrar agora'), matching: find.byType(IconButton)),
+    );
+    expect(button.onPressed, isNull);
+  });
+
   testWidgets('editar abre a folha já preenchida com os valores atuais', (tester) async {
     await pump(
       tester,

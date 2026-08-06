@@ -47,5 +47,35 @@ void main() {
       expect(restored.id, 's1');
       expect(restored.name, 'Netflix');
     });
+
+    test('autoChargeEnabled defaults to true and is omitted from toMap', () {
+      const sub = Subscription(id: 's1', name: 'Netflix', amount: 39.9, dueDay: 5, createdAt: '2026-01-01');
+      expect(sub.autoChargeEnabled, isTrue);
+      expect(sub.toMap().containsKey('autoChargeEnabled'), isFalse);
+    });
+
+    test('fromMap defaults autoChargeEnabled to true when absent (pre-existing docs)', () {
+      final sub = Subscription.fromMap('s1', {
+        'name': 'Netflix',
+        'amount': 39.9,
+        'dueDay': 5,
+        'createdAt': '2026-01-01',
+      });
+      expect(sub.autoChargeEnabled, isTrue);
+    });
+
+    test('autoChargeEnabled false round-trips through toMap/fromMap', () {
+      const sub = Subscription(
+        id: 's1',
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 5,
+        createdAt: '2026-01-01',
+        autoChargeEnabled: false,
+      );
+      final map = sub.toMap();
+      expect(map['autoChargeEnabled'], false);
+      expect(Subscription.fromMap('s1', map).autoChargeEnabled, isFalse);
+    });
   });
 }

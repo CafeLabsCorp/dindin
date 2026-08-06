@@ -36,6 +36,10 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
   String? _error;
   bool _submitting = false;
 
+  /// Subscriptions with a "Cobrar agora" tap in flight — keyed by id so one
+  /// row's request never disables another's button.
+  final _chargingIds = <String>{};
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -85,16 +89,59 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
       builder: (ctx) => AlertDialog(
         title: Text(l10n.removeSubscriptionConfirmTitle),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.remove)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.remove),
+          ),
         ],
       ),
     );
     if (confirmed != true) return;
-    await ref.read(firestoreServiceProvider)!.deleteSubscription(subscription.id);
+    await ref
+        .read(firestoreServiceProvider)!
+        .deleteSubscription(subscription.id);
   }
 
-  Future<void> _edit(Subscription subscription, List<Category> categories) async {
+  Future<void> _toggleAutoCharge(
+    Subscription subscription,
+    bool enabled,
+  ) async {
+    final firestore = ref.read(firestoreServiceProvider);
+    if (firestore == null) return;
+    await firestore.setSubscriptionAutoCharge(subscription.id, enabled);
+  }
+
+  /// Posts whatever is pending for [subscription] right now — the manual
+  /// counterpart to catch-up, for a subscription the user turned automatic
+  /// billing off for. A silent no-op result (nothing charged, e.g. the
+  /// account balance can't cover it) gets a snackbar, since there's no form
+  /// error slot on a list row the way create/edit have.
+  Future<void> _chargeNow(Subscription subscription) async {
+    final firestore = ref.read(firestoreServiceProvider);
+    if (firestore == null) return;
+    setState(() => _chargingIds.add(subscription.id));
+    try {
+      final report = await firestore.chargeSubscriptionNow(subscription.id);
+      if (!mounted) return;
+      if (report.isEmpty) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.chargeNowInsufficientBalance)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _chargingIds.remove(subscription.id));
+    }
+  }
+
+  Future<void> _edit(
+    Subscription subscription,
+    List<Category> categories,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -109,7 +156,8 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final subscriptionsAsync = ref.watch(subscriptionsProvider);
-    final categories = ref.watch(categoriesProvider).value ?? const <Category>[];
+    final categories =
+        ref.watch(categoriesProvider).value ?? const <Category>[];
     final catchUpState = ref.watch(recurringChargesCatchUpProvider);
     final showPending = catchUpState.hasValue;
     final today = ref.watch(todayProvider);
@@ -145,12 +193,16 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                     child: DropdownButtonFormField<int>(
                       initialValue: _dueDay,
                       isExpanded: true,
-                      decoration: InputDecoration(labelText: l10n.subscriptionDueDayLabel),
+                      decoration: InputDecoration(
+                        labelText: l10n.subscriptionDueDayLabel,
+                      ),
                       items: [
                         for (var d = 1; d <= 31; d++)
                           DropdownMenuItem(value: d, child: Text('$d')),
                       ],
-                      onChanged: _submitting ? null : (v) => setState(() => _dueDay = v ?? _dueDay),
+                      onChanged: _submitting
+                          ? null
+                          : (v) => setState(() => _dueDay = v ?? _dueDay),
                     ),
                   ),
                   (
@@ -158,7 +210,9 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                     child: TextField(
                       controller: _amountController,
                       enabled: !_submitting,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
                         labelText: l10n.amountLabel,
                         hintText: l10n.amountHint,
@@ -170,7 +224,9 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                     child: ChargeSourceField(
                       categories: categories,
                       value: _source,
-                      onChanged: _submitting ? null : (v) => setState(() => _source = v),
+                      onChanged: _submitting
+                          ? null
+                          : (v) => setState(() => _source = v),
                     ),
                   ),
                 ],
@@ -183,7 +239,12 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -195,12 +256,15 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
             children: [
               Text(
                 l10n.subscriptionsListTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 12),
               subscriptionsAsync.when(
                 data: (subscriptions) {
-                  if (subscriptions.isEmpty) return EmptyState(l10n.subscriptionsEmptyState);
+                  if (subscriptions.isEmpty)
+                    return EmptyState(l10n.subscriptionsEmptyState);
                   return Column(
                     children: [
                       for (var i = 0; i < subscriptions.length; i++)
@@ -208,10 +272,16 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                           subscription: subscriptions[i],
                           categories: categories,
                           pendingCharges: showPending
-                              ? schedule.pendingDueDates(subscriptions[i], today).length
+                              ? schedule
+                                    .pendingDueDates(subscriptions[i], today)
+                                    .length
                               : 0,
+                          charging: _chargingIds.contains(subscriptions[i].id),
                           onEdit: () => _edit(subscriptions[i], categories),
                           onDelete: () => _delete(subscriptions[i]),
+                          onToggleAutoCharge: (enabled) =>
+                              _toggleAutoCharge(subscriptions[i], enabled),
+                          onChargeNow: () => _chargeNow(subscriptions[i]),
                           divider: i > 0,
                         ),
                     ],
@@ -232,16 +302,22 @@ class _SubscriptionRow extends StatelessWidget {
   final Subscription subscription;
   final List<Category> categories;
   final int pendingCharges;
+  final bool charging;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final ValueChanged<bool> onToggleAutoCharge;
+  final VoidCallback onChargeNow;
   final bool divider;
 
   const _SubscriptionRow({
     required this.subscription,
     required this.categories,
     required this.pendingCharges,
+    required this.charging,
     required this.onEdit,
     required this.onDelete,
+    required this.onToggleAutoCharge,
+    required this.onChargeNow,
     required this.divider,
   });
 
@@ -266,7 +342,9 @@ class _SubscriptionRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        border: divider ? Border(top: BorderSide(color: context.tokens.border)) : null,
+        border: divider
+            ? Border(top: BorderSide(color: context.tokens.border))
+            : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -309,6 +387,30 @@ class _SubscriptionRow extends StatelessWidget {
               ],
             ),
           ),
+          Tooltip(
+            message: l10n.autoChargeSwitchTooltip,
+            child: Switch(
+              value: subscription.autoChargeEnabled,
+              onChanged: charging ? null : onToggleAutoCharge,
+            ),
+          ),
+          if (!subscription.autoChargeEnabled)
+            IconButton(
+              // Charging is only meaningful once something is actually due,
+              // and never for a caixinha that no longer exists — same guard
+              // catch-up itself would hit.
+              onPressed: (charging || pendingCharges == 0 || missingCaixinha)
+                  ? null
+                  : onChargeNow,
+              icon: charging
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.bolt_outlined),
+              tooltip: l10n.chargeNowTooltip,
+            ),
           IconButton(
             onPressed: onEdit,
             icon: const Icon(Icons.edit_outlined),
@@ -333,13 +435,18 @@ class _EditSubscriptionSheet extends ConsumerStatefulWidget {
   final Subscription subscription;
   final List<Category> categories;
 
-  const _EditSubscriptionSheet({required this.subscription, required this.categories});
+  const _EditSubscriptionSheet({
+    required this.subscription,
+    required this.categories,
+  });
 
   @override
-  ConsumerState<_EditSubscriptionSheet> createState() => _EditSubscriptionSheetState();
+  ConsumerState<_EditSubscriptionSheet> createState() =>
+      _EditSubscriptionSheetState();
 }
 
-class _EditSubscriptionSheetState extends ConsumerState<_EditSubscriptionSheet> {
+class _EditSubscriptionSheetState
+    extends ConsumerState<_EditSubscriptionSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _amountController;
   late int _dueDay;
@@ -417,7 +524,9 @@ class _EditSubscriptionSheetState extends ConsumerState<_EditSubscriptionSheet> 
         children: [
           Text(
             l10n.editSubscriptionTitle,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           // A day change only ever applies from the next unbilled month —
@@ -444,11 +553,16 @@ class _EditSubscriptionSheetState extends ConsumerState<_EditSubscriptionSheet> 
           DropdownButtonFormField<int>(
             initialValue: _dueDay,
             isExpanded: true,
-            decoration: InputDecoration(labelText: l10n.subscriptionDueDayLabel),
+            decoration: InputDecoration(
+              labelText: l10n.subscriptionDueDayLabel,
+            ),
             items: [
-              for (var d = 1; d <= 31; d++) DropdownMenuItem(value: d, child: Text('$d')),
+              for (var d = 1; d <= 31; d++)
+                DropdownMenuItem(value: d, child: Text('$d')),
             ],
-            onChanged: _submitting ? null : (v) => setState(() => _dueDay = v ?? _dueDay),
+            onChanged: _submitting
+                ? null
+                : (v) => setState(() => _dueDay = v ?? _dueDay),
           ),
           const SizedBox(height: 12),
           ChargeSourceField(
@@ -459,7 +573,10 @@ class _EditSubscriptionSheetState extends ConsumerState<_EditSubscriptionSheet> 
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              child: Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           const SizedBox(height: 16),
           FilledButton(

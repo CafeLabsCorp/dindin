@@ -264,6 +264,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeSubscriptionTooltip => 'Remove subscription';
 
   @override
+  String get autoChargeSwitchTooltip => 'Automatic billing';
+
+  @override
+  String get chargeNowTooltip => 'Charge now';
+
+  @override
+  String get chargeNowInsufficientBalance =>
+      'Charge not posted — insufficient balance.';
+
+  @override
   String get installmentPurchasesTitle => 'Installment purchases';
 
   @override

@@ -263,6 +263,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get removeSubscriptionTooltip => 'Remover assinatura';
 
   @override
+  String get autoChargeSwitchTooltip => 'Cobrança automática';
+
+  @override
+  String get chargeNowTooltip => 'Cobrar agora';
+
+  @override
+  String get chargeNowInsufficientBalance =>
+      'Cobrança não lançada — saldo insuficiente.';
+
+  @override
   String get installmentPurchasesTitle => 'Compras parceladas';
 
   @override

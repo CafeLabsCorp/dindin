@@ -290,6 +290,23 @@ void main() {
         );
       });
 
+      test('keeps autoChargeEnabled untouched — edited elsewhere, not this form', () async {
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 39.90,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            autoChargeEnabled: false,
+          ),
+        );
+
+        await svc.updateSubscription('s1', name: 'Netflix 4K', amount: 59.90, dueDay: 10);
+
+        expect((await subscription('s1'))!.autoChargeEnabled, isFalse);
+      });
+
       test('a price change never re-bills a month already charged', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 3, 20));
         await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
@@ -628,6 +645,92 @@ void main() {
 
         final exps = await expenses()..sort((a, b) => a.date.compareTo(b.date));
         expect(exps.map((e) => e.date), ['2026-01-31', '2026-02-28']);
+      });
+
+      test('skips a subscription with autoChargeEnabled false', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            autoChargeEnabled: false,
+          ),
+        );
+
+        final report = await svc.catchUpSubscriptions();
+
+        expect(report.isEmpty, isTrue);
+        expect(await expenses(), isEmpty);
+        expect(await accountBalance(), 100);
+        expect((await subscription('s1'))!.lastChargedDate, isNull);
+      });
+    });
+
+    group('setSubscriptionAutoCharge', () {
+      test('flips the flag and persists it', () async {
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await svc.setSubscriptionAutoCharge('s1', false);
+        expect((await subscription('s1'))!.autoChargeEnabled, isFalse);
+
+        await svc.setSubscriptionAutoCharge('s1', true);
+        expect((await subscription('s1'))!.autoChargeEnabled, isTrue);
+      });
+    });
+
+    group('chargeSubscriptionNow', () {
+      test('charges a pending due date even with autoChargeEnabled false', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            autoChargeEnabled: false,
+          ),
+        );
+
+        final report = await svc.chargeSubscriptionNow('s1');
+
+        expect(report.count, 1);
+        expect(report.total, 40);
+        expect(await accountBalance(), 60);
+        final stored = (await subscription('s1'))!;
+        expect(stored.lastChargedDate, '2026-01-05');
+        expect(
+          stored.autoChargeEnabled,
+          isFalse,
+          reason: 'charging is not the same action as turning auto-charge back on',
+        );
+      });
+
+      test('leaves the balance untouched when there is nothing pending', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 1));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 20,
+            createdAt: '2026-01-01',
+            autoChargeEnabled: false,
+          ),
+        );
+
+        final report = await svc.chargeSubscriptionNow('s1');
+
+        expect(report.isEmpty, isTrue);
+        expect(await accountBalance(), 100);
       });
     });
   });
