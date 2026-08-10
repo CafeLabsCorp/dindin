@@ -765,8 +765,9 @@ class FirestoreService {
   _readChargeSource(Transaction tx, String? categoryId, double amount) async {
     if (categoryId == null) {
       final acct = await _readBalance(tx, _account);
-      if (amount > acct + _eps)
+      if (amount > acct + _eps) {
         return (_ChargeOutcome.insufficientBalance, null);
+      }
       return (
         _ChargeOutcome.charged,
         (ref: _account, newBalance: acct - amount),
@@ -1189,8 +1190,9 @@ class FirestoreService {
           // the next one owed.
           final fresh = await tx.get(doc.reference);
           final data = fresh.data();
-          if (data == null)
+          if (data == null) {
             return _ChargeOutcome.superseded; // deleted meanwhile
+          }
           final current = InstallmentPurchase.fromMap(doc.id, data);
           if (current.chargedInstallments != index) {
             return _ChargeOutcome.superseded;

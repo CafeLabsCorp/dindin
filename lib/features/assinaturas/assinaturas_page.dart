@@ -263,8 +263,9 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
               const SizedBox(height: 12),
               subscriptionsAsync.when(
                 data: (subscriptions) {
-                  if (subscriptions.isEmpty)
+                  if (subscriptions.isEmpty) {
                     return EmptyState(l10n.subscriptionsEmptyState);
+                  }
                   return Column(
                     children: [
                       for (var i = 0; i < subscriptions.length; i++)
