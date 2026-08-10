@@ -629,17 +629,212 @@ Fazer 3 antes de 2 deixa os saldos dessincronizados no dia um.
   ser paga ou explicitamente perdoada primeiro. TODO: confirmar quando
   esse guard será agendado/implementado.
 
-## Contrato do cliente (estável independente da opção)
+## Superfície de integração
 
-As assinaturas de método público do `FirestoreService` são a costura. Elas
-não mudam se uma escrita vai direto (hoje / Option B) ou por um callable
-(Option A). Nomes de callable e payloads em `functions/index.js` espelham
-esses nomes de argumento 1:1, retornando `{ id }` (ou `{ transferId }`):
+Não existe API REST/GraphQL neste app — a fronteira onde o cliente lê/escreve
+dados é o SDK do Firestore, mais uma implementação paralela e não usada das
+mesmas operações via Cloud Functions. As duas estão documentadas abaixo, cada
+uma no formato que realmente tem.
 
-- `createCategory(name, recurring, monthlyBudget?, kind?, goalAmount?, allowNegative?)`
-- `updateCategory(id, name?, recurring?, monthlyBudget?, clearMonthlyBudget?, kind?, goalAmount?, clearGoalAmount?, allowNegative?)`
-- `deleteCategory(id)`
-- `createIncome(date, amount, source, description?)` / `updateIncome(id, ...)` / `deleteIncome(id)`
-- `createAllocation(categoryId, amount, date)` / `updateAllocation(id, ...)` / `deleteAllocation(id)`
-- `createTransfer(fromCategoryId, toCategoryId, amount, date) -> transferId` / `deleteTransfer(transferId)`
-- `createExpense(date, amount, categoryId?, description?)` / `updateExpense(id, ...)` / `deleteExpense(id)`
+### 1. Firestore, direto do cliente (ativo)
+
+O cliente lê e escreve no Firestore diretamente por
+`lib/services/firestore_service.dart` — não existe um backend próprio do app
+no caminho da requisição; a integridade do dinheiro é aplicada pelo
+`firestore.rules`, não por um servidor confiável (ver "Option B" acima). Cada
+operação abaixo é endereçada por um caminho sob `users/{uid}`; ver
+`docs/ARQUITETURA.pt-br.md` pro detalhamento completo das camadas em `lib/` e
+uma escrita rastreada ponta a ponta.
+
+**Quem pode chamar (vale pra todo caminho abaixo):** `isOwner(uid)` em
+`firestore.rules` — `request.auth.uid == uid`. Nenhuma leitura ou escrita
+cross-user é possível. No cliente, toda chamada de stream/escrita também
+depende de estar logado: `firestoreServiceProvider`
+(`lib/providers/providers.dart`) é `null` enquanto deslogado, e toda tela lê/
+escreve através dele em vez de instanciar `FirestoreService` sozinha.
+
+**Leituras — streams em tempo real**, um por coleção, cada um um
+`.snapshots()` mapeado pro modelo Dart correspondente:
+
+| Método | Caminho no Firestore |
+|---|---|
+| `watchCategories()` | `users/{uid}/categories` |
+| `watchIncomes()` | `users/{uid}/incomes` |
+| `watchAllocations()` | `users/{uid}/allocations` |
+| `watchExpenses()` | `users/{uid}/expenses` |
+| `watchSubscriptions()` | `users/{uid}/subscriptions` |
+| `watchInstallmentPurchases()` | `users/{uid}/installmentPurchases` |
+
+Um stream nunca lança erro no sentido de requisição — um permission-denied
+ou uma conexão caída aparece como `AsyncError` no `StreamProvider`
+correspondente, que as telas (via `ref.watch(...).value`) hoje tratam do
+mesmo jeito que "ainda não carregou", em vez de um estado de erro dedicado.
+TODO: confirmar se uma UI de erro de stream dedicada está planejada; hoje um
+stream negado/quebrado só parece que nunca termina de carregar.
+
+**Escritas — um método do `FirestoreService` por operação, cada um uma
+transação do Firestore.** "Falha com" lista a(s) mensagem(ns) de `StateError`
+lançada(s) ANTES de tentar a escrita (mapeada pra uma string localizada por
+`friendlyErrorMessage`, `lib/utils/errors.dart`); se uma checagem do lado do
+cliente aqui algum dia estiver errada ou for contornada, a mesma escrita
+ainda é rejeitada do lado do servidor por `firestore.rules` com
+`FirebaseException(code: 'permission-denied')` — essa rejeição, não o
+`StateError`, é a fronteira de segurança de verdade; o `StateError` só existe
+por uma mensagem mais rápida/amigável. "Também escreve" é o que muda além do
+documento óbvio.
+
+- **Categorias** — `users/{uid}/categories/{id}`, validado por
+  `validCategory` em `firestore.rules`:
+  - `createCategory(name, recurring, monthlyBudget?, kind?, goalAmount?, allowNegative?) → Category`.
+    Também escreve: `users/{uid}/balances/{id}` em `{ balance: 0 }`.
+  - `updateCategory(id, name?, recurring?, monthlyBudget?, clearMonthlyBudget?, kind?, goalAmount?, clearGoalAmount?, allowNegative?)`.
+    Só metadata, nunca toca o doc de saldo. Falha com: `'category not
+    found'`; `'cannot convert a caixinha with a negative balance to a
+    savings box; settle the debt first'` (converter `spend` → `save`
+    enquanto a caixinha tem dívida).
+  - `deleteCategory(id)`. Falha com: `'cannot delete a caixinha with a
+    negative balance; settle the debt first'`. Também escreve:
+    cascade-delete de todo doc de `allocations`/`expenses` que referencia
+    essa categoria, restaura `meta/account` pela soma das allocations
+    não-transferência que tinham saído dela, e apaga `balances/{id}`. NÃO
+    trata categoria com pernas de transferência — ver "Known constraints"
+    em `docs/ARQUITETURA.pt-br.md`.
+
+- **Receitas** — `users/{uid}/incomes/{id}`, `validIncome`. Só mexem em
+  `meta/account`:
+  - `createIncome(date, amount, source, description?) → Income`. Falha com:
+    `'income amount cannot be negative'`. Também escreve: `meta/account`
+    (+valor).
+  - `updateIncome(id, ...)`. Falha com: `'income not found'`, `'lowering
+    income would overdraw the account'`.
+  - `deleteIncome(id)`. Falha com: `'deleting this income would overdraw
+    the account'`.
+
+- **Alocações** — `users/{uid}/allocations/{id}`, `validAllocation` /
+  `isTransferLeg`. Conta → caixinha:
+  - `createAllocation(categoryId, amount, date) → Allocation`. Falha com:
+    `'allocation amount cannot be negative'`, `'category not found'`,
+    `'amount exceeds account balance'`. Também escreve: `meta/account`
+    (−valor) E `balances/{categoryId}` (+valor), mesma transação.
+  - `updateAllocation(id, ...)`. A caixinha é fixa (re-homing é
+    delete+recriar); uma perna de transferência não pode ser editada
+    individualmente. Falha com: `'allocation not found'`, uma mensagem de
+    edição não suportada pra perna de transferência, `'category not
+    found'`, `'amount exceeds account balance'`, `'reducing this
+    allocation would overdraw the caixinha'`.
+  - `deleteAllocation(id)`. Se a allocation é uma perna de transferência, as
+    DUAS pernas são removidas via `deleteTransfer` — nunca meia
+    transferência. Falha com: `'removing this allocation would overdraw
+    the caixinha'`.
+  - `createTransfer(fromCategoryId, toCategoryId, amount, date) → transferId`.
+    Falha com: `'transfer amount must be positive'`, `'source and
+    destination must differ'`, `'source category not found'`,
+    `'destination category not found'`, `'amount exceeds source caixinha
+    balance'`. Também escreve: DOIS docs de allocation compartilhando o
+    `transferId` retornado (perna negativa na origem, perna positiva no
+    destino) e OS DOIS `balances/{fromCategoryId}` /
+    `balances/{toCategoryId}` — `meta/account` fica intocado.
+  - `deleteTransfer(transferId)`. Falha com: `'undoing this transfer would
+    overdraw a caixinha'`. Reverte as duas pernas.
+
+- **Gastos** — `users/{uid}/expenses/{id}`, `validExpense` /
+  `isCaixinhaExpense` / `sameExpenseTarget` / `sameExpenseSource`. De uma
+  caixinha, ou direto da conta:
+  - `createExpense(date, amount, categoryId?, description?) → Expense`.
+    Falha com: `'expense amount cannot be negative'`, `'category not
+    found'`, `'amount exceeds available balance'`. Também escreve:
+    `meta/account` (−valor) se `categoryId` é nulo, senão
+    `balances/{categoryId}` (−valor).
+  - `updateExpense(id, ...)`. O alvo (caixinha vs conta) é fixo — mover um
+    gasto é delete+recriar. Falha com o mesmo conjunto do create, mais
+    `'expense not found'` e uma mensagem de edição não suportada pros
+    campos de alvo/origem.
+  - `deleteExpense(id)`.
+
+- **Assinaturas** — `users/{uid}/subscriptions/{id}`, `validSubscription`.
+  Uma cobrança fixa recorrente mensal; o doc em si não carrega saldo:
+  - `createSubscription(name, amount, dueDay, categoryId?) → Subscription`.
+    Falha com: `'subscription amount must be positive'`, `'dueDay must be
+    between 1 and 31'`.
+  - `updateSubscription(id, ...)`. Falha com: `'subscription not found'`,
+    mais as duas acima.
+  - `deleteSubscription(id)`.
+  - `setSubscriptionAutoCharge(id, enabled)` — toggle de um único campo,
+    sem implicação de saldo.
+  - `catchUpSubscriptions() → RecurringChargeReport`. Não é endereçado por
+    um caminho único — lê toda assinatura e, pra cada uma, pode escrever um
+    ou mais docs de `expenses/{id}` (um por data de vencimento perdida, do
+    mais antigo pro mais novo), cada um passando pelo mesmo efeito colateral
+    em `meta/account`/`balances/{categoryId}` de `createExpense`, marcado
+    `sourceType: 'subscription'`, `sourceId: <subscriptionId>`. Nunca lança
+    erro por uma data que não cabe no saldo — ela é simplesmente pulada e
+    tentada de novo na próxima chamada, refletido no
+    `RecurringChargeReport` retornado (contagem/total cobrado) em vez de um
+    erro. Chamado uma vez por sessão, não por um agendamento de servidor —
+    rastreado ponta a ponta em `docs/ARQUITETURA.pt-br.md`.
+  - `chargeSubscriptionNow(id) → RecurringChargeReport` — mesmo mecanismo
+    pra uma única assinatura, ignorando `autoChargeEnabled`.
+
+- **Parcelamentos** — `users/{uid}/installmentPurchases/{id}`,
+  `validInstallmentPurchase`. A contraparte limitada de uma assinatura:
+  - `createInstallmentPurchase(name, totalAmount, installments, purchaseDate, firstChargeDate, categoryId?) → InstallmentPurchase`.
+    Falha com: `'installment purchase amount must be positive'`,
+    `'installments must be between 2 and 36'`.
+  - `deleteInstallmentPurchase(id)`.
+  - `payInstallmentPurchase(id, amount, categoryId?)`. Falha com:
+    `'payment amount must be positive'`, `'installment purchase not
+    found'`, `'installment purchase is already settled'`, mais uma
+    mensagem de saldo/categoria. Também escreve: um `Expense` comum
+    (passando pelo mesmo portão de conta/caixinha do `createExpense`) e
+    incrementa `amortizedAmount` (limitado ao que ainda se deve).
+  - `catchUpInstallmentPurchases() → RecurringChargeReport`. Mesmo
+    mecanismo do `catchUpSubscriptions`, marcado `sourceType:
+    'installment'`, parando quando `chargedInstallments ==
+    installments` por parcelamento.
+
+- **Backup/restore** (`ImportExportService`, em cima de
+  `FirestoreService.fetchAll()`/`replaceAll(AppDb)`): não é endereçado por
+  um caminho do Firestore — `fetchAll` lê as seis coleções do ledger num
+  arquivo JSON (Ajustes → Exportar JSON), `replaceAll` limpa e reescreve as
+  seis mais recalcula os dois tipos de doc de saldo a partir do ledger
+  restaurado, passando pelo escape hatch de gênese/teardown das rules (ver
+  "Option B — o que está implementado" acima). Falha com um `StateError`
+  nomeando o primeiro saldo inconsistente encontrado — uma pré-validação
+  de **passo 0** que roda antes de qualquer coisa ser escrita, então um
+  backup ruim é rejeitado atomicamente (ver "F1" acima).
+
+As assinaturas de método público do `FirestoreService` são a costura estável
+independente de qual opção está ativa — não mudariam se as escritas fossem
+de diretas (hoje) pra um callable (abaixo).
+
+### 2. Callables de Cloud Functions (`functions/index.js`) — escrito, NÃO deployado
+
+`functions/` implementa as mesmas operações de escrita como Cloud Functions
+callable (`onCall`) — "Option A" acima. Existe só como referência; nada no
+app chama isso e `firebase.json` não tem bloco `functions`, então `firebase
+deploy` nunca toca esse diretório (ver `functions/README.md`). Se algum dia
+fosse conectado:
+
+- **Como é endereçado:** nome do callable, ex.:
+  `FirebaseFunctions.instance.httpsCallable('createExpense')`.
+- **Payload / resposta:** `{ ...args }` batendo com os nomes de argumento do
+  `FirestoreService` 1:1 (mesma lista acima); retorna `{ id }` (ou
+  `{ transferId }` pra `createTransfer`).
+- **Quem pode chamar:** `requireUid(request)` lança
+  `HttpsError('unauthenticated', ...)` se `request.auth?.uid` está ausente;
+  a função então só toca a própria subárvore daquele uid — mesma fronteira
+  do `isOwner(uid)` acima, só que aplicada em código (privilégios de admin)
+  em vez de rules.
+- **Como falha:** códigos `HttpsError` — `'failed-precondition'` (um
+  invariante de dinheiro seria violado), `'not-found'` (um doc referenciado
+  está faltando), `'invalid-argument'` (payload malformado),
+  `'unauthenticated'`.
+- **Lacuna de cobertura (verificada no código, não é chute):**
+  `functions/index.js` só tem callables pra
+  `createCategory`/`updateCategory`/`deleteCategory`,
+  `createIncome`/`updateIncome`/`deleteIncome`,
+  `createAllocation`/`updateAllocation`/`deleteAllocation`,
+  `createTransfer`/`deleteTransfer`,
+  `createExpense`/`updateExpense`/`deleteExpense` — é anterior a
+  `subscriptions`/`installmentPurchases` e não tem callables pra nenhuma das
+  duas. Adotar a Option A hoje precisaria adicionar essas antes.

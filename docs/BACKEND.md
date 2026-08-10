@@ -578,17 +578,203 @@ Doing 3 before 2 leaves balances desynced on day one.
   explicitly forgiven first. TODO: confirmar when this guard will be
   scheduled/implemented.
 
-## Client contract (stable regardless of option)
+## Integration surface
 
-`FirestoreService`'s public method signatures are the seam. They do not change
-whether a write goes direct (today / Option B) or through a callable (Option A).
-Callable names and payloads in `functions/index.js` mirror these argument
-names 1:1, returning `{ id }` (or `{ transferId }`):
+There is no REST/GraphQL API in this app — the boundary where the client
+reads/writes data is the Firestore SDK, plus a parallel, unused Cloud
+Functions implementation of the same operations. Both are documented below in
+their own shape.
 
-- `createCategory(name, recurring, monthlyBudget?, kind?, goalAmount?, allowNegative?)`
-- `updateCategory(id, name?, recurring?, monthlyBudget?, clearMonthlyBudget?, kind?, goalAmount?, clearGoalAmount?, allowNegative?)`
-- `deleteCategory(id)`
-- `createIncome(date, amount, source, description?)` / `updateIncome(id, ...)` / `deleteIncome(id)`
-- `createAllocation(categoryId, amount, date)` / `updateAllocation(id, ...)` / `deleteAllocation(id)`
-- `createTransfer(fromCategoryId, toCategoryId, amount, date) -> transferId` / `deleteTransfer(transferId)`
-- `createExpense(date, amount, categoryId?, description?)` / `updateExpense(id, ...)` / `deleteExpense(id)`
+### 1. Firestore, direct from the client (live)
+
+The client reads and writes Firestore directly through
+`lib/services/firestore_service.dart` — there is no backend of the app's own
+in the request path; money integrity is enforced by `firestore.rules`
+instead of a trusted server (see "Option B" above). Every operation below is
+addressed by a path under `users/{uid}`; see `docs/ARQUITETURA.md` for the
+full `lib/` layer breakdown and one write traced end to end.
+
+**Who can call it (applies to every path below):** `isOwner(uid)` in
+`firestore.rules` — `request.auth.uid == uid`. No cross-user read or write is
+possible. On the client, every stream/write call is additionally gated on
+being signed in: `firestoreServiceProvider` (`lib/providers/providers.dart`)
+is `null` while signed out, and every screen reads/writes through it rather
+than instantiating `FirestoreService` itself.
+
+**Reads — realtime streams**, one per collection, each a `.snapshots()`
+mapped to the matching Dart model:
+
+| Method | Firestore path |
+|---|---|
+| `watchCategories()` | `users/{uid}/categories` |
+| `watchIncomes()` | `users/{uid}/incomes` |
+| `watchAllocations()` | `users/{uid}/allocations` |
+| `watchExpenses()` | `users/{uid}/expenses` |
+| `watchSubscriptions()` | `users/{uid}/subscriptions` |
+| `watchInstallmentPurchases()` | `users/{uid}/installmentPurchases` |
+
+A stream never throws in the request sense — a permission-denied or dropped
+connection surfaces as an `AsyncError` on the matching `StreamProvider`,
+which screens (via `ref.watch(...).value`) currently treat the same as "not
+loaded yet" rather than a dedicated error state. TODO: confirmar whether a
+dedicated stream-error UI is planned; today a denied/broken stream just looks
+like it never finishes loading.
+
+**Writes — one `FirestoreService` method per operation, each a Firestore
+transaction.** "Fails with" lists the `StateError` message(s) thrown BEFORE
+the write is attempted (mapped to a localized string by
+`friendlyErrorMessage`, `lib/utils/errors.dart`); if a client-side check here
+is ever wrong or bypassed, the same write is still rejected server-side by
+`firestore.rules` with `FirebaseException(code: 'permission-denied')` — that
+rejection, not the `StateError`, is the actual security boundary, the
+`StateError` only exists for a faster/friendlier message. "Also writes" is
+what changes beyond the obvious document.
+
+- **Categories** — `users/{uid}/categories/{id}`, validated by
+  `validCategory` in `firestore.rules`:
+  - `createCategory(name, recurring, monthlyBudget?, kind?, goalAmount?, allowNegative?) → Category`.
+    Also writes: `users/{uid}/balances/{id}` at `{ balance: 0 }`.
+  - `updateCategory(id, name?, recurring?, monthlyBudget?, clearMonthlyBudget?, kind?, goalAmount?, clearGoalAmount?, allowNegative?)`.
+    Metadata-only, never touches the balance doc. Fails with:
+    `'category not found'`; `'cannot convert a caixinha with a negative
+    balance to a savings box; settle the debt first'` (converting `spend` →
+    `save` while the caixinha holds a debt).
+  - `deleteCategory(id)`. Fails with: `'cannot delete a caixinha with a
+    negative balance; settle the debt first'`. Also writes: cascade-deletes
+    every `allocations`/`expenses` doc referencing this category, restores
+    `meta/account` by the sum of the non-transfer allocations that had drawn
+    from it, and deletes `balances/{id}`. Does NOT handle a category holding
+    transfer legs — see "Known constraints" in `docs/ARQUITETURA.md`.
+
+- **Incomes** — `users/{uid}/incomes/{id}`, `validIncome`. Only ever move
+  `meta/account`:
+  - `createIncome(date, amount, source, description?) → Income`. Fails with:
+    `'income amount cannot be negative'`. Also writes: `meta/account` (+amount).
+  - `updateIncome(id, ...)`. Fails with: `'income not found'`,
+    `'lowering income would overdraw the account'`.
+  - `deleteIncome(id)`. Fails with: `'deleting this income would overdraw
+    the account'`.
+
+- **Allocations** — `users/{uid}/allocations/{id}`, `validAllocation` /
+  `isTransferLeg`. Account → caixinha:
+  - `createAllocation(categoryId, amount, date) → Allocation`. Fails with:
+    `'allocation amount cannot be negative'`, `'category not found'`,
+    `'amount exceeds account balance'`. Also writes: `meta/account`
+    (−amount) AND `balances/{categoryId}` (+amount), same transaction.
+  - `updateAllocation(id, ...)`. The caixinha is fixed (re-homing is
+    delete+recreate); a transfer leg can't be edited individually. Fails
+    with: `'allocation not found'`, an unsupported-edit message for a
+    transfer leg, `'category not found'`, `'amount exceeds account
+    balance'`, `'reducing this allocation would overdraw the caixinha'`.
+  - `deleteAllocation(id)`. If the allocation is a transfer leg, BOTH legs
+    are removed via `deleteTransfer` — never a half-transfer. Fails with:
+    `'removing this allocation would overdraw the caixinha'`.
+  - `createTransfer(fromCategoryId, toCategoryId, amount, date) → transferId`.
+    Fails with: `'transfer amount must be positive'`, `'source and
+    destination must differ'`, `'source category not found'`,
+    `'destination category not found'`, `'amount exceeds source caixinha
+    balance'`. Also writes: TWO allocation docs sharing the returned
+    `transferId` (negative leg on the source, positive leg on the
+    destination) and BOTH `balances/{fromCategoryId}` /
+    `balances/{toCategoryId}` — `meta/account` is untouched.
+  - `deleteTransfer(transferId)`. Fails with: `'undoing this transfer would
+    overdraw a caixinha'`. Reverses both legs.
+
+- **Expenses** — `users/{uid}/expenses/{id}`, `validExpense` /
+  `isCaixinhaExpense` / `sameExpenseTarget` / `sameExpenseSource`. From an
+  envelope, or straight from the account:
+  - `createExpense(date, amount, categoryId?, description?) → Expense`.
+    Fails with: `'expense amount cannot be negative'`, `'category not
+    found'`, `'amount exceeds available balance'`. Also writes:
+    `meta/account` (−amount) if `categoryId` is null, else
+    `balances/{categoryId}` (−amount).
+  - `updateExpense(id, ...)`. The target (envelope vs account) is fixed —
+    moving an expense is delete+recreate. Fails with the same set as
+    create, plus `'expense not found'` and an unsupported-edit message for
+    the target/source fields.
+  - `deleteExpense(id)`.
+
+- **Subscriptions** — `users/{uid}/subscriptions/{id}`,
+  `validSubscription`. A fixed recurring monthly charge; the doc itself
+  carries no balance:
+  - `createSubscription(name, amount, dueDay, categoryId?) → Subscription`.
+    Fails with: `'subscription amount must be positive'`, `'dueDay must be
+    between 1 and 31'`.
+  - `updateSubscription(id, ...)`. Fails with: `'subscription not found'`,
+    plus the two above.
+  - `deleteSubscription(id)`.
+  - `setSubscriptionAutoCharge(id, enabled)` — single-field toggle, no
+    balance implication.
+  - `catchUpSubscriptions() → RecurringChargeReport`. Not addressed by a
+    single path — reads every subscription and, for each one, may write one
+    or more `expenses/{id}` docs (one per missed due date, oldest first),
+    each going through the same `meta/account`/`balances/{categoryId}` side
+    effect as `createExpense`, tagged `sourceType: 'subscription'`,
+    `sourceId: <subscriptionId>`. Never throws for an unaffordable due
+    date — it's silently skipped and retried next call, reflected in the
+    returned `RecurringChargeReport` (count/total charged) rather than an
+    error. Called once per session, not by a server schedule — traced end
+    to end in `docs/ARQUITETURA.md`.
+  - `chargeSubscriptionNow(id) → RecurringChargeReport` — same mechanism for
+    one subscription, ignoring `autoChargeEnabled`.
+
+- **Installment purchases** — `users/{uid}/installmentPurchases/{id}`,
+  `validInstallmentPurchase`. A bounded counterpart to a subscription:
+  - `createInstallmentPurchase(name, totalAmount, installments, purchaseDate, firstChargeDate, categoryId?) → InstallmentPurchase`.
+    Fails with: `'installment purchase amount must be positive'`,
+    `'installments must be between 2 and 36'`.
+  - `deleteInstallmentPurchase(id)`.
+  - `payInstallmentPurchase(id, amount, categoryId?)`. Fails with:
+    `'payment amount must be positive'`, `'installment purchase not
+    found'`, `'installment purchase is already settled'`, plus a
+    balance/category message. Also writes: an ordinary `Expense` (through
+    the same account/envelope gate as `createExpense`) and increments
+    `amortizedAmount` (clamped to what's still owed).
+  - `catchUpInstallmentPurchases() → RecurringChargeReport`. Same mechanism
+    as `catchUpSubscriptions`, tagged `sourceType: 'installment'`, stopping
+    once `chargedInstallments == installments` per purchase.
+
+- **Backup/restore** (`ImportExportService`, on top of
+  `FirestoreService.fetchAll()`/`replaceAll(AppDb)`): not addressed by a
+  Firestore path — `fetchAll` reads the six ledger collections into a JSON
+  file (Ajustes → Exportar JSON), `replaceAll` wipes and rewrites all six
+  plus recomputes both balance doc types from the restored ledger, through
+  the rules' genesis/teardown escape hatch (see "Option B — what is
+  implemented" above). Fails with a `StateError` naming the first
+  inconsistent balance found — a **step 0** pre-validation that runs before
+  anything is written, so a bad backup is rejected atomically (see "F1"
+  above).
+
+`FirestoreService`'s public method signatures are the stable seam regardless
+of which option is live — they would not change if writes moved from direct
+(today) to a callable (below).
+
+### 2. Cloud Functions callables (`functions/index.js`) — written, NOT deployed
+
+`functions/` implements the same write operations as callable Cloud
+Functions (`onCall`) — "Option A" above. It exists as reference only; nothing
+in the app calls it and `firebase.json` has no `functions` block, so
+`firebase deploy` never touches it (see `functions/README.md`). If it were
+ever wired in:
+
+- **How addressed:** callable name, e.g.
+  `FirebaseFunctions.instance.httpsCallable('createExpense')`.
+- **Payload / response:** `{ ...args }` matching `FirestoreService`'s
+  argument names 1:1 (same list as above); returns `{ id }` (or
+  `{ transferId }` for `createTransfer`).
+- **Who can call it:** `requireUid(request)` throws
+  `HttpsError('unauthenticated', ...)` if `request.auth?.uid` is absent; the
+  function then only ever touches that uid's own subtree — same boundary as
+  `isOwner(uid)` above, just enforced in code (admin privileges) instead of
+  rules.
+- **How it fails:** `HttpsError` codes — `'failed-precondition'` (a money
+  invariant would be violated), `'not-found'` (a referenced doc is missing),
+  `'invalid-argument'` (malformed payload), `'unauthenticated'`.
+- **Coverage gap (verified in the code, not a guess):** `functions/index.js`
+  only has callables for `createCategory`/`updateCategory`/`deleteCategory`,
+  `createIncome`/`updateIncome`/`deleteIncome`,
+  `createAllocation`/`updateAllocation`/`deleteAllocation`,
+  `createTransfer`/`deleteTransfer`,
+  `createExpense`/`updateExpense`/`deleteExpense` — it predates
+  `subscriptions`/`installmentPurchases` and has no callables for either.
+  Adopting Option A today would need those added first.

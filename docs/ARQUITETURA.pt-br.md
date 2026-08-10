@@ -60,6 +60,122 @@ comentários ("mirrors X in the Next.js app's..."), mantidos porque explicam
 *por que* o schema tem o formato que tem, não porque o Next.js app ainda
 exista em algum lugar do repo.
 
+## Rastros ponta a ponta
+
+Duas operações, rastreadas por toda camada que atravessam, nomeando os
+arquivos e funções reais em cada salto. Escolhidas porque disparam de formas
+genuinamente diferentes — uma a partir de um toque explícito, outra só de
+abrir o app — mas convergem no mesmíssimo mecanismo de leitura/atualização
+assim que a escrita acontece, o que vale a pena ver escrito uma vez em vez de
+presumido como generalizável.
+
+### Rastro A — criar um gasto (de caixinha), escrita iniciada pelo usuário
+
+1. **Toque.** Na tela de Gastos (`lib/features/gastos/gastos_page.dart`), o
+   usuário escolhe uma caixinha (ou "Conta"), digita um valor e toca em
+   enviar — `_GastosPageState._submit()`.
+2. **Pré-checagem do lado do cliente.** `_submit` primeiro chama
+   `_blockedByFrozenDebt(categories, availableBalance)` pra desabilitar o
+   botão cedo com uma mensagem amigável se a caixinha escolhida é uma
+   dívida congelada que não pode receber mais gasto — um atalho de UX, não
+   o guard de verdade.
+3. **Provider → serviço.** Ele lê `ref.read(firestoreServiceProvider)`
+   (`null` enquanto deslogado) e chama
+   `FirestoreService.createExpense(date:, amount:, categoryId:, description:)`
+   (`lib/services/firestore_service.dart`).
+4. **Transação.** `createExpense` roda um `runTransaction` do Firestore: lê
+   o doc de saldo alvo (`users/{uid}/meta/account` se `categoryId` é nulo,
+   senão `users/{uid}/balances/{categoryId}`), lança `StateError` do lado
+   do cliente se o valor estourasse esse saldo (espelhando `_catDeltaOk`),
+   e então escreve TANTO o novo doc `users/{uid}/expenses/{id}` QUANTO o
+   doc de saldo decrementado, na mesma transação.
+5. **Validação do servidor.** A rule `allow create` de `expenses` em
+   `firestore.rules` rechecka `validExpense(...)` e, via `getAfter()`, que
+   o doc de saldo vinculado moveu por exatamente o valor do gasto e ficou
+   dentro do seu piso (`catDeltaOk`) — ver `docs/BACKEND.pt-br.md`, "Option
+   B — o que está implementado". Essa é a fronteira de segurança de
+   verdade; a checagem do passo 4 é só uma mensagem de erro mais rápida pro
+   cliente honesto.
+6. **Caminho de erro.** Qualquer `StateError` do passo 4, ou uma
+   `FirebaseException` de `permission-denied` do passo 5, é capturada no
+   `catch` do `_submit` e convertida numa string localizada por
+   `friendlyErrorMessage` (`lib/utils/errors.dart`), mostrada inline sob o
+   formulário. Nada é escrito em caso de falha.
+7. **O lado da leitura reage automaticamente.** O commit dispara os
+   listeners de `users/{uid}/expenses` e `users/{uid}/balances/{categoryId}`
+   (ou `meta/account`) nos quais `FirestoreService.watchExpenses()` (e os
+   streams de categories/allocations/incomes já abertos) estão inscritos. O
+   `StreamProvider` `expensesProvider` de `providers.dart` reemite.
+8. **Agregação.** `summaryProvider` (`providers.dart`), observando os
+   quatro streams do ledger, recombina em um `AppDb` e chama
+   `aggregation_service.buildSummary(db)` — pura, sem I/O — pra recalcular
+   o saldo da conta, o saldo da caixinha e o resumo do mês corrente.
+9. **A UI atualiza.** Tanto `GastosPage` (o gasto agora na lista, o saldo
+   restante da caixinha) quanto `DashboardPage`
+   (`lib/features/dashboard/dashboard_page.dart`, `ref.watch(summaryProvider)`)
+   reconstroem com os novos números — sem nenhuma chamada explícita de
+   "atualizar"; `ref.watch` é o que faz a emissão do stream do passo 7
+   alcançar as duas telas.
+
+### Rastro B — cobrança automática de assinatura, escrita disparada pela sessão (não um toque)
+
+Ponto de partida genuinamente diferente: nada aqui é disparado por um toque
+do usuário nesta tela — roda uma vez sempre que uma sessão logada começa, a
+partir de qualquer tela em que isso aconteça.
+
+1. **Abrir o app, não um toque.** `AppShell` (`lib/widgets/app_shell.dart`)
+   chama `ref.watch(recurringChargesCatchUpProvider)` a cada build — como um
+   `Provider` só reroda o corpo quando as próprias dependências mudam, isso
+   dispara exatamente uma vez por login, independente de qual tela o
+   `AppShell` estiver mostrando.
+2. **Provider → serviço.** `recurringChargesCatchUpProvider`
+   (`lib/providers/providers.dart`) lê `firestoreServiceProvider` e chama
+   `FirestoreService.catchUpSubscriptions()` e depois
+   `.catchUpInstallmentPurchases()`, nessa ordem.
+3. **Matemática de datas, fora do serviço.** `catchUpSubscriptions` pergunta
+   a `lib/services/recurring_schedule.dart` quais datas de vencimento cada
+   assinatura perdeu desde `lastChargedDate` — funções puras, as mesmas que
+   a tela de Gastos usa pra mostrar o que ainda está pendente, pra que as
+   duas nunca possam discordar (ver `docs/BACKEND.pt-br.md`, "Cobrança
+   pendente é mostrada, não escondida").
+4. **Uma transação por data de vencimento.** Pra cada mês perdido, do mais
+   antigo pro mais novo, `_chargePendingDueDates` roda uma transação que
+   RELÊ o doc da assinatura (proteção contra uma segunda sessão concorrente
+   cobrando duas vezes — ver `docs/BACKEND.pt-br.md`, "Duas sessões ao
+   mesmo tempo não cobram duas vezes"), e então escreve um novo doc
+   `users/{uid}/expenses/{id}` (marcado `sourceType: 'subscription'`,
+   `sourceId`) mais a mesma atualização de conta/`balances/{categoryId}` do
+   passo 4 do Rastro A — o mesmíssimo portão de saldo, já que uma cobrança
+   gerada precisa ser permitida se e somente se o mesmo gasto digitado à
+   mão seria. Uma ocorrência que não cabe no saldo é pulada, não lançada —
+   tentada de novo na próxima sessão.
+5. **Validação do servidor.** Mesmo caminho de `firestore.rules` do passo 5
+   do Rastro A — não existe rule separada pra um gasto gerado;
+   `sourceType`/`sourceId` são checados adicionalmente como imutáveis uma
+   vez definidos (`sameExpenseSource`).
+6. **O lado da leitura reage — mesmo mecanismo do Rastro A.** Cada cobrança
+   commitada é só mais uma escrita em `users/{uid}/expenses` e num doc de
+   saldo, então alcança `watchExpenses()` → `expensesProvider` →
+   `summaryProvider` → `DashboardPage`/`GastosPage` exatamente como no
+   Rastro A, passos 7-9 — sem tratamento especial pra uma cobrança gerada
+   em nenhum lugar do caminho de leitura.
+7. **Uma segunda reação de UI, independente — não pelo Firestore.** De
+   volta no `AppShell`, `ref.listen<AsyncValue<RecurringChargeReport>>(...)`
+   (não `ref.watch`) dispara assim que o próprio `FutureProvider` resolve, e
+   mostra um `SnackBar` nomeando o que acabou de ser cobrado. Essa é a
+   única parte do rastro que NÃO passa por um stream do Firestore — o app
+   avisa o usuário proativamente, a partir do próprio resultado do
+   provider, porque essas cobranças acontecem sem nenhuma interação e uma
+   linha aparecendo silenciosamente numa lista que o usuário pode nem abrir
+   seria, do contrário, o único rastro disso.
+8. **Falha é visível, não engolida.** Se o próprio passo 4 lançar erro (não
+   uma data que não cabe no saldo, uma falha de verdade),
+   `recurringChargesCatchUpProvider` loga e relança, virando um
+   `AsyncError` no provider em vez de ser silenciosamente engolido — a tela
+   de Gastos distingue "catch-up ainda não rodou" de "catch-up rodou e isso
+   genuinamente não cabe" usando esse estado de erro (ver
+   `docs/BACKEND.pt-br.md`, "Cobrança pendente é mostrada, não escondida").
+
 ## Modelo de dados (Firestore)
 
 Particionado por usuário sob `users/{uid}`:

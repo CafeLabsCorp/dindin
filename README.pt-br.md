@@ -55,6 +55,62 @@ flutter run -d windows     # Windows desktop
 flutter run                # Android (emulador/dispositivo conectado)
 ```
 
+## Configuração
+
+O app só fala com o próprio projeto Firebase (`dindin-cafelabs`) — não existe
+um backend separado pra apontar e nenhum arquivo `.env`.
+
+- `lib/firebase_options.dart` e `android/app/google-services.json` —
+  configuração do app Firebase Web/Android (API key, id do projeto, id do
+  app), gerados pelo `flutterfire configure`. Os dois estão **commitados de
+  propósito**: é configuração do Firebase do lado do cliente, não um
+  segredo — a fronteira de acesso de verdade é `firestore.rules` (ver
+  `docs/BACKEND.pt-br.md`), não esconder esse arquivo. Então um clone novo
+  roda sem nenhum passo de setup aqui. Só regenerar isso (mesmo comando) se
+  for apontar o app pra um projeto Firebase diferente.
+- `.firebaserc` — fixa a CLI `firebase` (deploys, comandos de emulador) no
+  projeto `dindin-cafelabs`.
+- O login com Google no Android/Windows também precisa do SHA-1 do app
+  registrado no console do Firebase (um passo único no console, não um
+  arquivo local) — ver `docs/ARQUITETURA.pt-br.md`, "Login diverges between
+  Web and native".
+- Os scripts só-de-admin (`scripts/backfill_balances.mjs`,
+  `scripts/deploy.sh`) precisam das próprias credenciais do Google Cloud
+  (`gcloud auth application-default login`, ou uma chave de service-account
+  via `GOOGLE_APPLICATION_CREDENTIALS`) — **não** necessário pra rodar ou
+  testar o app, só pra fazer deploy. Ver `docs/DEPLOY.pt-br.md`.
+
+## Rodando os testes
+
+```bash
+flutter pub get
+flutter test
+```
+
+Cobre `test/features` (testes de widget por tela), `test/services` (incl. a
+matemática pura de dinheiro em `aggregation_service_test.dart`),
+`test/models`, `test/utils` e `test/widgets`. Nenhum setup extra além do
+`flutter pub get`.
+
+As Firestore Security Rules — em especial os caminhos de
+`getAfter()`/gênese-teardown — não dá pra exercitar via `flutter test`; são
+um harness Node separado contra um **emulador local do Firestore**:
+
+```bash
+# terminal 1, a partir da raiz do repo
+firebase emulators:start --only firestore
+
+# terminal 2
+cd test/rules && npm install && npm test
+```
+
+O `npm test` ali roda tanto `rules.test.mjs` (as rules em si) quanto
+`backfill.test.mjs` (que dispara `scripts/backfill_balances.mjs` como um
+subprocesso de verdade, então precisa do próprio `cd scripts && npm install`
+feito uma vez também). O CI (`.github/workflows/ci.yml`) roda os mesmos dois
+arquivos contra um emulador auto-gerenciado em todo push pra `main`, se
+preferir ver a invocação exata em vez de rodar dois terminais localmente.
+
 ## Build e deploy
 
 Para uma mudança só de UI (sem tocar `firestore.rules`, índices ou o schema

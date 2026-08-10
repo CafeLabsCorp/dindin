@@ -60,6 +60,115 @@ cite that history in comments ("mirrors X in the Next.js app's..."), kept
 because they explain *why* the schema has the shape it has, not because the
 Next.js app still exists anywhere in the repo.
 
+## End-to-end traces
+
+Two operations, traced through every layer they cross, naming the real files
+and functions at each hop. They're picked because they trigger in genuinely
+different ways — one from an explicit tap, one from just opening the app —
+but converge on the exact same read/update mechanism once the write lands,
+which is the thing worth seeing spelled out once instead of assumed to
+generalize.
+
+### Trace A — creating a gasto (caixinha expense), user-initiated write
+
+1. **Tap.** On the Gastos screen (`lib/features/gastos/gastos_page.dart`),
+   the user picks a caixinha (or "Conta"), types an amount, and taps submit
+   — `_GastosPageState._submit()`.
+2. **Client-side pre-check.** `_submit` first calls
+   `_blockedByFrozenDebt(categories, availableBalance)` to disable the
+   button early with a friendly message if the chosen caixinha is a frozen
+   debt that can't take more spending — a UX shortcut, not the real guard.
+3. **Provider → service.** It reads `ref.read(firestoreServiceProvider)`
+   (`null` while signed out) and calls
+   `FirestoreService.createExpense(date:, amount:, categoryId:, description:)`
+   (`lib/services/firestore_service.dart`).
+4. **Transaction.** `createExpense` runs a Firestore `runTransaction`: reads
+   the target balance doc (`users/{uid}/meta/account` if `categoryId` is
+   null, else `users/{uid}/balances/{categoryId}`), throws `StateError`
+   client-side if the amount would overdraw it (mirroring `_catDeltaOk`),
+   then writes BOTH the new `users/{uid}/expenses/{id}` doc and the
+   decremented balance doc in the same transaction.
+5. **Server validation.** `firestore.rules`' `expenses` `allow create` rule
+   re-checks `validExpense(...)` and, via `getAfter()`, that the linked
+   balance doc moved by exactly the expense amount and stayed within its
+   floor (`catDeltaOk`) — see `docs/BACKEND.md`, "Option B — what is
+   implemented". This is the actual security boundary; step 4's check is
+   only a faster error message for the honest client.
+6. **Error path.** Any `StateError` from step 4, or a `permission-denied`
+   `FirebaseException` from step 5, is caught in `_submit`'s `catch` and
+   turned into a localized string by `friendlyErrorMessage`
+   (`lib/utils/errors.dart`), shown inline under the form. Nothing is
+   written on failure.
+7. **Read side reacts automatically.** The commit fires the
+   `users/{uid}/expenses` and `users/{uid}/balances/{categoryId}` (or
+   `meta/account`) listeners that `FirestoreService.watchExpenses()` (and
+   the categories/allocations/incomes streams already open) are subscribed
+   to. `providers.dart`'s `expensesProvider` `StreamProvider` re-emits.
+8. **Aggregation.** `summaryProvider` (`providers.dart`), watching all four
+   ledger streams, recombines them into an `AppDb` and calls
+   `aggregation_service.buildSummary(db)` — pure, no I/O — to recompute the
+   account balance, the caixinha's balance, and the current-month summary.
+9. **UI updates.** Both `GastosPage` (the expense now in its list, the
+   caixinha's remaining balance) and `DashboardPage`
+   (`lib/features/dashboard/dashboard_page.dart`, `ref.watch(summaryProvider)`)
+   rebuild with the new numbers — with no explicit "refresh" call anywhere;
+   `ref.watch` is what makes step 7's stream emission reach both screens.
+
+### Trace B — subscription auto-charge, session-triggered write (not a tap)
+
+Genuinely different starting point: nothing here is triggered by the user
+pressing a button on this screen — it runs once whenever a signed-in session
+starts, from whichever screen that happens to be.
+
+1. **App open, not a tap.** `AppShell` (`lib/widgets/app_shell.dart`) calls
+   `ref.watch(recurringChargesCatchUpProvider)` on every build — since a
+   `Provider` only re-runs its body when its own dependencies change, this
+   fires exactly once per sign-in, regardless of which screen `AppShell`
+   happens to be showing.
+2. **Provider → service.** `recurringChargesCatchUpProvider`
+   (`lib/providers/providers.dart`) reads `firestoreServiceProvider` and
+   calls `FirestoreService.catchUpSubscriptions()` then
+   `.catchUpInstallmentPurchases()`, in that order.
+3. **Date math, kept out of the service.** `catchUpSubscriptions` asks
+   `lib/services/recurring_schedule.dart` which due dates each subscription
+   has missed since `lastChargedDate` — pure functions, the same ones the
+   Gastos screen uses to show what's still pending, so the two can never
+   disagree (see `docs/BACKEND.md`, "A pending charge is shown, not
+   hidden").
+4. **One transaction per due date.** For each missed month, oldest first,
+   `_chargePendingDueDates` runs a transaction that RE-READS the
+   subscription doc (guards against a second concurrent session
+   double-charging — see `docs/BACKEND.md`, "Two sessions at once do not
+   double-charge"), then writes a new `users/{uid}/expenses/{id}` doc
+   (tagged `sourceType: 'subscription'`, `sourceId`) plus the same
+   account/`balances/{categoryId}` update as Trace A's step 4 — the exact
+   same balance gate, since a generated charge must be allowed if and only
+   if the same expense typed by hand would be. An occurrence that doesn't
+   fit the balance is skipped, not thrown — retried on the next session.
+5. **Server validation.** Same `firestore.rules` path as Trace A step 5 —
+   there's no separate rule for a generated expense; `sourceType`/`sourceId`
+   are additionally checked as immutable-once-set (`sameExpenseSource`).
+6. **Read side reacts — same mechanism as Trace A.** Each committed charge
+   is just another write to `users/{uid}/expenses` and a balance doc, so it
+   reaches `watchExpenses()` → `expensesProvider` → `summaryProvider` →
+   `DashboardPage`/`GastosPage` exactly as in Trace A, steps 7-9 — no
+   special-casing for a generated charge anywhere in the read path.
+7. **A second, independent UI reaction — not through Firestore.** Back in
+   `AppShell`, `ref.listen<AsyncValue<RecurringChargeReport>>(...)` (not
+   `ref.watch`) fires once the `FutureProvider` itself resolves, and shows a
+   `SnackBar` naming what was just charged. This is the one part of the
+   trace that does NOT go through a Firestore stream — the app tells the
+   user proactively, from the provider's own result, because these charges
+   happen with no interaction at all and a quiet row appearing in a list
+   the user may not open would otherwise be the only trace of it.
+8. **Failure is visible, not swallowed.** If step 4 itself throws (not an
+   unaffordable due date, an actual failure), `recurringChargesCatchUpProvider`
+   logs it and rethrows, landing as an `AsyncError` on the provider instead
+   of being silently eaten — the Gastos screen tells "catch-up hasn't run
+   yet" apart from "catch-up ran and this genuinely doesn't fit" using that
+   error state (see `docs/BACKEND.md`, "A pending charge is shown, not
+   hidden").
+
 ## Data model (Firestore)
 
 Partitioned per user under `users/{uid}`:
