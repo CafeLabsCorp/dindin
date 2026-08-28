@@ -37,11 +37,19 @@ rules_version = '2';
 // negative) would be impossible to restore.
 //
 // HONEST LIMITS (see docs/BACKEND.md, "Option B residual limitations"):
-//   * A client that deliberately deletes its own balance doc first can then
-//     write ledger docs without the delta check and re-create the balance at
-//     any non-negative value — and, for a SPEND caixinha, at any negative value
-//     too (catMayHoldNeg on the genesis path; needed so a frozen debt survives a
-//     restore, see below). This does NOT extend to the account or to 'save'
+//   * A client can rewrite its own balance docs directly. This is SIMPLER than
+//     the delete-then-recreate sequence this comment used to describe: there is
+//     NO delta linkage on a direct write to a balance doc at all. A plain
+//     set(users/{uid}/meta/account, {balance: 999999999}) on an ALREADY-EXISTING
+//     doc is accepted — no teardown, no genesis path, no linked ledger op — and
+//     the same holds for balances/{catId}, which takes any non-negative value,
+//     raised OR lowered. The delta check (getAfter) is attached to LEDGER
+//     writes, not to the balance documents themselves. Additionally, a client
+//     that deletes its balance doc first can write ledger docs without any
+//     delta check and re-create the balance at any non-negative value — and,
+//     for a SPEND caixinha, at any negative value too (catMayHoldNeg on the
+//     genesis path; needed so a frozen debt survives a restore, see below).
+//     This does NOT extend to the account or to 'save'
 //     caixinhas, which stay floored at >= 0 even on genesis. All data here is
 //     single-tenant (a user can only corrupt THEIR OWN numbers, never another
 //     user's), and the app's display recomputes balances by summing the ledger,
@@ -56,6 +64,42 @@ rules_version = '2';
 //     by isOwner() and is unaffected by any of this.
 //   * These getAfter()/null-teardown rules CANNOT be unit-tested from Flutter.
 //     They MUST be exercised against the Firestore emulator before deploy.
+//
+// ABUSE / OVERLOAD POSTURE — read this before concluding that the list above
+// is the whole risk picture. Everything above is about MONEY INTEGRITY, which
+// is a single-tenant, self-inflicted concern. Availability is NOT: this is a
+// free-tier (Spark) project, so one account can degrade or halt the service
+// for EVERYONE. That threat is handled here, in this file, and is a different
+// axis from the "residual limitations" above.
+//   * STORAGE (the sharp edge). Spark caps total Firestore storage at 1 GiB
+//     and, unlike the daily read/write quotas, IT DOES NOT RESET. Firestore's
+//     own limit is 1 MiB per document, so ~1,165 max-size documents fill the
+//     project permanently and every user's writes start failing until a human
+//     manually deletes data. Type checks alone never prevented this, so every
+//     ledger validator below is CLOSED (keys().hasOnly — unknown fields are
+//     rejected outright) and every string and number is BOUNDED. See the
+//     "shape/size limits" helpers.
+//   * QUOTA. Spark also caps reads (50K/day) and writes (20K/day) per project,
+//     shared across all users. Rules cannot rate-limit — they see one request
+//     at a time and have no counter — so this is NOT closed here. What bounds
+//     it instead: Firebase App Check (bot attestation, available on Spark, a
+//     console toggle with nothing declarative in this file) and the client's
+//     read-windowing. The read side is the binding constraint in practice:
+//     unwindowed collection listeners can burn the whole daily read quota on a
+//     handful of page loads. See docs/BACKEND.md, "Abuse / overload posture".
+//   * COST. There is no billing-blowout risk in the money sense, because Spark
+//     cannot overspend — it has no card attached and hard-stops at the quota.
+//     The failure mode is an OUTAGE, not a bill. That is a deliberate trade:
+//     see docs/BACKEND.md.
+//   * DOCUMENT-ACCESS CEILING (an availability trap, not a security one). A
+//     batched write gets 20 document access calls TOTAL (repeats on the same
+//     document are cached and counted once). Because each ledger write costs
+//     one getAfter() per DISTINCT caixinha, a bulk restore/delete batch
+//     spanning 20+ caixinhas is rejected wholesale — including the delete
+//     sweep that runs AFTER the balance docs are already gone, which is how a
+//     failed restore turns into lost data. The client MUST chunk by distinct
+//     categories, not by document count. Pinned by
+//     test/rules/rules.test.mjs, "rules document-access ceiling (H1)".
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -63,12 +107,72 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    function isNonNegNumber(v) {
-      return v is number && v >= 0;
+    // --- shape/size limits (abuse & storage-cap defense) --------------------
+    // Rationale and the exact numbers are documented in docs/BACKEND.md,
+    // "Abuse / overload posture". In short: every ledger validator below is
+    // CLOSED (keys().hasOnly) and every string/number is BOUNDED, because
+    // Firestore's own per-document ceiling is 1 MiB and the Spark plan's 1 GiB
+    // total storage cap DOES NOT RESET — ~1,165 oversized docs (well inside a
+    // single day's 20K write quota) would fill the project permanently and
+    // take the app down for every user, not just the abuser. Type checks alone
+    // never bounded anything: `isIsoDate` used to be a floor with no ceiling,
+    // so a 900 KB string passed as a date (verified against the emulator).
+    //
+    // The ceilings are deliberately generous vs. real data (a caixinha is
+    // "Mercado", not 120 chars) so no legitimate existing document or old JSON
+    // backup can be refused; they exist to bound STORAGE, not to police
+    // content. The client mirrors them as input maxLength so the user gets a
+    // form error instead of a raw permission-denied.
+
+    // Names: categories, subscriptions, installment purchases.
+    function isName(v) {
+      return v is string && v.size() <= 120;
+    }
+    // Free-text notes on an income/expense. Must stay above isName + the
+    // "(3/12)" suffix that catch-up appends when it generates a description.
+    function isDesc(v) {
+      return v is string && v.size() <= 280;
+    }
+    // A field holding ANOTHER document's id (categoryId, transferId, sourceId).
+    // Firestore auto-ids are 20 chars and UUIDs 36; 128 leaves room for any
+    // legacy id scheme in an old backup while still bounding storage.
+    function isIdRef(v) {
+      return v is string && v.size() <= 128;
+    }
+    // A short enum-ish tag (income source, expense sourceType). Not a strict
+    // whitelist: a value written by a NEWER build must survive an
+    // export/import round trip (see docs/BACKEND.md on `sourceType`).
+    function isTag(v) {
+      return v is string && v.size() <= 40;
     }
 
+    // A money amount. The UPPER bound is not cosmetic: `Infinity` is a valid
+    // Firestore double that satisfies `>= 0`, and — far worse — it NEUTRALISES
+    // the getAfter() delta linkage that the whole Option B model rests on,
+    // because `Infinity == Infinity + delta` is true for every delta. One
+    // write of `Infinity` would otherwise disable the money-integrity check
+    // permanently. A finite bound rejects Infinity, and NaN fails both
+    // comparisons, so this single helper closes both. Verified in
+    // test/rules/rules.test.mjs ("non-finite numbers").
+    function isNonNegNumber(v) {
+      return v is number && v >= 0 && v <= 1000000000;
+    }
+    // Signed counterpart, for transfer legs (which may be negative).
+    function isSignedAmount(v) {
+      return v is number && v >= -1000000000 && v <= 1000000000;
+    }
+    // A denormalized balance. Wider than a single amount (it is a running SUM
+    // of many), but still finite for exactly the Infinity/NaN reason above.
+    function isFiniteBalance(v) {
+      return v is number && v >= -1000000000000 && v <= 1000000000000;
+    }
+
+    // An ISO date string. The ceiling matters as much as the floor: a
+    // date-only value is 10 chars ("2026-01-01") and a full
+    // DateTime.toIso8601String() is 26-27 ("2026-08-27T18:59:12.345678Z"),
+    // so 32 covers every value the client can produce with headroom.
     function isIsoDate(v) {
-      return v is string && v.size() >= 10;
+      return v is string && v.size() >= 10 && v.size() <= 32;
     }
 
     // --- denormalized balance docs -----------------------------------------
@@ -177,7 +281,8 @@ service cloud.firestore {
       allow create, update: if isOwner(uid)
                             && docId == 'account'
                             && request.resource.data.keys().hasOnly(['balance'])
-                            && isNonNegNumber(request.resource.data.balance);
+                            && isFiniteBalance(request.resource.data.balance)
+                            && request.resource.data.balance >= 0;
       allow delete: if isOwner(uid); // needed for a full restore reset
     }
 
@@ -199,7 +304,7 @@ service cloud.firestore {
       // existing balance doc), so the freeze still holds in normal operation.
       allow create, update: if isOwner(uid)
                             && request.resource.data.keys().hasOnly(['balance'])
-                            && request.resource.data.balance is number
+                            && isFiniteBalance(request.resource.data.balance)
                             && (request.resource.data.balance >= 0
                                 || request.resource.data.balance >= balBefore(balDoc(uid, categoryId))
                                 || catAllowsNeg(uid, categoryId)
@@ -209,7 +314,9 @@ service cloud.firestore {
 
     // --- categories ---------------------------------------------------------
     function validCategory(d) {
-      return d.name is string
+      return d.keys().hasOnly(['name', 'recurring', 'createdAt', 'monthlyBudget',
+                               'kind', 'goalAmount', 'allowNegative'])
+          && isName(d.name)
           && d.recurring is bool
           && isIsoDate(d.createdAt)
           && (!('monthlyBudget' in d.keys()) || isNonNegNumber(d.monthlyBudget))
@@ -247,10 +354,11 @@ service cloud.firestore {
     // Income only ever adds to the account. create/update/delete must move
     // meta/account by exactly the income's before->after delta and never below 0.
     function validIncome(d) {
-      return isIsoDate(d.date)
+      return d.keys().hasOnly(['date', 'amount', 'source', 'description'])
+          && isIsoDate(d.date)
           && isNonNegNumber(d.amount)
-          && d.source is string
-          && (!('description' in d.keys()) || d.description is string);
+          && isTag(d.source)
+          && (!('description' in d.keys()) || isDesc(d.description));
     }
 
     match /users/{uid}/incomes/{incomeId} {
@@ -271,11 +379,12 @@ service cloud.firestore {
     // `transferId`, may be negative, and touches ONLY its caixinha (the paired
     // legs net to zero against the account).
     function validAllocation(d) {
-      return d.categoryId is string
-          && d.amount is number
+      return d.keys().hasOnly(['categoryId', 'amount', 'date', 'transferId'])
+          && isIdRef(d.categoryId)
+          && isSignedAmount(d.amount)
           && isIsoDate(d.date)
           && (('transferId' in d.keys())
-                ? d.transferId is string
+                ? isIdRef(d.transferId)
                 : d.amount >= 0);
     }
     function isTransferLeg(d) {
@@ -325,12 +434,14 @@ service cloud.firestore {
     // generated expense debits the account exactly like a manual one — so
     // they're only shape-checked here, and pinned immutable on update below.
     function validExpense(d) {
-      return isIsoDate(d.date)
+      return d.keys().hasOnly(['date', 'amount', 'categoryId', 'description',
+                               'sourceType', 'sourceId'])
+          && isIsoDate(d.date)
           && isNonNegNumber(d.amount)
-          && (!('categoryId' in d.keys()) || d.categoryId is string)
-          && (!('description' in d.keys()) || d.description is string)
-          && (!('sourceType' in d.keys()) || d.sourceType is string)
-          && (!('sourceId' in d.keys()) || d.sourceId is string)
+          && (!('categoryId' in d.keys()) || isIdRef(d.categoryId))
+          && (!('description' in d.keys()) || isDesc(d.description))
+          && (!('sourceType' in d.keys()) || isTag(d.sourceType))
+          && (!('sourceId' in d.keys()) || isIdRef(d.sourceId))
           && (('sourceType' in d.keys()) == ('sourceId' in d.keys()));
     }
     function isCaixinhaExpense(d) {
@@ -400,13 +511,22 @@ service cloud.firestore {
     // Expense, and that write is checked by the `expenses` rules above
     // against whichever balance doc it targets. So this is shape-only, same
     // as every other field on this doc.
+    // NOTE `autoChargeEnabled`: this validator did not mention the field at
+    // all before the keys are closed with hasOnly, because an unlisted field
+    // was simply ignored. It IS written by the client (`Subscription.toMap`
+    // emits it when false, and `setSubscriptionAutoCharge` updates it), so it
+    // MUST appear in hasOnly — leaving it out would have broken the
+    // Assinaturas auto-charge switch on the first write.
     function validSubscription(d) {
-      return d.name is string
-          && d.amount is number && d.amount > 0
+      return d.keys().hasOnly(['name', 'amount', 'dueDay', 'createdAt',
+                               'lastChargedDate', 'categoryId', 'autoChargeEnabled'])
+          && isName(d.name)
+          && d.amount is number && d.amount > 0 && d.amount <= 1000000000
           && d.dueDay is int && d.dueDay >= 1 && d.dueDay <= 31
           && isIsoDate(d.createdAt)
           && (!('lastChargedDate' in d.keys()) || isIsoDate(d.lastChargedDate))
-          && (!('categoryId' in d.keys()) || d.categoryId is string);
+          && (!('categoryId' in d.keys()) || isIdRef(d.categoryId))
+          && (!('autoChargeEnabled' in d.keys()) || d.autoChargeEnabled is bool);
     }
 
     match /users/{uid}/subscriptions/{subscriptionId} {
@@ -432,8 +552,12 @@ service cloud.firestore {
     // only supports add/remove and catchUpInstallmentPurchases bumping
     // `chargedInstallments`, see docs/ARQUITETURA.md).
     function validInstallmentPurchase(d) {
-      return d.name is string
-          && d.totalAmount is number && d.totalAmount > 0
+      return d.keys().hasOnly(['name', 'totalAmount', 'installments',
+                               'purchaseDate', 'firstChargeDate', 'createdAt',
+                               'chargedInstallments', 'categoryId',
+                               'amortizedAmount'])
+          && isName(d.name)
+          && d.totalAmount is number && d.totalAmount > 0 && d.totalAmount <= 1000000000
           && d.installments is int && d.installments >= 2 && d.installments <= 36
           && isIsoDate(d.purchaseDate)
           && isIsoDate(d.firstChargeDate)
@@ -441,7 +565,7 @@ service cloud.firestore {
           && d.chargedInstallments is int
           && d.chargedInstallments >= 0
           && d.chargedInstallments <= d.installments
-          && (!('categoryId' in d.keys()) || d.categoryId is string)
+          && (!('categoryId' in d.keys()) || isIdRef(d.categoryId))
           // Money paid ahead of the schedule. Mutable (it only grows, as the
           // user pays), but never negative and never more than the purchase
           // is worth — a value above totalAmount would mean the app collected

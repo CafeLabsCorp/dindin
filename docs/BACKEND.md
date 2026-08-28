@@ -464,15 +464,36 @@ Doing 3 before 2 leaves balances desynced on day one.
   particular: the `getAfter(...) == null` genesis/teardown branches, a full
   `replaceAll` restore, and a `deleteCategory` cascade. This is the single
   biggest open verification item.
-- **Self-inflicted drift is possible, cross-user harm is not.** A client that
-  deliberately deletes its own balance doc first can then write ledger docs
-  without the delta check and re-create the balance at any non-negative value
-  — and, for a `spend` caixinha specifically, at any negative value too
-  (`catMayHoldNeg`, the genesis-only escape hatch — see "Descongelar via
-  teardown" below for why that exists and what it does/doesn't allow). All
-  data is single-tenant, so this only corrupts the user's OWN numbers, and the
-  UI recomputes balances from the ledger anyway. The real security boundary
+- **Self-inflicted drift is possible, cross-user harm is not.** *(Description
+  corrected — the mechanism is simpler than previously documented here. The
+  conclusion is unchanged and still accepted.)* A client can rewrite its own
+  balance docs **directly**: there is no delta linkage on a write to a balance
+  document at all. A plain `set(users/{uid}/meta/account, {balance:
+  999999999})` on an **already-existing** doc is accepted — no teardown, no
+  delete-then-recreate, no linked ledger op — and `balances/{catId}` likewise
+  takes any non-negative value, **raised or lowered**, via the `>= 0` and
+  `>= balBefore` branches. The `getAfter()` delta check is attached to LEDGER
+  writes, not to the balance docs themselves. Separately, a client that
+  deletes its balance doc first can also write ledger docs with no delta check
+  and re-create the balance at any non-negative value — and, for a `spend`
+  caixinha specifically, at any negative value too (`catMayHoldNeg`, the
+  genesis-only escape hatch — see "Descongelar via teardown" below).
+  All data is single-tenant, so this only corrupts the user's OWN numbers, and
+  the UI recomputes balances from the ledger anyway. The real security boundary
   (no cross-user read/write) is enforced unconditionally by `isOwner()`.
+  Closing this would require summing the ledger (impossible in rules) or Cloud
+  Functions (Blaze, declined) — so it is the accepted Option-B ceiling, not an
+  oversight. Pinned by `test/rules/rules.test.mjs`, "the bypass needs NO
+  teardown".
+- **`Infinity` used to neutralise the delta check entirely — CLOSED.**
+  `Infinity` is a valid Firestore double that satisfies `>= 0`, and it made
+  `getAfter().balance == balBefore + delta` true for *every* delta, because
+  `Infinity == Infinity + x`. One write of `{balance: Infinity}` therefore
+  disabled the whole Option B money-integrity model for that user — a cheaper
+  and more total bypass than the teardown one above. Every amount and balance
+  now carries a finite upper bound, which rejects `Infinity`; `NaN` was
+  already rejected because it fails every comparison. Pinned by "non-finite
+  numbers are rejected".
 - **Allocation/expense edits are restricted** to keep the rules tractable:
   `updateAllocation` keeps the same caixinha, `updateExpense` keeps the same
   target (caixinha vs account). Re-homing is delete + recreate. These edit

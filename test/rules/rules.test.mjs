@@ -35,6 +35,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 
@@ -220,6 +221,33 @@ describe('balance doc direct-write guard (documented residual limitation)', () =
     await assertFails(
       setDoc(accountDoc(aliceDb(), 'alice'), { balance: 10, extra: 'nope' }),
     );
+  });
+
+  test('the bypass needs NO teardown: an EXISTING balance doc takes any non-negative value, up or down', async () => {
+    // Pins the corrected description in firestore.rules "HONEST LIMITS". The
+    // header used to describe this as a delete-then-recreate sequence; it is
+    // simpler than that. There is no delta linkage on a direct write to a
+    // balance doc at all, so a plain set() on an ALREADY-EXISTING doc is
+    // accepted — no deletion, no genesis path, no linked ledger op.
+    await seed(async (sdb) => {
+      await setDoc(accountDoc(sdb, 'alice'), { balance: 400 });
+      await setDoc(catDoc(sdb, 'alice', 'c1'), {
+        name: 'Casa', recurring: true, createdAt: '2026-01-01',
+      });
+      await setDoc(balDoc(sdb, 'alice', 'c1'), { balance: 500 });
+    });
+    const db = aliceDb();
+    // Raised far beyond anything the ledger justifies.
+    await assertSucceeds(setDoc(accountDoc(db, 'alice'), { balance: 999999999 }));
+    // A caixinha raised (the `>= balBefore` branch) ...
+    await assertSucceeds(setDoc(balDoc(db, 'alice', 'c1'), { balance: 999999 }));
+    // ... and LOWERED, which the `>= 0` branch accepts just as readily. Only
+    // ever self-harm (less spending power), but the docs must say so.
+    await assertSucceeds(setDoc(balDoc(db, 'alice', 'c1'), { balance: 10 }));
+
+    // The ceiling that still holds: this is confined to the caller's OWN
+    // subtree. It is not a cross-user hole, which is the boundary that matters.
+    await assertFails(setDoc(accountDoc(bobDb(), 'alice'), { balance: 1 }));
   });
 });
 
@@ -1442,5 +1470,422 @@ describe('recurring charges: source caixinha and early payoff', () => {
         totalAmount: 700,
       }),
     );
+  });
+});
+
+// -----------------------------------------------------------------------
+// 13. Document shape & size limits (B1 — abuse / storage-cap defense)
+// -----------------------------------------------------------------------
+//
+// The Spark plan's 1 GiB storage cap DOES NOT RESET daily. Before these
+// limits existed, every ledger validator checked TYPES but never SIZE and
+// never rejected unknown fields, so ~1,165 documents of ~900 KB each (well
+// inside a single day's 20K write quota) would have filled the project
+// permanently — taking the app down for EVERY user, not just the abuser.
+// These tests pin each closed validator so the ceiling can't silently
+// regress. See firestore.rules, "shape/size limits", and docs/BACKEND.md,
+// "Abuse / overload posture".
+
+describe('document shape & size limits (B1)', () => {
+  // Comfortably under Firestore's own 1 MiB per-document limit, so a rejection
+  // here is the RULES talking, not the platform refusing an oversized write.
+  const big = 'x'.repeat(900 * 1024);
+
+  test('an oversized string is rejected in every ledger collection', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(catDoc(db, 'alice', 'c1'), {
+        name: big, recurring: false, createdAt: '2026-01-01',
+      }),
+    );
+    await assertFails(
+      setDoc(incomeDoc(db, 'alice', 'i1'), {
+        date: '2026-01-01', amount: 0, source: big,
+      }),
+    );
+    await assertFails(
+      setDoc(allocDoc(db, 'alice', 'a1'), {
+        categoryId: big, amount: 0, date: '2026-01-01',
+      }),
+    );
+    await assertFails(
+      setDoc(expenseDoc(db, 'alice', 'e1'), {
+        date: '2026-01-01', amount: 0, description: big,
+      }),
+    );
+    await assertFails(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), {
+        name: big, amount: 1, dueDay: 1, createdAt: '2026-01-01',
+      }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        name: big, totalAmount: 100, installments: 2,
+        purchaseDate: '2026-01-01', firstChargeDate: '2026-02-01',
+        createdAt: '2026-01-01', chargedInstallments: 0,
+      }),
+    );
+  });
+
+  test('an oversized date is rejected — isIsoDate is a WINDOW, not just a floor', async () => {
+    const db = aliceDb();
+    // The historical hole: `v.size() >= 10` accepted a 900 KB string as a date.
+    await assertFails(
+      setDoc(catDoc(db, 'alice', 'c1'), {
+        name: 'ok', recurring: false, createdAt: big,
+      }),
+    );
+    // A short-but-invalid date is still rejected by the floor.
+    await assertFails(
+      setDoc(catDoc(db, 'alice', 'c2'), {
+        name: 'ok', recurring: false, createdAt: '2026',
+      }),
+    );
+  });
+
+  test('unknown fields are rejected in every ledger collection (validators are closed)', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(catDoc(db, 'alice', 'c1'), {
+        name: 'ok', recurring: false, createdAt: '2026-01-01', junk: 'payload',
+      }),
+    );
+    await assertFails(
+      setDoc(incomeDoc(db, 'alice', 'i1'), {
+        date: '2026-01-01', amount: 0, source: 'freela', junk: 'payload',
+      }),
+    );
+    await assertFails(
+      setDoc(expenseDoc(db, 'alice', 'e1'), {
+        date: '2026-01-01', amount: 0, junk: 'payload',
+      }),
+    );
+    await assertFails(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), {
+        name: 'ok', amount: 1, dueDay: 1, createdAt: '2026-01-01', junk: 'payload',
+      }),
+    );
+  });
+
+  test('every field the Flutter client actually writes is still accepted', async () => {
+    // Guards the other side of hasOnly: a legitimate doc carrying every
+    // optional field must NOT be refused. `autoChargeEnabled` is the one that
+    // would have broken the Assinaturas switch had it been left out.
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(catDoc(db, 'alice', 'c1'), {
+        name: 'Mercado',
+        recurring: true,
+        createdAt: '2026-08-27T18:59:12.345678',
+        monthlyBudget: 500,
+        kind: 'spend',
+        goalAmount: 1000,
+        allowNegative: true,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(subscriptionDoc(db, 'alice', 's1'), {
+        name: 'Netflix',
+        amount: 39.9,
+        dueDay: 10,
+        createdAt: '2026-08-27T18:59:12.345678',
+        lastChargedDate: '2026-08-10',
+        categoryId: 'c1',
+        autoChargeEnabled: false,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        name: 'Notebook Dell',
+        totalAmount: 1200,
+        installments: 12,
+        purchaseDate: '2026-01-01',
+        firstChargeDate: '2026-02-01',
+        createdAt: '2026-08-27T18:59:12.345678',
+        chargedInstallments: 3,
+        categoryId: 'c1',
+        amortizedAmount: 100,
+      }),
+    );
+  });
+
+  test('flipping autoChargeEnabled on an existing subscription still works', async () => {
+    // setSubscriptionAutoCharge does a single-field update(); request.resource
+    // .data is the MERGED doc, so hasOnly must still see a valid shape.
+    await seed((sdb) =>
+      setDoc(subscriptionDoc(sdb, 'alice', 's1'), {
+        name: 'Netflix', amount: 39.9, dueDay: 10, createdAt: '2026-01-01',
+      }),
+    );
+    const db = aliceDb();
+    await assertSucceeds(
+      updateDoc(subscriptionDoc(db, 'alice', 's1'), { autoChargeEnabled: false }),
+    );
+  });
+
+  test('non-finite numbers are rejected — Infinity would neutralise the delta linkage', async () => {
+    // Infinity is a valid Firestore double that satisfies `>= 0`. Worse, it
+    // makes `getAfter().balance == balBefore + delta` true for EVERY delta
+    // (Infinity == Infinity + x), which would disable Option B's core
+    // money-integrity check with a single write. NaN fails the comparisons
+    // and was already rejected; the finite ceiling closes Infinity too.
+    const db = aliceDb();
+    await assertFails(setDoc(accountDoc(db, 'alice'), { balance: Infinity }));
+    await assertFails(setDoc(accountDoc(db, 'alice'), { balance: NaN }));
+    await assertFails(setDoc(balDoc(db, 'alice', 'c1'), { balance: Infinity }));
+
+    // And the attack it enabled: park the account at Infinity, then spend
+    // freely because every delta check passes trivially.
+    const attack = writeBatch(db);
+    attack.set(expenseDoc(db, 'alice', 'e1'), { date: '2026-01-01', amount: 999999 });
+    attack.set(accountDoc(db, 'alice'), { balance: Infinity });
+    await assertFails(attack.commit());
+  });
+
+  test('an absurd amount is rejected but a realistic one is not', async () => {
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(incomeDoc(db, 'alice', 'i1'), {
+      date: '2026-01-01', amount: 1e15, source: 'freela',
+    });
+    batch.set(accountDoc(db, 'alice'), { balance: 1e15 });
+    await assertFails(batch.commit());
+
+    const ok = writeBatch(db);
+    ok.set(incomeDoc(db, 'alice', 'i2'), {
+      date: '2026-01-01', amount: 4500.75, source: 'freela',
+    });
+    ok.set(accountDoc(db, 'alice'), { balance: 4500.75 });
+    await assertSucceeds(ok.commit());
+  });
+});
+
+// -----------------------------------------------------------------------
+// 14. Rules document-access ceiling (H1 — batch chunking contract)
+// -----------------------------------------------------------------------
+//
+// A batched write may make at most 20 DOCUMENT ACCESS CALLS for the whole
+// request; repeated access to the SAME document is cached and counted once.
+// During a restore the balance docs are absent, so each allocation/expense
+// still costs one getAfter(balances/{categoryId}) per DISTINCT caixinha, and
+// allocations additionally spend one on meta/account.
+//
+// That makes the ceiling a function of DISTINCT CAIXINHAS IN THE BATCH, not
+// of the document count the client chunks on (400). These tests pin the exact
+// cliff, because `FirestoreService._deleteRefs`/`_setDocs` must chunk under it
+// (see docs/BACKEND.md, "Batch chunking"). A restore that trips this fails at
+// step 2/3 — AFTER step 1 has already deleted the balance docs — which is a
+// data-loss bug, not a cosmetic one.
+
+describe('rules document-access ceiling (H1)', () => {
+  /** Builds a restore-step-3 batch spanning `n` distinct caixinhas. */
+  function restoreBatchSpanning(db, n, withAllocations) {
+    const batch = writeBatch(db);
+    for (let i = 0; i < n; i++) {
+      const cat = `c${i}`;
+      batch.set(catDoc(db, 'alice', cat), {
+        name: `cat ${i}`, recurring: false, createdAt: '2026-01-01',
+      });
+      if (withAllocations) {
+        batch.set(allocDoc(db, 'alice', `a${i}`), {
+          categoryId: cat, amount: 10, date: '2026-01-02',
+        });
+      } else {
+        batch.set(expenseDoc(db, 'alice', `e${i}`), {
+          categoryId: cat, amount: 10, date: '2026-01-02',
+        });
+      }
+    }
+    return batch;
+  }
+
+  test('a restore batch spanning 19 distinct caixinhas succeeds', async () => {
+    const db = aliceDb();
+    await assertSucceeds(restoreBatchSpanning(db, 19, true).commit());
+  });
+
+  test('a restore batch spanning 20 distinct caixinhas FAILS (20 cats + meta/account = 21 accesses)', async () => {
+    // This is the live data-loss bug: it lands at step 3 of replaceAll, after
+    // steps 1 and 2 have already wiped the balance docs and the ledger. The
+    // client MUST chunk by distinct categories, not by document count.
+    const db = aliceDb();
+    await assertFails(restoreBatchSpanning(db, 20, true).commit());
+  });
+
+  test('caixinha EXPENSES hit the same cliff as allocations', async () => {
+    // A caixinha expense evaluates accountDeltaOk(uid, 0) as well as
+    // catDeltaOk, so it spends the same budget: 1 (meta/account) + 1 per
+    // distinct caixinha. Measured, not assumed — an earlier reading that
+    // suggested expenses were one cheaper did not reproduce, so the client
+    // must treat BOTH shapes as having the same 19-caixinha ceiling.
+    const db = aliceDb();
+    await assertSucceeds(restoreBatchSpanning(db, 19, false).commit());
+    await testEnv.clearFirestore();
+    await assertFails(restoreBatchSpanning(aliceDb(), 20, false).commit());
+  });
+
+  test('the same ceiling applies to the DELETE sweep (replaceAll step 2)', async () => {
+    // Step 2 deletes the old ledger with the balance docs already gone. Each
+    // delete still evaluates catTornDown -> getAfter(balances/{cat}), so the
+    // wipe itself trips the same cliff — and it trips it AFTER step 1, which
+    // is what turns a failed restore into lost data.
+    async function seedNCaixinhas(n) {
+      await seed(async (sdb) => {
+        for (let i = 0; i < n; i++) {
+          await setDoc(catDoc(sdb, 'alice', `c${i}`), {
+            name: `c${i}`, recurring: false, createdAt: '2026-01-01',
+          });
+          await setDoc(allocDoc(sdb, 'alice', `a${i}`), {
+            categoryId: `c${i}`, amount: 10, date: '2026-01-02',
+          });
+        }
+      });
+    }
+
+    await seedNCaixinhas(19);
+    let db = aliceDb();
+    let ok = writeBatch(db);
+    for (let i = 0; i < 19; i++) ok.delete(allocDoc(db, 'alice', `a${i}`));
+    await assertSucceeds(ok.commit());
+
+    await testEnv.clearFirestore();
+    await seedNCaixinhas(20);
+    db = aliceDb();
+    const bad = writeBatch(db);
+    for (let i = 0; i < 20; i++) bad.delete(allocDoc(db, 'alice', `a${i}`));
+    await assertFails(bad.commit());
+  });
+});
+
+// -----------------------------------------------------------------------
+// 15. Full account deletion (B5 — Play Store requirement + LGPD)
+// -----------------------------------------------------------------------
+//
+// Google Play requires a self-service "delete my account" path. Under Option
+// B the ORDER is load-bearing, because `categories` delete is gated by
+// catDebtFree(), which reads the PRE-COMMIT balance doc — a caixinha holding
+// a frozen debt refuses to be deleted while its balance doc still exists.
+//
+// The order these tests prove:
+//   1. meta/account + every balances/* — ON ITS OWN COMMIT.
+//   2. the six ledger collections (balance docs now absent -> catTornDown).
+//   3. FirebaseAuth.currentUser.delete() (needs recent re-auth; not testable
+//      here, it is an Auth operation, not a Firestore one).
+//
+// A half-finished deletion strands data under users/{uid} that is
+// UNREACHABLE FOREVER (rules key on request.auth.uid and uids are never
+// reissued) — invisible to everyone, but permanently consuming the 1 GiB cap
+// and an unmet deletion request. Hence scripts/sweep_orphans.mjs.
+
+describe('full account deletion (B5)', () => {
+  async function seedFullUser() {
+    await seed(async (sdb) => {
+      await setDoc(catDoc(sdb, 'alice', 'c1'), {
+        name: 'Mercado', recurring: true, createdAt: '2026-01-01',
+      });
+      // A caixinha carrying a FROZEN DEBT: allowNegative is off while the
+      // balance is negative. This is the case that makes the order matter.
+      await setDoc(catDoc(sdb, 'alice', 'c2'), {
+        name: 'Dívida', recurring: false, createdAt: '2026-01-01',
+        kind: 'spend', allowNegative: false,
+      });
+      await setDoc(incomeDoc(sdb, 'alice', 'i1'), {
+        date: '2026-01-01', amount: 1000, source: 'freela',
+      });
+      await setDoc(allocDoc(sdb, 'alice', 'a1'), {
+        categoryId: 'c1', amount: 600, date: '2026-01-02',
+      });
+      await setDoc(expenseDoc(sdb, 'alice', 'e1'), {
+        date: '2026-01-03', amount: 100, categoryId: 'c1',
+      });
+      await setDoc(subscriptionDoc(sdb, 'alice', 's1'), {
+        name: 'Netflix', amount: 39.9, dueDay: 10, createdAt: '2026-01-01',
+      });
+      await setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), {
+        name: 'Notebook', totalAmount: 1200, installments: 12,
+        purchaseDate: '2026-01-01', firstChargeDate: '2026-02-01',
+        createdAt: '2026-01-01', chargedInstallments: 2,
+      });
+      await setDoc(accountDoc(sdb, 'alice'), { balance: 400 });
+      await setDoc(balDoc(sdb, 'alice', 'c1'), { balance: 500 });
+      await setDoc(balDoc(sdb, 'alice', 'c2'), { balance: -50 }); // frozen debt
+    });
+  }
+
+  test('the prescribed order deletes everything, frozen debt included', async () => {
+    await seedFullUser();
+    const db = aliceDb();
+
+    // Step 1 — balance docs first, on their own commit.
+    const step1 = writeBatch(db);
+    step1.delete(accountDoc(db, 'alice'));
+    step1.delete(balDoc(db, 'alice', 'c1'));
+    step1.delete(balDoc(db, 'alice', 'c2'));
+    await assertSucceeds(step1.commit());
+
+    // Step 2 — the six ledger collections. The indebted caixinha c2 now
+    // deletes cleanly because its balance doc is already gone.
+    const step2 = writeBatch(db);
+    step2.delete(catDoc(db, 'alice', 'c1'));
+    step2.delete(catDoc(db, 'alice', 'c2'));
+    step2.delete(incomeDoc(db, 'alice', 'i1'));
+    step2.delete(allocDoc(db, 'alice', 'a1'));
+    step2.delete(expenseDoc(db, 'alice', 'e1'));
+    step2.delete(subscriptionDoc(db, 'alice', 's1'));
+    step2.delete(installmentPurchaseDoc(db, 'alice', 'p1'));
+    await assertSucceeds(step2.commit());
+
+    // Nothing readable is left behind.
+    for (const ref of [
+      accountDoc(db, 'alice'), balDoc(db, 'alice', 'c1'), balDoc(db, 'alice', 'c2'),
+      catDoc(db, 'alice', 'c1'), catDoc(db, 'alice', 'c2'),
+      incomeDoc(db, 'alice', 'i1'), allocDoc(db, 'alice', 'a1'),
+      expenseDoc(db, 'alice', 'e1'), subscriptionDoc(db, 'alice', 's1'),
+      installmentPurchaseDoc(db, 'alice', 'p1'),
+    ]) {
+      const snap = await getDoc(ref);
+      assert.equal(snap.exists(), false, `${ref.path} should be gone`);
+    }
+  });
+
+  test('an indebted caixinha CANNOT be deleted while its balance doc still exists', async () => {
+    // This is why step 1 has to come first and has to be its own commit.
+    await seedFullUser();
+    const db = aliceDb();
+    await assertFails(deleteDoc(catDoc(db, 'alice', 'c2')));
+  });
+
+  test('deleting the balance doc and the indebted category in ONE commit still fails', async () => {
+    // catDebtFree() reads the PRE-COMMIT balance via get(), not getAfter(), so
+    // tearing the balance down in the same batch does not help. The balance
+    // deletion must COMMIT first.
+    await seedFullUser();
+    const db = aliceDb();
+    const oneShot = writeBatch(db);
+    oneShot.delete(balDoc(db, 'alice', 'c2'));
+    oneShot.delete(catDoc(db, 'alice', 'c2'));
+    await assertFails(oneShot.commit());
+  });
+
+  test('a debt-free caixinha can be deleted together with its balance doc', async () => {
+    // Contrast with the case above: c1 is positive, so catDebtFree passes on
+    // the pre-commit read and the single-commit shape is fine. Only the
+    // indebted case is order-sensitive.
+    await seedFullUser();
+    const db = aliceDb();
+    const oneShot = writeBatch(db);
+    oneShot.delete(balDoc(db, 'alice', 'c1'));
+    oneShot.delete(catDoc(db, 'alice', 'c1'));
+    oneShot.delete(allocDoc(db, 'alice', 'a1'));
+    oneShot.delete(expenseDoc(db, 'alice', 'e1'));
+    await assertSucceeds(oneShot.commit());
+  });
+
+  test('another user can never delete this account (isolation holds throughout)', async () => {
+    await seedFullUser();
+    const mallory = bobDb();
+    await assertFails(deleteDoc(accountDoc(mallory, 'alice')));
+    await assertFails(deleteDoc(catDoc(mallory, 'alice', 'c1')));
+    await assertFails(deleteDoc(incomeDoc(mallory, 'alice', 'i1')));
   });
 });
