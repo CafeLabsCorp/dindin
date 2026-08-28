@@ -7,7 +7,9 @@
   "scripts": {
     "backfill": "node backfill_balances.mjs",
     "backfill:dry": "node backfill_balances.mjs --dry-run",
-    "backfill:verify": "node backfill_balances.mjs --verify"
+    "backfill:verify": "node backfill_balances.mjs --verify",
+    "sweep:dry": "node sweep_orphans.mjs --dry-run",
+    "sweep": "node sweep_orphans.mjs --confirm"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0"
