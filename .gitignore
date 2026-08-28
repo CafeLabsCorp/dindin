@@ -13,8 +13,6 @@ build/
 android/local.properties
 android/**/gradle-wrapper.jar
 android/.gradle
-android/key.properties
-**/android/app/*.jks
 windows/flutter/generated_plugin*
 web/firebase-config.js
 ios/Flutter/flutter_export_environment.sh
@@ -38,6 +36,28 @@ node_modules/
 *service-account*.json
 *firebase-adminsdk*.json
 *-adminsdk-*.json
+
+# --- Android release signing — NEVER commit (this repo is PUBLIC) ------------
+# Losing the upload keystore, or leaking it, is not recoverable by editing code:
+# see docs/DEPLOY.md, "Android release". The keystore itself is supposed to live
+# OUTSIDE this repository entirely; these patterns are a second line of defence
+# for the case where someone drops a copy in the working tree by accident.
+# (android/.gitignore repeats key.properties/*.jks/*.keystore for the same
+# reason — a belt-and-braces duplication that is intentional, not leftover.)
+**/key.properties
+*.jks
+*.keystore
+*.p12
+*.pepk
+
+# Release artifacts and Dart symbol files. Normally these land under build/
+# (already ignored above), but `--split-debug-info` / a manual copy can put them
+# anywhere. Symbol files are NOT secret, but they are also not versioned here —
+# they must be archived next to the keystore backup, see docs/DEPLOY.md.
+*.aab
+*.apk
+*.symbols
+symbols/
 
 # misc
 .DS_Store

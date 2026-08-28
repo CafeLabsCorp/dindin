@@ -1,0 +1,24 @@
+# Template for android/key.properties — copy to `key.properties` (same folder)
+# and fill in. `key.properties` itself is gitignored and must NEVER be
+# committed: this repository is public, and the upload key it points at cannot
+# be replaced without Google's help once the app is published.
+#
+#   cp android/key.properties.example android/key.properties
+#
+# Full instructions (keystore generation, backup, build) are in docs/DEPLOY.md,
+# section "Android release (Google Play)".
+
+# ABSOLUTE path to the upload keystore. Keep it OUTSIDE this repository — a
+# relative path here would be resolved against android/app/, and a keystore in
+# the working tree is one `git add -A` away from being public forever.
+storeFile=/home/felip/keys/dindin/dindin-upload-key.jks
+
+# Password of the keystore file itself.
+storePassword=
+
+# Alias of the key inside the keystore (must match `-alias` from keytool).
+keyAlias=upload
+
+# Password of that key. Using the same value as storePassword is normal and
+# what `keytool -genkey` suggests by default.
+keyPassword=

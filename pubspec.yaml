@@ -4,18 +4,34 @@ description: "A new Flutter project."
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-# The following defines the version and build number for your application.
-# A version number is three numbers separated by dots, like 1.2.43
-# followed by an optional build number separated by a +.
-# Both the version and the builder number may be overridden in flutter
-# build by specifying --build-name and --build-number, respectively.
-# In Android, build-name is used as versionName while build-number used as versionCode.
-# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
-# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
-# Read more about iOS versioning at
-# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-# In Windows, build-name is used as the major, minor, and patch parts
-# of the product and file versions while build-number is used as the build suffix.
+# Version scheme — read this before bumping. Full rationale in docs/DEPLOY.md
+# ("Versioning"). Format is `<versionName>+<versionCode>`:
+#
+#   versionName (1.0.0)  Semantic version of the PRODUCT, shared by every
+#                        distribution channel (Web, Android, Windows). This is
+#                        the number a human sees. Bump MAJOR/MINOR/PATCH by the
+#                        usual semver judgement.
+#
+#   versionCode (+1)     ANDROID ONLY. A monotonic counter of artifacts uploaded
+#                        to the Play Console. Google Play refuses any upload
+#                        whose versionCode is not strictly greater than every
+#                        code previously uploaded to the app — including builds
+#                        that were only sent to internal testing, or that were
+#                        rejected. It can never be reused or lowered, for the
+#                        lifetime of the listing.
+#
+# Practical rules:
+#   - Web deploys (`flutter build web`) ignore versionCode entirely. Bumping it
+#     without a web release, or releasing web without bumping it, are both
+#     normal. It counts Play uploads, not product releases.
+#   - +1 the versionCode for EVERY AAB you upload, even a re-upload of an
+#     otherwise-identical build. Never edit it downwards.
+#   - Do not switch to a date-based code (e.g. 20260827): it caps you at one
+#     upload per day and burns the integer space irreversibly.
+#   - scripts/release_android.sh bumps and verifies this for you.
+#
+# First Play release: 1.0.0+1 (nothing has ever been uploaded, so code 1 is
+# still free).
 version: 1.0.0+1
 
 environment:

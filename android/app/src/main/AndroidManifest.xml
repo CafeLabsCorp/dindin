@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- android:label is the launcher label, shown under the icon on the
+         device home screen. It is independent of the Play Store listing title
+         (set in the Play Console) and of the web app's title in
+         web/index.html — three separate strings, kept consistent by hand.
+         Changed from the lowercase template value "dindin" to the brand
+         spelling before the first Play upload. Unlike the package name, this
+         one can still be changed in a later release. -->
     <application
-        android:label="dindin"
+        android:label="Dindin"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

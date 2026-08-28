@@ -1,13 +1,20 @@
 name: CI
 
-# MVP-scale CI: analyze + test on every push to main. No deploy step here —
-# shipping to production stays a deliberate manual action via
-# `scripts/deploy.sh` (see docs/DEPLOY.md). Both jobs run on GitHub's free
-# Actions minutes for public/private repos at this volume (a handful of
-# pushes/day, each job a couple of minutes) — nowhere near the free-tier cap.
+# MVP-scale CI: analyze + test + an Android release-build check on every push
+# to main. No deploy step here, for web or for Android — shipping to production
+# stays a deliberate manual action via `scripts/deploy.sh` (web) or
+# `scripts/release_android.sh` + a Play Console upload (Android). See
+# docs/DEPLOY.md, including "Why the Play upload is manual".
+#
+# Cost: this repository is PUBLIC (github.com/CafeLabsCorp/dindin), so GitHub
+# Actions minutes are unmetered — there is no free-tier cap to blow through and
+# no billing surface here at all. (For reference, if it were ever made private,
+# the cap is 2,000 min/month and the android job below is the expensive one at
+# roughly 10 minutes a run.)
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   flutter:
@@ -66,3 +73,61 @@ jobs:
       # it's added to that script's file list, not by directory convention.
       - name: Run rules + backfill tests against the Firestore emulator
         run: npx --yes firebase-tools emulators:exec --only firestore --project dindin-rules-test "npm test --prefix test/rules"
+
+  # Builds the Android App Bundle the way a real release does, minus the
+  # signing key. `flutter analyze`/`flutter test` do NOT compile the Android
+  # target, so without this job a broken Gradle/manifest/plugin change is only
+  # discovered on release day, by hand, under time pressure.
+  #
+  # NOT a deploy job: it uploads nothing to Google Play, and it holds no
+  # secrets. android/key.properties is absent here (it is gitignored and lives
+  # only on the maintainer's machine), so android/app/build.gradle.kts falls
+  # back to the debug key and prints a loud warning. That is intentional — it
+  # also proves the fallback path keeps working for fresh clones. The resulting
+  # .aab is deliberately NOT published as a workflow artifact: a debug-signed
+  # bundle is not installable-from-Play and not something anyone should be
+  # tempted to upload.
+  android:
+    name: android release build (unsigned check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      # AGP 9 / Gradle 9.1 require JDK 17+; 17 matches the source/target
+      # compatibility in android/app/build.gradle.kts.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - run: flutter pub get
+
+      - name: Build release AAB (debug-signed — verifies the build, not the release)
+        run: flutter build appbundle --release
+
+      # Cheap guard against the version scheme silently regressing: Play
+      # rejects any upload whose versionCode is not a positive integer greater
+      # than every previous one, and the most common way that breaks is a bad
+      # edit to pubspec.yaml's `version:` line.
+      - name: Check pubspec version parses as <name>+<code>
+        run: |
+          line="$(grep -m1 '^version: ' pubspec.yaml)"
+          echo "$line"
+          echo "$line" | grep -qE '^version: [0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$' \
+            || { echo "::error::pubspec.yaml version must be <major>.<minor>.<patch>+<versionCode>, see docs/DEPLOY.md"; exit 1; }
