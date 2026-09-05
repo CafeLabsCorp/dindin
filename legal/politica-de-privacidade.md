@@ -11,10 +11,15 @@ no Google Play e não apresentar a usuário antes da revisão jurídica.**
 > arquivadas no repositório, para que seja sempre possível provar qual texto
 > estava em vigor em qualquer data.
 
-> ⚠️ **Pendências de dado real neste documento** (marcadas com `[CONFIRMAR]`
-> ao longo do texto): região do Firestore do projeto `dindin-cafelabs`.
-> Enquanto não forem preenchidas, o texto está incompleto e não pode ser
-> publicado.
+> ⚠️ **Status desta minuta** (31/08/2026): a região do Firestore está
+> confirmada (`southamerica-east1`, São Paulo — item 6) e o controlador está
+> identificado. Foi adicionada a seção **3.4 (medição de uso via Google
+> Analytics para Firebase)** — decisão de produto de 31/08/2026 de instrumentar
+> o mínimo. Restam `[CONFIRMAR]` para o(a) advogado(a) decidir: (a) se a
+> medição de uso se apoia em legítimo interesse com opt-out ou exige
+> consentimento; (b) o prazo de retenção a fixar no console. Além disso, falta
+> a revisão jurídica geral e a implementação, no app, do fluxo de exclusão de
+> conta (seção 8) e do controle de Ajustes → Privacidade.
 
 ---
 
@@ -40,8 +45,8 @@ explicação seja completa.
 ## 2. Quem é responsável pelos seus dados
 
 **Controlador (quem decide quais dados existem e por quê):**
-Café Labs, operada por Felipe Portes Antunes (CPF 704.995.256-71) — a Café
-Labs ainda não possui CNPJ próprio.
+Café Labs, operada por Felipe Portes Antunes — a Café Labs ainda não possui
+CNPJ próprio. Contato: `privacidade@cafelabs.net`.
 
 Diferentemente de outros produtos da Café Labs, aqui **não existe um terceiro
 controlador**: quem decide as finalidades do tratamento é a própria Café Labs,
@@ -50,6 +55,8 @@ e é ela quem responde perante você e perante a ANPD.
 **Operadores (quem processa dados por conta da Café Labs):**
 - **Google LLC / Google Cloud (Firebase Authentication e Cloud Firestore)** —
   hospeda a sua conta e as suas anotações financeiras.
+- **Google LLC (Google Analytics para Firebase)** — processa a medição de uso
+  agregada descrita na seção 3.4. Não recebe nenhuma anotação financeira sua.
 - **Vercel Inc.** — hospeda apenas o site de apresentação
   `dindin.cafelabs.net`, que não recebe nenhum dado financeiro seu.
 
@@ -123,22 +130,57 @@ revelam hábitos e situação de vida.
   registra para operação e segurança do serviço, sob a política de privacidade
   do próprio Google.
 
-### 3.4 O que NÃO é coletado
+### 3.4 Dados de uso (medição do aplicativo)
+
+O aplicativo usa o **Google Analytics para Firebase** para entender, de forma
+agregada, se as pessoas que instalam o Dindin realmente conseguem usá-lo e
+voltam a usá-lo — e assim decidir o que melhorar. Essa medição é
+**deliberadamente reduzida**:
+
+- **Identificador de instância do app**: um código gerado pelo Firebase,
+  ligado à instalação do app naquele aparelho (não à sua identidade). Você
+  pode zerá-lo apagando os dados do app ou reinstalando.
+- **Localização aproximada**: país e, no máximo, região/estado, deduzidos do
+  endereço IP. **Não** é GPS e **não** identifica cidade nem endereço.
+- **Aparelho e versão**: modelo do aparelho, versão do sistema operacional,
+  versão do Dindin, idioma.
+- **Eventos de uso**: telas visitadas e um conjunto pequeno de ações sem
+  conteúdo financeiro — por exemplo "conta criada", "primeira caixinha
+  criada", "primeiro gasto lançado", "exportação usada" — além de dados de
+  sessão (quando o app foi aberto, por quanto tempo) e a informação derivada
+  de se você voltou ao app nos dias seguintes.
+
+O que **não** entra nessa medição: o **conteúdo** das suas anotações (valores,
+nomes de caixinhas, descrições, saldos), o seu e-mail, o seu nome e o seu UID.
+Os eventos registram que uma ação aconteceu, nunca os dados que você digitou.
+
+A coleta do **identificador de publicidade do aparelho** (`Advertising ID`) e
+os "sinais do Google" (cruzamento com dados de conta Google para publicidade)
+ficam **desligados**. Esses dados **não** são usados para anúncios, não são
+combinados com dados de outros apps ou sites, e não são vendidos.
+
+**Você pode desligar essa medição** dentro do aplicativo, em Ajustes →
+Privacidade, a qualquer momento e sem perder nenhuma função. `[CONFIRMAR com
+advogado(a): manter a medição como legítimo interesse com opt-out — seção 5 —
+ou exigir consentimento (opt-in) na primeira abertura.]`
+
+### 3.5 O que NÃO é coletado
 
 Por decisão de projeto, o Dindin **não** coleta e **não** pede:
 
 - CPF, RG ou qualquer documento de identidade
 - Número de cartão, conta bancária, chave Pix ou qualquer dado de pagamento
 - Conexão com banco, Open Finance, importação de fatura ou extrato
-- Localização/GPS, contatos da agenda, fotos, câmera, microfone
+- Localização por GPS, contatos da agenda, fotos, câmera, microfone
 - Dados de saúde ou qualquer outro dado pessoal sensível
 
-O aplicativo **não contém SDK de analytics, de publicidade ou de rastreamento
-de terceiros**, não exibe anúncios e não compartilha dados com redes de
-anúncios. Isso é verificável: as dependências do app estão públicas em
-`pubspec.yaml`, no repositório do projeto.
+Fora o Google Analytics para Firebase descrito no item 3.4 (medição de uso
+própria, sem identificador de publicidade), o aplicativo **não contém SDK de
+publicidade nem de rastreamento de terceiros**, não exibe anúncios e não
+compartilha dados com redes de anúncios. As dependências do app estão
+públicas em `pubspec.yaml`, no repositório do projeto.
 
-### 3.5 Site de apresentação (`dindin.cafelabs.net`)
+### 3.6 Site de apresentação (`dindin.cafelabs.net`)
 
 O site de apresentação é apenas informativo — **não** dá acesso a nenhuma
 anotação financeira e não tem formulário, cadastro ou login. Ele usa uma
@@ -160,11 +202,14 @@ identificação individual, não é exibido banner de cookies.
 | Impedir que uma pessoa acesse os dados de outra | UID, regras de segurança do Firestore |
 | Manter o serviço funcionando (corrigir falhas, operar a infraestrutura) | dados técnicos, com acesso restrito |
 | Responder a você quando pedir suporte ou exercer um direito | e-mail |
-| Medir audiência do site de apresentação, de forma agregada | dados agregados da seção 3.5 |
+| Entender de forma agregada se o app é usado e se você volta a usá-lo, para decidir o que melhorar | dados de uso da seção 3.4 |
+| Medir audiência do site de apresentação, de forma agregada | dados agregados da seção 3.6 |
 
 Os dados **não** são usados para: propaganda, marketing, venda,
-perfilamento, análise de crédito, score, ou compartilhamento com bancos,
-seguradoras, empregadores, lojas ou qualquer terceiro comercial.
+perfilamento comercial, análise de crédito, score, ou compartilhamento com
+bancos, seguradoras, empregadores, lojas ou qualquer terceiro comercial. A
+medição de uso da seção 3.4 é de produto e não cria um perfil comercial ou
+publicitário seu.
 
 **O Dindin não envia mensagens promocionais.** Hoje o único e-mail que você
 pode receber é transacional (por exemplo, uma confirmação ou uma resposta a um
@@ -185,6 +230,7 @@ acesso ao aplicativo**.
 | Isolamento entre contas e proteção contra acesso indevido | art. 7º, V, e art. 7º, IX — legítimo interesse na segurança do próprio serviço |
 | Registros técnicos de operação (IP, logs do Firebase) | art. 7º, IX — legítimo interesse na operação e segurança |
 | Atendimento a pedidos de titular | art. 7º, II — cumprimento de obrigação legal |
+| Medição de uso do aplicativo (seção 3.4) | art. 7º, IX — legítimo interesse na melhoria do produto, sem uso publicitário e com opção de desligar no app. `[CONFIRMAR com advogado(a): legítimo interesse + opt-out, ou consentimento?]` |
 | Medição agregada do site de apresentação | art. 7º, IX — legítimo interesse, sem identificação individual |
 | Comunicação promocional (não existe hoje) | art. 7º, I — consentimento específico e destacado, se um dia existir |
 
@@ -198,30 +244,28 @@ comunicação promocional **não** limita nada no aplicativo.
 A sua conta e as suas anotações ficam armazenadas no **Google Firebase
 (Firebase Authentication e Cloud Firestore)**, no projeto `dindin-cafelabs`.
 
-`[CONFIRMAR: região do banco de dados Firestore do projeto dindin-cafelabs]`
+O banco de dados Firestore do projeto `dindin-cafelabs` está na região
+`southamerica-east1` (São Paulo, Brasil) — confirmado em 31/08/2026.
 
-- **Se a região for `southamerica-east1` (São Paulo, Brasil):** as suas
-  anotações financeiras ficam armazenadas em território nacional. O Google,
-  como operador, pode acessá-las a partir de outros países exclusivamente para
-  suporte técnico e operação da infraestrutura, sob os compromissos
-  contratuais de proteção de dados do Google Cloud — hipótese do art. 33, II,
-  da LGPD (cláusulas contratuais).
-- **Se a região for qualquer outra (por exemplo `nam5`, Estados Unidos):** há
-  **transferência internacional de dados**. Nesse caso, as suas anotações
-  financeiras são armazenadas fora do Brasil, em infraestrutura do Google, e a
-  transferência se apoia no art. 33, II, da LGPD (cláusulas contratuais
-  padrão firmadas com o Google Cloud/Firebase), com as garantias do "Cloud
-  Data Processing Addendum" do Google.
+As suas anotações financeiras ficam armazenadas **em território nacional**. O
+Google, como operador, pode acessá-las a partir de outros países
+exclusivamente para suporte técnico e operação da infraestrutura, sob os
+compromissos contratuais de proteção de dados do Google Cloud ("Cloud Data
+Processing Addendum") — hipótese do art. 33, II, da LGPD (cláusulas
+contratuais).
 
-O Firebase Authentication opera em infraestrutura global do Google,
-independentemente da região escolhida para o Firestore — ou seja, **os dados
-da sua conta (e-mail e credencial) trafegam e podem ser armazenados fora do
-Brasil** em qualquer cenário, sob a mesma hipótese do art. 33, II.
+O Firebase Authentication e o Google Analytics para Firebase (medição de uso
+da seção 3.4) operam em infraestrutura global do Google, independentemente da
+região escolhida para o Firestore — ou seja, **os dados da sua conta (e-mail e
+credencial) e os dados de uso da seção 3.4 trafegam e podem ser armazenados
+fora do Brasil**, sob a mesma hipótese do art. 33, II (cláusulas contratuais
+padrão do Google, "Cloud Data Processing Addendum"). Os dados de uso não
+incluem o conteúdo das suas anotações financeiras.
 
 O site de apresentação é hospedado na Vercel, com servidores fora do Brasil,
 mas o site **não recebe nenhum dado financeiro nem dado de conta**; a única
 informação que sai do país por ali é a medição agregada e não identificável
-descrita no item 3.5.
+descrita no item 3.6.
 
 ---
 
@@ -235,6 +279,7 @@ descrita no item 3.5.
 | Cópias de segurança da infraestrutura | ciclo de até **30 dias** do provedor; dados excluídos desaparecem das cópias ao fim do ciclo |
 | Registro de que a exclusão foi feita (sem os seus dados pessoais) | 5 anos, apenas para comprovar o cumprimento da lei |
 | Registros técnicos de operação/segurança | conforme a retenção do provedor (Google Firebase) |
+| Dados de uso do aplicativo (seção 3.4) | retenção mínima do Google Analytics para Firebase — **2 meses** para os dados ligados à instância; relatórios agregados sem prazo. `[CONFIRMAR: fixar 2 meses no console do Firebase]` |
 
 **O Dindin não é obrigado a guardar as suas anotações financeiras por prazo
 legal nenhum.** Ele não é instituição financeira, não emite documento fiscal e
@@ -258,7 +303,9 @@ Pela LGPD (art. 18), você pode a qualquer momento:
   pode guardar ou levar para outro serviço
 - **Saber com quem** os seus dados são compartilhados (seção 2)
 - **Revogar** qualquer consentimento que você tenha dado separadamente
-- **Se opor** a um tratamento que você considere irregular
+- **Se opor** a um tratamento que você considere irregular — inclusive
+  **desligar a medição de uso** da seção 3.4 em Ajustes → Privacidade, sem
+  perder nenhuma função do app
 - **Reclamar** à ANPD (Autoridade Nacional de Proteção de Dados)
 
 **Como pedir:** escreva para `privacidade@cafelabs.net`. A resposta é dada em
@@ -266,9 +313,10 @@ até **15 dias**.
 
 ### Exclusão da conta — o que acontece na prática
 
-`[CONFIRMAR: o procedimento abaixo descreve o comportamento pretendido do
-fluxo de exclusão; ele ainda NÃO está implementado no aplicativo. Ver seção
-"Requisitos de implementação" do relatório de compliance.]`
+> **Nota de implementação** (não faz parte do texto público): a política de
+> exclusão abaixo foi ratificada em 31/08/2026 — hard delete imediato, sem
+> carência, com exportação oferecida antes de confirmar. O fluxo ainda **não
+> está implementado no aplicativo**; é o próximo passo do time de mobile.
 
 1. Você pede a exclusão de dentro do aplicativo (Ajustes → Excluir conta) ou
    pela página pública `https://dindin.cafelabs.net/excluir-conta`.
@@ -348,7 +396,7 @@ permanecem arquivadas.
 
 ## 12. Contato
 
-Café Labs — Felipe Portes Antunes (CPF 704.995.256-71)
+Café Labs — Felipe Portes Antunes
 E-mail: `privacidade@cafelabs.net`
 
 Autoridade Nacional de Proteção de Dados (ANPD): `gov.br/anpd`

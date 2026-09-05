@@ -24,7 +24,7 @@ gasta em cada uma.
 digital: ele soma, organiza e mostra o que você escreveu.
 
 O Dindin é fornecido pela **Café Labs**, operada por Felipe Portes Antunes
-(CPF 704.995.256-71) — a Café Labs ainda não possui CNPJ próprio.
+— a Café Labs ainda não possui CNPJ próprio. Contato: `contato@cafelabs.net`.
 
 ### 1.1 O que o Dindin NÃO é
 
