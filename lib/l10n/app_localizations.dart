@@ -686,6 +686,18 @@ abstract class AppLocalizations {
   /// **'Parcela pendente'**
   String get installmentPendingTooltip;
 
+  /// No description provided for @installmentDueLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'vence {date}'**
+  String installmentDueLabel(String date);
+
+  /// No description provided for @installmentPaidOnLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'pago {date}'**
+  String installmentPaidOnLabel(String date);
+
   /// No description provided for @pendingChargesWarning.
   ///
   /// In pt, this message translates to:

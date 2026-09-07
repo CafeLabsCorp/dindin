@@ -18,6 +18,7 @@
 /// UI and the services.
 library;
 
+import '../models/expense.dart';
 import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
 import 'aggregation_service.dart' as agg;
@@ -92,9 +93,44 @@ List<double> installmentAmounts(double totalAmount, int installments) {
 /// The 0-indexed occurrence's due date: [InstallmentPurchase.firstChargeDate]'s
 /// day of month, [index] months later, clamped for short months (see
 /// [dueDateFor]).
+///
 DateTime installmentDueDate(InstallmentPurchase purchase, int index) {
   final first = _parseIsoDate(purchase.firstChargeDate);
   return dueDateFor(first.year, first.month + index, first.day);
+}
+
+/// Which day each installment was actually charged on, keyed by 0-based
+/// index — the counterpart to [installmentDueDate], which says when it was
+/// *supposed* to be charged. The two differ whenever catch-up ran late,
+/// since it only runs when the app is opened.
+///
+/// The link is the generated [Expense]: catch-up writes one per installment,
+/// tagged with the purchase's id and described `"<name> (k/N)"`. That suffix
+/// is what says WHICH installment — ordering by date would not, because an
+/// early payment ([FirestoreService.payInstallmentPurchase]) also writes an
+/// expense against the same purchase without being an installment at all.
+///
+/// An installment with no matching expense simply has no entry (its
+/// description was edited, or a restore dropped the row); the caller falls
+/// back to showing the due date alone.
+Map<int, String> installmentPaidDates(
+  InstallmentPurchase purchase,
+  List<Expense> expenses,
+) {
+  final suffix = RegExp(r'\((\d+)/(\d+)\)$');
+  final dates = <int, String>{};
+  for (final expense in expenses) {
+    if (expense.sourceId != purchase.id) continue;
+    final match = suffix.firstMatch((expense.description ?? '').trim());
+    if (match == null) continue;
+    // The denominator has to agree, so a description that merely happens to
+    // end in something like "(2/3)" is not read as an installment marker.
+    if (int.parse(match.group(2)!) != purchase.installments) continue;
+    final ordinal = int.parse(match.group(1)!);
+    if (ordinal < 1 || ordinal > purchase.installments) continue;
+    dates[ordinal - 1] = expense.date;
+  }
+  return dates;
 }
 
 /// Tolerance for "this debt is paid off", in the same spirit as

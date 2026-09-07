@@ -5,6 +5,7 @@
 // firestore_service_test.dart cover what catch-up DOES with the answers.
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/models/subscription.dart';
 import 'package:dindin/services/recurring_schedule.dart';
@@ -277,6 +278,67 @@ void main() {
         remaining -= amount;
       }
       expect(charges, [33.34, 33.33, 33.33]);
+    });
+  });
+
+  group('installmentPaidDates', () {
+    const purchase = InstallmentPurchase(
+      id: 'p1',
+      name: 'Notebook',
+      totalAmount: 300,
+      installments: 3,
+      purchaseDate: '2026-01-01',
+      firstChargeDate: '2026-01-10',
+      createdAt: '2026-01-01',
+      chargedInstallments: 2,
+    );
+    Expense expense(String id, String date, String? description, {String? sourceId = 'p1'}) => Expense(
+      id: id,
+      date: date,
+      amount: 100,
+      description: description,
+      sourceType: sourceId == null ? null : 'installment',
+      sourceId: sourceId,
+    );
+
+    test('casa cada parcela pelo sufixo (k/N) da descrição', () {
+      final dates = installmentPaidDates(purchase, [
+        expense('e1', '2026-01-12', 'Notebook (1/3)'),
+        expense('e2', '2026-02-11', 'Notebook (2/3)'),
+      ]);
+      expect(dates, {0: '2026-01-12', 1: '2026-02-11'});
+    });
+
+    test('ignora o gasto de pagamento adiantado, que não é parcela nenhuma', () {
+      // Mesmo sourceId, sem sufixo: ordenar por data contaria isso como parcela.
+      final dates = installmentPaidDates(purchase, [
+        expense('e1', '2026-01-12', 'Notebook (1/3)'),
+        expense('e2', '2026-01-20', 'Notebook'),
+      ]);
+      expect(dates, {0: '2026-01-12'});
+    });
+
+    test('ignora gasto de outra compra e gasto digitado à mão', () {
+      final dates = installmentPaidDates(purchase, [
+        expense('e1', '2026-01-12', 'Outro (1/3)', sourceId: 'p2'),
+        expense('e2', '2026-01-13', 'Almoço (1/3)', sourceId: null),
+      ]);
+      expect(dates, isEmpty);
+    });
+
+    test('exige que o denominador bata, pra não ler um "(2/3)" qualquer', () {
+      final dates = installmentPaidDates(purchase, [
+        expense('e1', '2026-01-12', 'Notebook (2/9)'),
+      ]);
+      expect(dates, isEmpty);
+    });
+
+    test('parcela sem gasto correspondente simplesmente não aparece', () {
+      final dates = installmentPaidDates(purchase, [
+        expense('e2', '2026-02-11', 'Notebook (2/3)'),
+      ]);
+      expect(dates.containsKey(0), isFalse);
+      expect(dates[1], '2026-02-11');
     });
   });
 }

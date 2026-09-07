@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
+import '../../models/expense.dart';
 import '../../models/installment_purchase.dart';
 import '../../providers/providers.dart';
 import '../../services/recurring_schedule.dart' as schedule;
@@ -478,28 +479,32 @@ class _InstallmentPurchaseRowState extends State<_InstallmentPurchaseRow> {
 /// numbers behind the summary line's average, since front-loaded rounding
 /// (see `recurring_schedule.installmentAmounts`) means they're not all
 /// identical.
-class _InstallmentDetailsList extends StatelessWidget {
+class _InstallmentDetailsList extends ConsumerWidget {
   final InstallmentPurchase purchase;
 
   const _InstallmentDetailsList({required this.purchase});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final amounts = schedule.installmentAmounts(
       purchase.totalAmount,
       purchase.installments,
     );
+    // Same provider the Gastos screen already watches, so this adds no second
+    // Firestore listener — see the read-windowing note in docs/BACKEND.md.
+    final expenses = ref.watch(expensesProvider).value ?? const <Expense>[];
+    final paidDates = schedule.installmentPaidDates(purchase, expenses);
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+      child: Column(
         children: [
           for (var i = 0; i < amounts.length; i++)
-            _InstallmentChip(
+            _InstallmentRow(
               index: i + 1,
               amount: amounts[i],
               paid: i < purchase.chargedInstallments,
+              dueDate: schedule.installmentDueDate(purchase, i),
+              paidDate: paidDates[i],
             ),
         ],
       ),
@@ -507,15 +512,22 @@ class _InstallmentDetailsList extends StatelessWidget {
   }
 }
 
-class _InstallmentChip extends StatelessWidget {
+/// One installment: what it costs, when it was due, and — once charged —
+/// the day it actually went out. Those last two differ whenever catch-up ran
+/// late, which is why both are shown rather than just one.
+class _InstallmentRow extends StatelessWidget {
   final int index;
   final double amount;
   final bool paid;
+  final DateTime dueDate;
+  final String? paidDate;
 
-  const _InstallmentChip({
+  const _InstallmentRow({
     required this.index,
     required this.amount,
     required this.paid,
+    required this.dueDate,
+    required this.paidDate,
   });
 
   @override
@@ -527,36 +539,43 @@ class _InstallmentChip extends StatelessWidget {
       message: paid
           ? l10n.installmentPaidTooltip
           : l10n.installmentPendingTooltip,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: paid ? color : tokens.border),
-          borderRadius: BorderRadius.circular(999),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '$index',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: color,
+            SizedBox(
+              width: 24,
+              child: Text(
+                '$index',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
               ),
             ),
-            const SizedBox(width: 4),
-            Text(
-              formatCurrency(amount),
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            SizedBox(
+              width: 96,
+              child: Text(
+                formatCurrency(amount),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
-            if (paid) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.check, size: 12, color: color),
-            ],
+            Expanded(
+              child: Text(
+                [
+                  l10n.installmentDueLabel(formatDate(isoDateFrom(dueDate))),
+                  if (paidDate != null)
+                    l10n.installmentPaidOnLabel(formatDate(paidDate!)),
+                ].join(' · '),
+                style: TextStyle(fontSize: 12, color: tokens.subtle),
+              ),
+            ),
+            if (paid) Icon(Icons.check, size: 12, color: color),
           ],
         ),
       ),

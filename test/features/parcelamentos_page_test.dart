@@ -9,6 +9,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:dindin/features/parcelamentos/parcelamentos_page.dart';
 import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/models/category.dart';
+import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/services/firestore_service.dart';
@@ -43,6 +44,7 @@ void main() {
   Future<void> pump(
     WidgetTester tester, {
     List<InstallmentPurchase> purchases = const [],
+    List<Expense> expenses = const [],
     DateTime? today,
     bool catchUpFailed = false,
   }) async {
@@ -53,6 +55,7 @@ void main() {
         overrides: [
           categoriesProvider.overrideWith((ref) => Stream.value(const [gastar])),
           installmentPurchasesProvider.overrideWith((ref) => Stream.value(purchases)),
+          expensesProvider.overrideWith((ref) => Stream.value(expenses)),
           todayProvider.overrideWithValue(today ?? DateTime(2026, 4, 1)),
           if (catchUpFailed)
             recurringChargesCatchUpProvider.overrideWith(
@@ -210,4 +213,32 @@ void main() {
 
     expect(find.text('Informe um nome.'), findsOneWidget);
   });
+
+  testWidgets('cada parcela mostra o vencimento, e as pagas mostram o dia real', (tester) async {
+    await pump(
+      tester,
+      purchases: [emAndamento],
+      // A cobrança roda quando o app abre, então a parcela 1 venceu dia 10 e
+      // só foi lançada dia 12 — é essa diferença que justifica as duas datas.
+      expenses: const [
+        Expense(
+          id: 'e1',
+          date: '2026-01-12',
+          amount: 100,
+          description: 'Notebook Dell (1/10)',
+          sourceType: 'installment',
+          sourceId: 'p1',
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver parcelas'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('vence 10/01'), findsWidgets);
+    expect(find.textContaining('pago 12/01'), findsOneWidget);
+    // A parcela 4 ainda não foi cobrada: vencimento sim, dia pago não.
+    expect(find.textContaining('vence 10/04'), findsOneWidget);
+  });
+
 }

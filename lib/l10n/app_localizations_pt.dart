@@ -337,6 +337,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get installmentPendingTooltip => 'Parcela pendente';
 
   @override
+  String installmentDueLabel(String date) {
+    return 'vence $date';
+  }
+
+  @override
+  String installmentPaidOnLabel(String date) {
+    return 'pago $date';
+  }
+
+  @override
   String pendingChargesWarning(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
