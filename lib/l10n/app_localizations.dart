@@ -698,6 +698,36 @@ abstract class AppLocalizations {
   /// **'pago {date}'**
   String installmentPaidOnLabel(String date);
 
+  /// No description provided for @installmentDueDayLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'vence todo dia {day}'**
+  String installmentDueDayLabel(String day);
+
+  /// No description provided for @installmentDueDayEditTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mudar o dia de vencimento'**
+  String get installmentDueDayEditTooltip;
+
+  /// No description provided for @installmentDueDayDialogTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Dia de vencimento'**
+  String get installmentDueDayDialogTitle;
+
+  /// No description provided for @installmentDueDayDialogHint.
+  ///
+  /// In pt, this message translates to:
+  /// **'Vale da próxima parcela em diante — o que já foi cobrado não muda de data.'**
+  String get installmentDueDayDialogHint;
+
+  /// No description provided for @installmentDueDayReset.
+  ///
+  /// In pt, this message translates to:
+  /// **'Voltar ao dia original'**
+  String get installmentDueDayReset;
+
   /// No description provided for @pendingChargesWarning.
   ///
   /// In pt, this message translates to:

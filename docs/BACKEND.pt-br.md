@@ -122,11 +122,21 @@ Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
   ter cobrado mais que a dívida. Existe pra não precisar reescrever
   `totalAmount`/`installments`, que continuam imutáveis porque são a
   referência de `chargedInstallments`. Ausente = 0.
+- `installmentPurchases/{id}.dueDayOverride` — o dia do mês em que as
+  parcelas RESTANTES vencem, quando o usuário moveu. Ausente = manter o dia do
+  próprio `firstChargeDate`, que é como toda compra se comportava antes deste
+  campo existir. Mutável (1-31) justamente porque o `firstChargeDate` não é:
+  ele ancora todas as ocorrências, inclusive as já faturadas, então
+  reescrevê-lo mudaria retroativamente datas em que dinheiro já saiu. Por isso
+  o `recurring_schedule.installmentDueDate` ignora o override para qualquer
+  índice abaixo de `chargedInstallments` — mover o vencimento nunca reescreve
+  histórico — e só o DIA se move, nunca a sequência de meses.
 
 Backups JSON antigos (sem `monthlyBudget`, sem `transferId`, sem
 `kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`, sem
 `installmentPurchases`, sem `sourceType`/`sourceId`, sem `categoryId` nas
-coleções recorrentes, sem `amortizedAmount`) importam sem alterações.
+coleções recorrentes, sem `amortizedAmount`, sem `dueDayOverride`) importam
+sem alterações.
 
 ### Docs de saldo denormalizados (Option B — ver abaixo)
 
@@ -781,6 +791,9 @@ documento óbvio.
     Falha com: `'installment purchase amount must be positive'`,
     `'installments must be between 2 and 36'`.
   - `deleteInstallmentPurchase(id)`.
+  - `updateInstallmentDueDay(id, day?)` — move o dia em que as parcelas
+    restantes vencem, ou desfaz o move com `null`. Falha com:
+    `'due day must be between 1 and 31'`, `'installment purchase not found'`.
   - `payInstallmentPurchase(id, amount, categoryId?)`. Falha com:
     `'payment amount must be positive'`, `'installment purchase not
     found'`, `'installment purchase is already settled'`, mais uma

@@ -349,6 +349,24 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String installmentDueDayLabel(String day) {
+    return 'due on day $day each month';
+  }
+
+  @override
+  String get installmentDueDayEditTooltip => 'Change the due day';
+
+  @override
+  String get installmentDueDayDialogTitle => 'Due day';
+
+  @override
+  String get installmentDueDayDialogHint =>
+      'Applies from the next installment on — what was already charged keeps its date.';
+
+  @override
+  String get installmentDueDayReset => 'Back to the original day';
+
+  @override
   String pendingChargesWarning(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

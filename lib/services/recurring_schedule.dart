@@ -94,9 +94,15 @@ List<double> installmentAmounts(double totalAmount, int installments) {
 /// day of month, [index] months later, clamped for short months (see
 /// [dueDateFor]).
 ///
+/// [InstallmentPurchase.dueDayOverride] replaces the day — but only for
+/// occurrences that have NOT been billed yet. An installment already charged
+/// keeps the date it was actually scheduled for, so moving the due day never
+/// rewrites history, and the month sequence is untouched either way.
 DateTime installmentDueDate(InstallmentPurchase purchase, int index) {
   final first = _parseIsoDate(purchase.firstChargeDate);
-  return dueDateFor(first.year, first.month + index, first.day);
+  final override = purchase.dueDayOverride;
+  final day = (override != null && index >= purchase.chargedInstallments) ? override : first.day;
+  return dueDateFor(first.year, first.month + index, day);
 }
 
 /// Which day each installment was actually charged on, keyed by 0-based

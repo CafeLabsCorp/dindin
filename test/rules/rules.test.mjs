@@ -1232,6 +1232,47 @@ describe('installmentPurchases', () => {
     );
   });
 
+  test('dueDayOverride can be set, changed and cleared — it is the movable part of the schedule', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, dueDayOverride: 20 }),
+    );
+    await assertSucceeds(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, dueDayOverride: 5 }),
+    );
+    await assertSucceeds(setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), base));
+  });
+
+  test('dueDayOverride is rejected outside 1-31, or as anything but an int', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, dueDayOverride: 0 }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, dueDayOverride: 32 }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, dueDayOverride: '10' }),
+    );
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), { ...base, dueDayOverride: 10.5 }),
+    );
+  });
+
+  test('moving the due day does NOT open a path to moving firstChargeDate with it', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));
+    await assertFails(
+      setDoc(installmentPurchaseDoc(db, 'alice', 'p1'), {
+        ...base,
+        dueDayOverride: 20,
+        firstChargeDate: '2026-03-05',
+      }),
+    );
+  });
+
   test('delete succeeds for the owner', async () => {
     const db = aliceDb();
     await seed(async (sdb) => setDoc(installmentPurchaseDoc(sdb, 'alice', 'p1'), base));

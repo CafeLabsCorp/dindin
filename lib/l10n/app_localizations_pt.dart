@@ -347,6 +347,24 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String installmentDueDayLabel(String day) {
+    return 'vence todo dia $day';
+  }
+
+  @override
+  String get installmentDueDayEditTooltip => 'Mudar o dia de vencimento';
+
+  @override
+  String get installmentDueDayDialogTitle => 'Dia de vencimento';
+
+  @override
+  String get installmentDueDayDialogHint =>
+      'Vale da próxima parcela em diante — o que já foi cobrado não muda de data.';
+
+  @override
+  String get installmentDueDayReset => 'Voltar ao dia original';
+
+  @override
   String pendingChargesWarning(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

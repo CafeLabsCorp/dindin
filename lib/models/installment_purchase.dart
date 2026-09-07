@@ -41,6 +41,22 @@ class InstallmentPurchase {
   /// as 0 — exactly how they already behaved.
   final double amortizedAmount;
 
+  /// Day of the month the REMAINING installments fall due, when the user has
+  /// moved it — `null` means "keep [firstChargeDate]'s own day", which is how
+  /// every purchase behaved before this field existed.
+  ///
+  /// It exists because [firstChargeDate] cannot move: it anchors every
+  /// occurrence, including the ones already billed, so rewriting it would
+  /// retroactively change dates that money already went out on (and is
+  /// immutable in `firestore.rules` for that reason). This moves only what
+  /// has NOT been charged yet — see `recurring_schedule.installmentDueDate`,
+  /// which ignores it for any index below [chargedInstallments].
+  ///
+  /// Only the DAY moves, never the month: a purchase due in March, April and
+  /// May still bills in March, April and May. Short months clamp, same as
+  /// everywhere else (see `recurring_schedule.dueDateFor`).
+  final int? dueDayOverride;
+
   const InstallmentPurchase({
     required this.id,
     required this.name,
@@ -52,7 +68,33 @@ class InstallmentPurchase {
     this.chargedInstallments = 0,
     this.categoryId,
     this.amortizedAmount = 0,
+    this.dueDayOverride,
   });
+
+  /// Every field carried over unless named. The doc is rewritten whole on
+  /// every charge and every early payment, so a field added here and missed
+  /// at one of those sites would be silently erased the next time the user
+  /// paid something.
+  InstallmentPurchase copyWith({
+    int? chargedInstallments,
+    double? amortizedAmount,
+    int? dueDayOverride,
+    bool clearDueDayOverride = false,
+  }) {
+    return InstallmentPurchase(
+      id: id,
+      name: name,
+      totalAmount: totalAmount,
+      installments: installments,
+      purchaseDate: purchaseDate,
+      firstChargeDate: firstChargeDate,
+      createdAt: createdAt,
+      chargedInstallments: chargedInstallments ?? this.chargedInstallments,
+      categoryId: categoryId,
+      amortizedAmount: amortizedAmount ?? this.amortizedAmount,
+      dueDayOverride: clearDueDayOverride ? null : (dueDayOverride ?? this.dueDayOverride),
+    );
+  }
 
   /// Whether every scheduled occurrence has been billed. NOT the same as
   /// "nothing left to pay" — an early payoff settles the debt with
@@ -74,6 +116,7 @@ class InstallmentPurchase {
       chargedInstallments: (map['chargedInstallments'] as num?)?.toInt() ?? 0,
       categoryId: map['categoryId'] as String?,
       amortizedAmount: (map['amortizedAmount'] as num?)?.toDouble() ?? 0,
+      dueDayOverride: (map['dueDayOverride'] as num?)?.toInt(),
     );
   }
 
@@ -88,6 +131,7 @@ class InstallmentPurchase {
       'chargedInstallments': chargedInstallments,
       if (categoryId != null) 'categoryId': categoryId,
       if (amortizedAmount != 0) 'amortizedAmount': amortizedAmount,
+      if (dueDayOverride != null) 'dueDayOverride': dueDayOverride,
     };
   }
 

@@ -241,4 +241,33 @@ void main() {
     expect(find.textContaining('vence 10/04'), findsOneWidget);
   });
 
+  testWidgets('mostra o dia de vencimento das próximas parcelas', (tester) async {
+    await pump(tester, purchases: [emAndamento]);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('vence todo dia 10'), findsOneWidget);
+  });
+
+  testWidgets('com o dia alterado, as parcelas futuras andam e as pagas ficam', (tester) async {
+    await pump(
+      tester,
+      purchases: [emAndamento.copyWith(dueDayOverride: 25)],
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('vence todo dia 25'), findsOneWidget);
+
+    await tester.tap(find.text('Ver parcelas'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('vence 10/01'), findsOneWidget, reason: 'parcela 1, já cobrada');
+    expect(find.textContaining('vence 25/04'), findsOneWidget, reason: 'parcela 4, ainda não');
+  });
+
+  testWidgets('quitado não oferece mudar o dia — não há parcela futura pra mover', (tester) async {
+    await pump(
+      tester,
+      purchases: [emAndamento.copyWith(chargedInstallments: 10)],
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('vence todo dia'), findsNothing);
+  });
 }

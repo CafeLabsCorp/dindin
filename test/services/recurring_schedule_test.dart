@@ -281,6 +281,53 @@ void main() {
     });
   });
 
+  group('installmentDueDate com dueDayOverride', () {
+    InstallmentPurchase purchase({int charged = 0, int? override}) => InstallmentPurchase(
+      id: 'p1',
+      name: 'Notebook',
+      totalAmount: 1200,
+      installments: 12,
+      purchaseDate: '2026-01-01',
+      firstChargeDate: '2026-01-10',
+      createdAt: '2026-01-01',
+      chargedInstallments: charged,
+      dueDayOverride: override,
+    );
+
+    test('sem override, nada muda', () {
+      expect(installmentDueDate(purchase(), 2), DateTime(2026, 3, 10));
+    });
+
+    test('move o dia das parcelas ainda não cobradas', () {
+      expect(installmentDueDate(purchase(override: 20), 2), DateTime(2026, 3, 20));
+    });
+
+    test('NÃO move o que já foi cobrado — o histórico fica como foi', () {
+      final p = purchase(charged: 3, override: 20);
+      expect(installmentDueDate(p, 0), DateTime(2026, 1, 10));
+      expect(installmentDueDate(p, 2), DateTime(2026, 3, 10));
+      expect(installmentDueDate(p, 3), DateTime(2026, 4, 20));
+    });
+
+    test('mexe no dia, nunca no mês: a sequência de meses é a mesma', () {
+      final p = purchase(override: 28);
+      expect(
+        [for (var i = 0; i < 4; i++) installmentDueDate(p, i).month],
+        [1, 2, 3, 4],
+      );
+    });
+
+    test('dia 31 encolhe pro fim do mês curto, como em qualquer vencimento', () {
+      expect(installmentDueDate(purchase(override: 31), 1), DateTime(2026, 2, 28));
+    });
+
+    test('o vencimento novo é o que a cobrança pendente passa a usar', () {
+      // dia 10 já passou em 15/01, dia 20 ainda não: a parcela sai da fila.
+      expect(pendingInstallmentIndexes(purchase(), DateTime(2026, 1, 15)), [0]);
+      expect(pendingInstallmentIndexes(purchase(override: 20), DateTime(2026, 1, 15)), isEmpty);
+    });
+  });
+
   group('installmentPaidDates', () {
     const purchase = InstallmentPurchase(
       id: 'p1',

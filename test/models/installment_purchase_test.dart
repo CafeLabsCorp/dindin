@@ -82,4 +82,44 @@ void main() {
       expect(restored.name, 'Notebook Dell');
     });
   });
+
+  group('dueDayOverride', () {
+    const base = InstallmentPurchase(
+      id: 'p1',
+      name: 'Notebook',
+      totalAmount: 1200,
+      installments: 12,
+      purchaseDate: '2026-01-01',
+      firstChargeDate: '2026-01-10',
+      createdAt: '2026-01-01',
+    );
+
+    test('ausente no mapa lê como null — é como toda compra antiga se comporta', () {
+      expect(InstallmentPurchase.fromMap('p1', base.toMap()).dueDayOverride, isNull);
+      expect(base.toMap().containsKey('dueDayOverride'), isFalse);
+    });
+
+    test('faz round-trip quando existe', () {
+      final withOverride = base.copyWith(dueDayOverride: 20);
+      expect(withOverride.toMap()['dueDayOverride'], 20);
+      expect(
+        InstallmentPurchase.fromMap('p1', withOverride.toMap()).dueDayOverride,
+        20,
+      );
+    });
+
+    test('copyWith carrega os outros campos — é o que impede o overwrite de apagar', () {
+      final charged = base.copyWith(dueDayOverride: 20).copyWith(chargedInstallments: 3);
+      expect(charged.dueDayOverride, 20);
+      expect(charged.chargedInstallments, 3);
+      expect(charged.firstChargeDate, '2026-01-10');
+      expect(charged.name, 'Notebook');
+    });
+
+    test('clearDueDayOverride volta pro dia original', () {
+      final cleared = base.copyWith(dueDayOverride: 20).copyWith(clearDueDayOverride: true);
+      expect(cleared.dueDayOverride, isNull);
+      expect(cleared.toMap().containsKey('dueDayOverride'), isFalse);
+    });
+  });
 }

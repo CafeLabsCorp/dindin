@@ -116,11 +116,20 @@ Before onboarding real users there is a working path for both:
   `totalAmount`/`installments` never have to be rewritten; those stay
   immutable because they are what `chargedInstallments` is counted against.
   Absent = 0.
+- `installmentPurchases/{id}.dueDayOverride` — the day of the month the
+  REMAINING installments fall due, when the user has moved it. Absent = keep
+  `firstChargeDate`'s own day, which is how every purchase behaved before this
+  field existed. Mutable (1-31) precisely because `firstChargeDate` is not:
+  that field anchors every occurrence, including the ones already billed, so
+  rewriting it would retroactively change dates money already went out on.
+  `recurring_schedule.installmentDueDate` therefore ignores the override for
+  any index below `chargedInstallments` — moving the due day never rewrites
+  history — and only the DAY moves, never the month sequence.
 
 Old JSON backups (no `monthlyBudget`, no `transferId`, no `kind`/`goalAmount`,
 no `allowNegative`, no `subscriptions`, no `installmentPurchases`, no
 `sourceType`/`sourceId`, no `categoryId` on the recurring collections, no
-`amortizedAmount`) import unchanged.
+`amortizedAmount`, no `dueDayOverride`) import unchanged.
 
 ### Denormalized balance docs (Option B — see below)
 
@@ -745,6 +754,9 @@ what changes beyond the obvious document.
     Fails with: `'installment purchase amount must be positive'`,
     `'installments must be between 2 and 36'`.
   - `deleteInstallmentPurchase(id)`.
+  - `updateInstallmentDueDay(id, day?)` — moves the day the remaining
+    installments fall due, or clears the move with `null`. Fails with:
+    `'due day must be between 1 and 31'`, `'installment purchase not found'`.
   - `payInstallmentPurchase(id, amount, categoryId?)`. Fails with:
     `'payment amount must be positive'`, `'installment purchase not
     found'`, `'installment purchase is already settled'`, plus a

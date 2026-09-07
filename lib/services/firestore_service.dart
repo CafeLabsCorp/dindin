@@ -1070,6 +1070,35 @@ class FirestoreService {
     await _installmentPurchases.doc(id).delete();
   }
 
+  /// Moves the day of the month the REMAINING installments fall due, or
+  /// clears the move with `null`.
+  ///
+  /// Only the day changes, and only for occurrences not yet billed — see
+  /// [InstallmentPurchase.dueDayOverride]. `firstChargeDate` stays put
+  /// (it is immutable in `firestore.rules`), so what was already charged
+  /// keeps the dates it was actually charged on.
+  ///
+  /// Read-then-write inside a transaction rather than a blind merge: the doc
+  /// is written whole everywhere else, and a catch-up landing in between
+  /// would otherwise be overwritten by a stale copy.
+  Future<void> updateInstallmentDueDay(String id, int? day) async {
+    if (day != null && (day < 1 || day > 31)) {
+      throw StateError('due day must be between 1 and 31');
+    }
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(_installmentPurchases.doc(id));
+      final data = snap.data();
+      if (data == null) throw StateError('installment purchase not found');
+      final purchase = InstallmentPurchase.fromMap(id, data);
+      tx.set(
+        _installmentPurchases.doc(id),
+        purchase
+            .copyWith(dueDayOverride: day, clearDueDayOverride: day == null)
+            .toMap(),
+      );
+    });
+  }
+
   /// Pays [amount] toward [id] on top of its scheduled installments — one
   /// month you had more cash, or you settled the whole thing at once.
   ///
@@ -1135,18 +1164,9 @@ class FirestoreService {
       tx.set(source.ref, {'balance': source.newBalance});
       tx.set(
         _installmentPurchases.doc(id),
-        InstallmentPurchase(
-          id: purchase.id,
-          name: purchase.name,
-          totalAmount: purchase.totalAmount,
-          installments: purchase.installments,
-          purchaseDate: purchase.purchaseDate,
-          firstChargeDate: purchase.firstChargeDate,
-          createdAt: purchase.createdAt,
-          chargedInstallments: purchase.chargedInstallments,
-          categoryId: purchase.categoryId,
-          amortizedAmount: agg.round2(purchase.amortizedAmount + applied),
-        ).toMap(),
+        purchase
+            .copyWith(amortizedAmount: agg.round2(purchase.amortizedAmount + applied))
+            .toMap(),
       );
     });
   }
@@ -1234,18 +1254,7 @@ class FirestoreService {
           // from the just-read [current] unchanged.
           tx.set(
             doc.reference,
-            InstallmentPurchase(
-              id: current.id,
-              name: current.name,
-              totalAmount: current.totalAmount,
-              installments: current.installments,
-              purchaseDate: current.purchaseDate,
-              firstChargeDate: current.firstChargeDate,
-              createdAt: current.createdAt,
-              chargedInstallments: index + 1,
-              categoryId: current.categoryId,
-              amortizedAmount: current.amortizedAmount,
-            ).toMap(),
+            current.copyWith(chargedInstallments: index + 1).toMap(),
           );
           billed = amount;
           return _ChargeOutcome.charged;

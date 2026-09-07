@@ -116,6 +116,14 @@
   "@installmentPaidOnLabel": {
     "placeholders": { "date": { "type": "String" } }
   },
+  "installmentDueDayLabel": "due on day {day} each month",
+  "@installmentDueDayLabel": {
+    "placeholders": { "day": { "type": "String" } }
+  },
+  "installmentDueDayEditTooltip": "Change the due day",
+  "installmentDueDayDialogTitle": "Due day",
+  "installmentDueDayDialogHint": "Applies from the next installment on — what was already charged keeps its date.",
+  "installmentDueDayReset": "Back to the original day",
 
   "pendingChargesWarning": "{count, plural, =1{1 charge wasn't posted because the account balance didn't cover it. It goes through on its own once there's enough.} other{{count} charges weren't posted because the account balance didn't cover them. They go through on their own once there's enough.}}",
   "pendingChargesRowLabel": "{count, plural, =1{1 pending charge} other{{count} pending charges}}",

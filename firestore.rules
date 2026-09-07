@@ -555,7 +555,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['name', 'totalAmount', 'installments',
                                'purchaseDate', 'firstChargeDate', 'createdAt',
                                'chargedInstallments', 'categoryId',
-                               'amortizedAmount'])
+                               'amortizedAmount', 'dueDayOverride'])
           && isName(d.name)
           && d.totalAmount is number && d.totalAmount > 0 && d.totalAmount <= 1000000000
           && d.installments is int && d.installments >= 2 && d.installments <= 36
@@ -575,7 +575,17 @@ service cloud.firestore {
           && (!('amortizedAmount' in d.keys())
                 || (d.amortizedAmount is number
                     && d.amortizedAmount >= 0
-                    && d.amortizedAmount <= d.totalAmount));
+                    && d.amortizedAmount <= d.totalAmount))
+          // Day of the month the not-yet-billed installments fall due.
+          // Mutable on purpose — it is the one part of the schedule the user
+          // is allowed to move — and it moves nothing that already happened:
+          // the client ignores it for indexes below chargedInstallments, and
+          // firstChargeDate (which anchors the months, and the dates money
+          // already went out on) stays immutable right below.
+          && (!('dueDayOverride' in d.keys())
+                || (d.dueDayOverride is int
+                    && d.dueDayOverride >= 1
+                    && d.dueDayOverride <= 31));
     }
 
     match /users/{uid}/installmentPurchases/{purchaseId} {

@@ -103,6 +103,75 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
         .deleteInstallmentPurchase(purchase.id);
   }
 
+  /// Moves the day the remaining installments fall due. Only the day: the
+  /// months are anchored to `firstChargeDate`, which cannot move because the
+  /// charges already made are counted against it.
+  Future<void> _changeDueDay(InstallmentPurchase purchase) async {
+    final l10n = AppLocalizations.of(context)!;
+    final anchorDay = schedule.installmentDueDate(purchase, 0).day;
+    var selected = purchase.dueDayOverride ?? anchorDay;
+    // 0 is the "back to the original day" answer, which clears the override —
+    // distinct from null, which is a plain cancel.
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.installmentDueDayDialogTitle),
+        content: StatefulBuilder(
+          builder: (ctx, setLocalState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButton<int>(
+                value: selected,
+                isExpanded: true,
+                items: [
+                  for (var d = 1; d <= 31; d++)
+                    DropdownMenuItem(value: d, child: Text('$d')),
+                ],
+                onChanged: (v) =>
+                    setLocalState(() => selected = v ?? selected),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.installmentDueDayDialogHint,
+                style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (purchase.dueDayOverride != null)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 0),
+              child: Text(l10n.installmentDueDayReset),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, selected),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    final firestore = ref.read(firestoreServiceProvider);
+    if (firestore == null) return;
+    try {
+      await firestore.updateInstallmentDueDay(
+        purchase.id,
+        // Picking the anchor's own day is the same as having no override, and
+        // storing it as one would leave a field that means nothing.
+        (picked == 0 || picked == anchorDay) ? null : picked,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = friendlyErrorMessage(l10n, e));
+    }
+  }
+
   Future<void> _pay(
     InstallmentPurchase purchase,
     List<Category> categories,
@@ -265,6 +334,7 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                               : 0,
                           onPay: () => _pay(purchases[i], categories),
                           onDelete: () => _delete(purchases[i]),
+                          onChangeDueDay: () => _changeDueDay(purchases[i]),
                           divider: i > 0,
                         ),
                     ],
@@ -322,6 +392,7 @@ class _InstallmentPurchaseRow extends StatefulWidget {
   final int pendingCharges;
   final VoidCallback onPay;
   final VoidCallback onDelete;
+  final VoidCallback onChangeDueDay;
   final bool divider;
 
   const _InstallmentPurchaseRow({
@@ -330,6 +401,7 @@ class _InstallmentPurchaseRow extends StatefulWidget {
     required this.pendingCharges,
     required this.onPay,
     required this.onDelete,
+    required this.onChangeDueDay,
     required this.divider,
   });
 
@@ -352,6 +424,11 @@ class _InstallmentPurchaseRowState extends State<_InstallmentPurchaseRow> {
     // cent higher to absorb rounding, or smaller after an early payment —
     // see recurring_schedule.installmentChargeAmount.
     final perInstallment = purchase.totalAmount / purchase.installments;
+    // What the NEXT charge will use: the override when set, otherwise the
+    // anchor's own day (see InstallmentPurchase.dueDayOverride).
+    final dueDay =
+        purchase.dueDayOverride ??
+        schedule.installmentDueDate(purchase, purchase.chargedInstallments).day;
     final missingCaixinha =
         purchase.chargesCaixinha &&
         !widget.categories.any((c) => c.id == purchase.categoryId);
@@ -401,6 +478,34 @@ class _InstallmentPurchaseRowState extends State<_InstallmentPurchaseRow> {
                         color: context.tokens.subtle,
                       ),
                     ),
+                    if (!settled)
+                      // The one part of the schedule that can move. Sits by
+                      // the progress line because that is where the user is
+                      // already looking to answer "when does this hit again".
+                      InkWell(
+                        onTap: widget.onChangeDueDay,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                l10n.installmentDueDayLabel('$dueDay'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.tokens.subtle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.edit_outlined,
+                                size: 12,
+                                color: context.tokens.subtle,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Text(
                       settled
                           ? l10n.installmentSettledLabel

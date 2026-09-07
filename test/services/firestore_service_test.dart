@@ -750,6 +750,73 @@ void main() {
       return data == null ? null : InstallmentPurchase.fromMap(id, data);
     }
 
+    group('updateInstallmentDueDay', () {
+      Future<void> seedNotebook({int charged = 3}) => seed(
+        InstallmentPurchase(
+          id: 'p1',
+          name: 'Notebook',
+          totalAmount: 1000,
+          installments: 10,
+          purchaseDate: '2026-01-01',
+          firstChargeDate: '2026-01-10',
+          createdAt: '2026-01-01',
+          chargedInstallments: charged,
+        ),
+      );
+
+      test('grava o dia novo sem tocar em mais nada da compra', () async {
+        await seedNotebook();
+
+        await svc.updateInstallmentDueDay('p1', 20);
+
+        final p = (await purchase('p1'))!;
+        expect(p.dueDayOverride, 20);
+        expect(p.firstChargeDate, '2026-01-10', reason: 'a âncora não se move');
+        expect(p.chargedInstallments, 3);
+        expect(p.totalAmount, 1000);
+        expect(p.installments, 10);
+      });
+
+      test('null volta pro dia original', () async {
+        await seedNotebook();
+        await svc.updateInstallmentDueDay('p1', 20);
+
+        await svc.updateInstallmentDueDay('p1', null);
+
+        expect((await purchase('p1'))!.dueDayOverride, isNull);
+      });
+
+      test('recusa dia fora de 1..31', () async {
+        await seedNotebook();
+        expect(() => svc.updateInstallmentDueDay('p1', 0), throwsStateError);
+        expect(() => svc.updateInstallmentDueDay('p1', 32), throwsStateError);
+      });
+
+      test('recusa compra que não existe', () async {
+        expect(() => svc.updateInstallmentDueDay('sumiu', 20), throwsStateError);
+      });
+
+      test('a cobrança seguinte usa o dia novo, e o adiantamento não apaga ele', () async {
+        await svc.createIncome(date: '2026-01-01', amount: 5000, source: IncomeSource.freela);
+        await seedNotebook(charged: 3);
+        await svc.updateInstallmentDueDay('p1', 20);
+
+        // 15/04: a parcela 4 venceria dia 10 (já passada), mas agora vence 20.
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 4, 15));
+        await svc.catchUpInstallmentPurchases();
+        expect((await purchase('p1'))!.chargedInstallments, 3, reason: 'dia 20 ainda não chegou');
+
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 4, 25));
+        await svc.catchUpInstallmentPurchases();
+        final afterCharge = (await purchase('p1'))!;
+        expect(afterCharge.chargedInstallments, 4);
+        expect(afterCharge.dueDayOverride, 20, reason: 'a reescrita do doc não pode perder o campo');
+
+        await svc.payInstallmentPurchase('p1', amount: 100, date: '2026-04-25');
+        expect((await purchase('p1'))!.dueDayOverride, 20);
+      });
+    });
+
     group('payInstallmentPurchase (adiantar / quitar)', () {
       test('an extra payment debits the account and shortens the schedule', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 4, 15));
