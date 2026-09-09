@@ -282,6 +282,12 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "legalSectionLabel": "Legal",
+  "legalDescription": "Como seus dados são tratados e as regras de uso do Dindin.",
+  "privacyPolicyLinkLabel": "Política de Privacidade",
+  "termsOfUseLinkLabel": "Termos de Uso",
+  "linkOpenErrorMessage": "Não foi possível abrir o link.",
+
   "privacySectionLabel": "Privacidade",
   "analyticsOptOutLabel": "Compartilhar dados de uso anônimos",
   "analyticsOptOutDescription": "Ajuda a Café Labs a entender como o Dindin é usado (nenhum valor, saldo ou descrição de gasto é enviado). Você pode desligar a qualquer momento.",

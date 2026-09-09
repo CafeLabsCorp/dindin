@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../widgets/page_header.dart';
@@ -9,6 +10,15 @@ import '../../providers/locale_provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../widgets/app_card.dart';
+
+/// dindin-landing's legal pages — no locale prefix needed, its middleware
+/// redirects `/privacidade`/`/termos` to the visitor's locale
+/// (`/pt/privacidade`, `/en/termos`, ...) on its own. Kept as MINUTA
+/// (in-review) as of this writing — see `dindin/legal/*.md` and
+/// `tarefas/empresa/dindin.md`'s decision 6; the app links to them
+/// regardless, same as the Play Store listing does.
+const _privacyPolicyUrl = 'https://dindin.cafelabs.net/privacidade';
+const _termsOfUseUrl = 'https://dindin.cafelabs.net/termos';
 
 /// The outcome of the "Excluir conta" confirmation dialog below.
 enum _DeleteAccountDialogAction { cancel, export, delete }
@@ -79,6 +89,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       setState(() => _message = l10n.importErrorMessage(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openLink(String url) async {
+    final l10n = AppLocalizations.of(context)!;
+    var ok = false;
+    try {
+      ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.linkOpenErrorMessage)));
     }
   }
 
@@ -253,6 +276,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   final firestore = ref.read(firestoreServiceProvider);
                   firestore?.setAnalyticsOptOut(!enabled);
                 },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.legalSectionLabel, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(
+                l10n.legalDescription,
+                style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => _openLink(_privacyPolicyUrl),
+                    child: Text(l10n.privacyPolicyLinkLabel),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _openLink(_termsOfUseUrl),
+                    child: Text(l10n.termsOfUseLinkLabel),
+                  ),
+                ],
               ),
             ],
           ),

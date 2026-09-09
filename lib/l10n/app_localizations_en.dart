@@ -662,6 +662,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get legalSectionLabel => 'Legal';
+
+  @override
+  String get legalDescription =>
+      'How your data is handled and Dindin\'s terms of use.';
+
+  @override
+  String get privacyPolicyLinkLabel => 'Privacy Policy';
+
+  @override
+  String get termsOfUseLinkLabel => 'Terms of Use';
+
+  @override
+  String get linkOpenErrorMessage => 'Couldn\'t open the link.';
+
+  @override
   String get privacySectionLabel => 'Privacy';
 
   @override

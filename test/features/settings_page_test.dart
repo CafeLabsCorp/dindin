@@ -42,13 +42,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// The lower AppCards (e.g. Zona de perigo) sit below the fold in the test
-  /// viewport's default size. `find.text` finds a widget anywhere in the
-  /// tree regardless of visibility, but `tester.tap` sends a pointer event
-  /// at that widget's on-screen offset — off-screen, that hits nothing (or
-  /// something else) instead of the target. So every test that TAPS
-  /// something below the fold must scroll THAT specific finder into view
-  /// first.
+  /// The lower AppCards (Privacidade, Legal, Zona de perigo) sit below the
+  /// fold in the test viewport's default size. `find.text` finds a widget
+  /// anywhere in the tree regardless of visibility, but `tester.tap` sends a
+  /// pointer event at that widget's on-screen offset — off-screen, that hits
+  /// nothing (or something else) instead of the target. So every test that
+  /// TAPS something below the fold must scroll THAT specific finder into
+  /// view first — scrolling straight to the bottom of the page would push an
+  /// earlier target (e.g. a legal link) back off the TOP of the viewport.
   Future<void> scrollUntilVisible(WidgetTester tester, Finder finder) async {
     await tester.scrollUntilVisible(finder, 300);
     await tester.pumpAndSettle();
@@ -85,6 +86,41 @@ void main() {
 
     expect(find.text('Sair'), findsOneWidget);
     expect(find.text('Sign out'), findsNothing);
+  });
+
+  group('links legais (item 6 da rodada Forge)', () {
+    testWidgets('a seção Legal mostra os links de Política de Privacidade e Termos de Uso', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.text('Legal'));
+
+      expect(find.text('Legal'), findsOneWidget);
+      expect(find.text('Política de Privacidade'), findsOneWidget);
+      expect(find.text('Termos de Uso'), findsOneWidget);
+    });
+
+    testWidgets('tocar num link legal não derruba a tela mesmo sem um url_launcher real registrado', (tester) async {
+      // No ambiente de teste não há plugin de URL registrado — launchUrl
+      // lançaria MissingPluginException; _openLink captura e mostra um
+      // SnackBar em vez de deixar a exceção subir (ver settings_page.dart).
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.widgetWithText(OutlinedButton, 'Política de Privacidade'));
+
+      // `runAsync` escapes the fake-async zone `testWidgets` normally runs
+      // in — the (mocked, unregistered) platform channel round trip
+      // `launchUrl` makes never resolves under plain `pump()`s, only under
+      // REAL event-loop processing (a real `Future.delayed` inside the same
+      // `runAsync` block gives it a turn to do so).
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Política de Privacidade'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+      // Not pumpAndSettle: the SnackBar auto-dismisses on a timer, and
+      // pumpAndSettle would pump straight through its whole lifetime.
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Não foi possível abrir o link.'), findsOneWidget);
+    });
   });
 
   group('privacidade / opt-out de analytics (item 7 da rodada Forge, decisão 7)', () {

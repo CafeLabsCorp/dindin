@@ -1178,6 +1178,36 @@ abstract class AppLocalizations {
   /// **'Erro ao importar: {error}'**
   String importErrorMessage(String error);
 
+  /// No description provided for @legalSectionLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Legal'**
+  String get legalSectionLabel;
+
+  /// No description provided for @legalDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Como seus dados são tratados e as regras de uso do Dindin.'**
+  String get legalDescription;
+
+  /// No description provided for @privacyPolicyLinkLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Política de Privacidade'**
+  String get privacyPolicyLinkLabel;
+
+  /// No description provided for @termsOfUseLinkLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Termos de Uso'**
+  String get termsOfUseLinkLabel;
+
+  /// No description provided for @linkOpenErrorMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível abrir o link.'**
+  String get linkOpenErrorMessage;
+
   /// No description provided for @privacySectionLabel.
   ///
   /// In pt, this message translates to:

@@ -205,6 +205,12 @@
   "exportErrorMessage": "Export error: {error}",
   "importErrorMessage": "Import error: {error}",
 
+  "legalSectionLabel": "Legal",
+  "legalDescription": "How your data is handled and Dindin's terms of use.",
+  "privacyPolicyLinkLabel": "Privacy Policy",
+  "termsOfUseLinkLabel": "Terms of Use",
+  "linkOpenErrorMessage": "Couldn't open the link.",
+
   "privacySectionLabel": "Privacy",
   "analyticsOptOutLabel": "Share anonymous usage data",
   "analyticsOptOutDescription": "Helps Café Labs understand how Dindin is used (no amount, balance, or expense description is ever sent). You can turn this off at any time.",
