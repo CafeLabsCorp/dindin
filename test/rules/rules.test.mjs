@@ -1713,10 +1713,14 @@ describe('document shape & size limits (B1)', () => {
 //
 // That makes the ceiling a function of DISTINCT CAIXINHAS IN THE BATCH, not
 // of the document count the client chunks on (400). These tests pin the exact
-// cliff, because `FirestoreService._deleteRefs`/`_setDocs` must chunk under it
-// (see docs/BACKEND.md, "Batch chunking"). A restore that trips this fails at
-// step 2/3 — AFTER step 1 has already deleted the balance docs — which is a
-// data-loss bug, not a cosmetic one.
+// cliff, because `FirestoreService._deleteChunked`/`_setChunked` (backed by
+// `lib/services/restore_chunking.dart`'s `chunkForRulesCeiling`, capped at 19
+// distinct caixinhas per batch) must chunk under it. A restore that trips
+// this fails at step 2/3 — AFTER step 1 has already deleted the balance
+// docs — which is a data-loss bug, not a cosmetic one. FIXED: see the last
+// test in this block, which replicates exactly the chunking
+// `chunkForRulesCeiling` produces for a 25-caixinha restore and asserts
+// every resulting chunk succeeds.
 
 describe('rules document-access ceiling (H1)', () => {
   /** Builds a restore-step-3 batch spanning `n` distinct caixinhas. */
@@ -1795,6 +1799,38 @@ describe('rules document-access ceiling (H1)', () => {
     const bad = writeBatch(db);
     for (let i = 0; i < 20; i++) bad.delete(allocDoc(db, 'alice', `a${i}`));
     await assertFails(bad.commit());
+  });
+
+  test('the FIX: a 25-caixinha restore, chunked the way chunkForRulesCeiling does it (19 + 6), succeeds end to end', async () => {
+    // Mirrors FirestoreService.replaceAll's step 3 for 25 distinct caixinhas:
+    // one category + one allocation per caixinha, split into exactly the two
+    // chunks `chunkForRulesCeiling` (default cap 19) would produce — this is
+    // the fix for the bug the tests above pin the cliff for.
+    const db = aliceDb();
+    const n = 25;
+    const cap = 19;
+
+    for (let start = 0; start < n; start += cap) {
+      const end = Math.min(start + cap, n);
+      const batch = writeBatch(db);
+      for (let i = start; i < end; i++) {
+        const cat = `c${i}`;
+        batch.set(catDoc(db, 'alice', cat), {
+          name: `cat ${i}`, recurring: false, createdAt: '2026-01-01',
+        });
+        batch.set(allocDoc(db, 'alice', `a${i}`), {
+          categoryId: cat, amount: 10, date: '2026-01-02',
+        });
+      }
+      await assertSucceeds(batch.commit());
+    }
+
+    // Every one of the 25 caixinhas actually landed — a chunk "succeeding"
+    // in isolation isn't proof nothing was skipped or double-processed.
+    for (let i = 0; i < n; i++) {
+      const snap = await getDoc(catDoc(db, 'alice', `c${i}`));
+      assert.equal(snap.exists(), true, `c${i} should exist`);
+    }
   });
 });
 

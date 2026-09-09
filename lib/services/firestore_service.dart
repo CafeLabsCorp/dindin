@@ -10,7 +10,9 @@ import '../models/income_source.dart';
 import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
 import 'aggregation_service.dart' as agg;
+import 'backup_validation.dart';
 import 'recurring_schedule.dart' as schedule;
+import 'restore_chunking.dart';
 
 /// CRUD for a single user's data, mirroring the Next.js API routes under
 /// `src/app/api/*` — same validation rules, now enforced client-side against
@@ -1285,16 +1287,25 @@ class FirestoreService {
   // here from the imported ledger via `aggregation_service`.
   // -------------------------------------------------------------------------
   Future<void> replaceAll(AppDb db) async {
-    // 0. Validate BEFORE mutating anything, so a bad backup can never leave the
-    //    database half-restored (the "trava no meio" failure). A recomputed
-    //    negative balance is only legitimate — and only re-materializable by the
-    //    rules (catMayHoldNeg on the genesis path) — for an EXISTING spend
-    //    caixinha (a frozen/open debt). The account may never be negative, and a
-    //    'save' caixinha may never hold a debt; those are corruption, so we
-    //    refuse loudly here instead of letting a mid-restore rule denial abort a
-    //    partial write. Orphan ids (referenced by the ledger but absent from
-    //    db.categories) are NOT written as balance docs at all (see step 4), so
-    //    an orphan negative can't reach the rules and isn't checked here.
+    // 0a. Validate the SHAPE of every doc (lengths/ranges `firestore.rules`
+    //     enforces) before anything else — see backup_validation.dart's doc
+    //     comment for why this has to be separate from 0b below: a field
+    //     that is well-typed but out of bounds would otherwise only be
+    //     caught by the rules themselves, mid-restore, after the wipe below
+    //     has already happened.
+    validateBackupShape(db);
+
+    // 0b. Validate the recomputed BALANCES before mutating anything, so a bad
+    //    backup can never leave the database half-restored (the "trava no
+    //    meio" failure). A recomputed negative balance is only legitimate —
+    //    and only re-materializable by the rules (catMayHoldNeg on the
+    //    genesis path) — for an EXISTING spend caixinha (a frozen/open debt).
+    //    The account may never be negative, and a 'save' caixinha may never
+    //    hold a debt; those are corruption, so we refuse loudly here instead
+    //    of letting a mid-restore rule denial abort a partial write. Orphan
+    //    ids (referenced by the ledger but absent from db.categories) are NOT
+    //    written as balance docs at all (see step 4), so an orphan negative
+    //    can't reach the rules and isn't checked here.
     final knownKind = {for (final c in db.categories) c.id: c.effectiveKind};
     final catBalances = agg.categoryBalances(db);
     if (agg.accountBalance(db) < 0) {
@@ -1317,54 +1328,109 @@ class FirestoreService {
     }
 
     // 1. Remove the derived balance docs (account + every caixinha) first.
+    //    Deleting a balance doc costs NO document-access call under the
+    //    rules (`allow delete: if isOwner(uid);`, no get()/getAfter()), so
+    //    plain doc-count chunking is safe here regardless of how many
+    //    caixinhas there are.
     final existingBalances = await _balances.get();
     await _deleteRefs([
       _account,
       ...existingBalances.docs.map((d) => d.reference),
     ]);
 
-    // 2. Delete existing ledger docs (balance docs now absent -> rules skip deltas).
-    //    Subscriptions and installment purchases carry no balance/delta of
-    //    their own (see their sections above), so they're wiped and
-    //    rewritten here alongside the other ledger collections with no
-    //    special ordering need.
-    for (final collection in [
-      _categories,
-      _incomes,
-      _allocations,
-      _expenses,
-      _subscriptions,
-      _installmentPurchases,
-    ]) {
-      final existing = await collection.get();
-      await _deleteRefs(existing.docs.map((d) => d.reference).toList());
-    }
+    // 2. Delete existing ledger docs (balance docs now absent -> rules skip
+    //    deltas, i.e. the teardown path). Chunked by DISTINCT CAIXINHA, not
+    //    doc count — see restore_chunking.dart. Deleting a category costs one
+    //    access (its own balance doc, via `catDebtFree`); deleting an
+    //    allocation/expense with a `categoryId` costs one per that id (via
+    //    `catTornDown`). Incomes/subscriptions/installment purchases cost
+    //    nothing per-caixinha (incomes only ever touch the shared
+    //    `meta/account` slot; the other two have no get()/getAfter() in
+    //    their delete rule at all), so plain doc-count chunking is safe for
+    //    them. Pinned by test/rules/rules.test.mjs, "the same ceiling
+    //    applies to the DELETE sweep (replaceAll step 2)".
+    await _deleteLedgerCollectionsChunked();
 
     // 3. Write the new ledger docs (still no balance docs -> genesis path).
+    //    Same distinct-caixinha chunking as step 2: a category CREATE costs
+    //    nothing, but an allocation/expense CREATE with a `categoryId` costs
+    //    one access per distinct caixinha (`catDeltaOk`) plus the shared
+    //    `meta/account` slot (`accountDeltaOk`) — exactly the H1 ceiling,
+    //    pinned by "a restore batch spanning 20 distinct caixinhas FAILS".
+    await _setChunked([
+      for (final c in db.categories) (_categories.doc(c.id), c.toMap(), null),
+    ]);
     await _setDocs([
-      for (final c in db.categories) (_categories.doc(c.id), c.toMap()),
       for (final i in db.incomes) (_incomes.doc(i.id), i.toMap()),
-      for (final a in db.allocations) (_allocations.doc(a.id), a.toMap()),
-      for (final e in db.expenses) (_expenses.doc(e.id), e.toMap()),
+    ]);
+    await _setChunked([
+      for (final a in db.allocations)
+        (_allocations.doc(a.id), a.toMap(), a.categoryId),
+    ]);
+    await _setChunked([
+      for (final e in db.expenses) (_expenses.doc(e.id), e.toMap(), e.categoryId),
+    ]);
+    await _setDocs([
       for (final s in db.subscriptions) (_subscriptions.doc(s.id), s.toMap()),
+    ]);
+    await _setDocs([
       for (final p in db.installmentPurchases)
         (_installmentPurchases.doc(p.id), p.toMap()),
     ]);
 
-    // 4. Write the derived balance docs last (recomputed in step 0). Only
+    // 4. Write the derived balance docs last (recomputed in step 0b). Only
     //    caixinhas that still exist get a balance doc — an orphan id left in the
     //    ledger by an incomplete delete would otherwise produce a junk balance
     //    doc the rules can't police (no category to read), and would fail the
     //    genesis floor if negative. Dropping it keeps the ledger intact while
     //    the display still recomputes correctly by summing that ledger.
-    await _setDocs([
-      (_account, {'balance': agg.accountBalance(db)}),
+    //    Chunked the same way: most balances cost nothing to write (a
+    //    non-negative value short-circuits before any get()), but a
+    //    recomputed NEGATIVE balance (a frozen debt) does read other docs, so
+    //    many of those landing in one batch could also hit the ceiling —
+    //    staying on the same conservative cap costs nothing for this rare,
+    //    one-time write.
+    await _setChunked([
+      (_account, {'balance': agg.accountBalance(db)}, null),
       for (final entry in catBalances.entries)
         if (knownKind.containsKey(entry.key))
-          (_balance(entry.key), {'balance': entry.value}),
+          (_balance(entry.key), {'balance': entry.value}, entry.key),
     ]);
   }
 
+  /// Deletes every doc in the six ledger collections. ASSUMES the balance
+  /// docs are ALREADY gone (an earlier, already-committed batch) so every
+  /// delete here takes the rules' teardown path. Used by [replaceAll]'s
+  /// step 2, ahead of its fresh write.
+  Future<void> _deleteLedgerCollectionsChunked() async {
+    final existingCategories = await _categories.get();
+    await _deleteChunked([
+      for (final d in existingCategories.docs) (d.reference, d.id),
+    ]);
+    final existingAllocations = await _allocations.get();
+    await _deleteChunked([
+      for (final d in existingAllocations.docs)
+        (d.reference, d.data()['categoryId'] as String?),
+    ]);
+    final existingExpenses = await _expenses.get();
+    await _deleteChunked([
+      for (final d in existingExpenses.docs)
+        (d.reference, d.data()['categoryId'] as String?),
+    ]);
+    // Incomes/subscriptions/installment purchases carry no per-caixinha cost
+    // on delete (see the step-2 comment in [replaceAll]) — plain
+    // doc-count chunking is safe.
+    for (final collection in [_incomes, _subscriptions, _installmentPurchases]) {
+      final existing = await collection.get();
+      await _deleteRefs(existing.docs.map((d) => d.reference).toList());
+    }
+  }
+
+  /// Plain doc-count chunking (Firestore's own ~500-writes-per-batch ceiling,
+  /// kept at a conservative 400) — safe for deletes that cost NOTHING or a
+  /// single SHARED access under the rules' document-access ceiling,
+  /// regardless of how many docs are in [refs]. See [_deleteChunked] for
+  /// deletes that cost one access PER DISTINCT caixinha instead.
   Future<void> _deleteRefs(
     List<DocumentReference<Map<String, dynamic>>> refs,
   ) async {
@@ -1377,6 +1443,24 @@ class FirestoreService {
     }
   }
 
+  /// Same as [_deleteRefs], but ALSO chunks by distinct caixinha (see
+  /// restore_chunking.dart) — for deletes whose rule costs one
+  /// get()/getAfter() call per distinct `category` (a category's own id, or
+  /// an allocation/expense's `categoryId`; pass `null` for a doc that isn't
+  /// tied to one).
+  Future<void> _deleteChunked(
+    List<(DocumentReference<Map<String, dynamic>> ref, String? category)> items,
+  ) async {
+    for (final chunk in chunkForRulesCeiling(items, (i) => i.$2)) {
+      final batch = _db.batch();
+      for (final (ref, _) in chunk) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    }
+  }
+
+  /// Plain doc-count chunking, the `set()` counterpart to [_deleteRefs].
   Future<void> _setDocs(
     List<(DocumentReference<Map<String, dynamic>>, Map<String, dynamic>)>
     writes,
@@ -1384,6 +1468,27 @@ class FirestoreService {
     for (var i = 0; i < writes.length; i += 400) {
       final batch = _db.batch();
       for (final (ref, data) in writes.skip(i).take(400)) {
+        batch.set(ref, data);
+      }
+      await batch.commit();
+    }
+  }
+
+  /// The `set()` counterpart to [_deleteChunked] — chunks by distinct
+  /// caixinha as well as doc count.
+  Future<void> _setChunked(
+    List<
+      (
+        DocumentReference<Map<String, dynamic>> ref,
+        Map<String, dynamic> data,
+        String? category,
+      )
+    >
+    writes,
+  ) async {
+    for (final chunk in chunkForRulesCeiling(writes, (w) => w.$3)) {
+      final batch = _db.batch();
+      for (final (ref, data, _) in chunk) {
         batch.set(ref, data);
       }
       await batch.commit();

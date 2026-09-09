@@ -1957,7 +1957,81 @@ void main() {
         expect(await accountBalance(), 100 - 30); // 70
       },
     );
+
+    test(
+      'a backup with an out-of-bounds field (e.g. a description over 280 '
+      'chars) is refused BEFORE anything is wiped — regression test for the '
+      "validate-before-wipe fix (backup_validation.dart)",
+      () async {
+        await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
+
+        final badBackup = AppDb(
+          categories: const [],
+          incomes: [
+            Income(
+              id: 'i1',
+              date: '2026-01-01',
+              amount: 100,
+              source: IncomeSource.freela,
+              description: 'x' * 281,
+            ),
+          ],
+          allocations: const [],
+          expenses: const [],
+        );
+
+        await expectLater(() => svc.replaceAll(badBackup), throwsStateError);
+
+        // Nothing was mutated: the pre-existing data survives intact.
+        final db = await svc.fetchAll();
+        expect(db.incomes.single.amount, 500);
+        expect(await accountBalance(), 500);
+      },
+    );
+
+    test(
+      'restoring a backup spanning 25 distinct caixinhas succeeds and every '
+      'caixinha ends up with the right balance — regression test for the '
+      'batch-chunking fix (restore_chunking.dart); the RULES-side ceiling '
+      'this fixes is pinned separately against the real emulator in '
+      'test/rules/rules.test.mjs ("rules document-access ceiling (H1)"), '
+      'since FakeFirebaseFirestore does not evaluate security rules',
+      () async {
+        const n = 25;
+        final categories = [
+          for (var i = 0; i < n; i++)
+            Category(id: 'c$i', name: 'cat $i', recurring: false, createdAt: '2026-01-01'),
+        ];
+        final allocations = [
+          for (var i = 0; i < n; i++)
+            Allocation(id: 'a$i', categoryId: 'c$i', amount: 10.0 * (i + 1), date: '2026-01-02'),
+        ];
+        final income = Income(
+          id: 'i1',
+          date: '2026-01-01',
+          amount: allocations.fold(0.0, (total, a) => total + a.amount),
+          source: IncomeSource.freela,
+        );
+        final backup = AppDb(
+          categories: categories,
+          incomes: [income],
+          allocations: allocations,
+          expenses: const [],
+        );
+
+        await svc.replaceAll(backup);
+
+        final db = await svc.fetchAll();
+        expect(db.categories.length, n);
+        expect(db.allocations.length, n);
+        for (var i = 0; i < n; i++) {
+          expect(await categoryBalance('c$i'), 10.0 * (i + 1));
+        }
+        expect(await accountBalance(), 0); // fully allocated, nothing left over
+      },
+    );
   });
+
 }
 
 /// A [FirebaseFirestore] that forwards everything [FirestoreService] uses to
