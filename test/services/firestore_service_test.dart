@@ -2122,6 +2122,18 @@ void main() {
     });
   });
 
+  group('watchAnalyticsOptOut / setAnalyticsOptOut (decision 7)', () {
+    test('defaults to false (collection ON) before the settings doc exists', () async {
+      expect(await svc.watchAnalyticsOptOut().first, isFalse);
+    });
+
+    test('setAnalyticsOptOut persists and watchAnalyticsOptOut reflects it', () async {
+      await svc.setAnalyticsOptOut(true);
+      expect(await svc.watchAnalyticsOptOut().first, isTrue);
+      await svc.setAnalyticsOptOut(false);
+      expect(await svc.watchAnalyticsOptOut().first, isFalse);
+    });
+  });
 
 }
 

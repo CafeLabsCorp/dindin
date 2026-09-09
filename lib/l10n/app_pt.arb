@@ -282,6 +282,10 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "privacySectionLabel": "Privacidade",
+  "analyticsOptOutLabel": "Compartilhar dados de uso anônimos",
+  "analyticsOptOutDescription": "Ajuda a Café Labs a entender como o Dindin é usado (nenhum valor, saldo ou descrição de gasto é enviado). Você pode desligar a qualquer momento.",
+
   "dangerZoneSectionLabel": "Zona de perigo",
   "deleteAccountDescription": "Excluir sua conta apaga todos os seus dados imediatamente — caixinhas, receitas, gastos, assinaturas e parcelamentos. Não há como desfazer.",
   "deleteAccountButton": "Excluir conta",

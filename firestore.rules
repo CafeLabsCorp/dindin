@@ -274,16 +274,26 @@ service cloud.firestore {
       return getAfter(acctDoc(uid)) == null || getAfter(acctDoc(uid)).data.balance >= 0;
     }
 
-    // meta/account holds the general account balance. Only the `account` doc
-    // is allowed under meta; everything else denies by default.
+    // meta/account holds the general account balance; meta/settings holds
+    // app preferences that aren't part of the money model (today: the
+    // Analytics opt-out toggle, decision 7 — see docs/BACKEND.md). Only
+    // these two doc ids are allowed under meta; everything else denies by
+    // default. Kept as separate branches (not one merged validator) so
+    // `account`'s validator — which anchors the money-integrity model — stays
+    // exactly as narrow as before; a bug in the unrelated `settings` shape
+    // can't widen what it accepts.
     match /users/{uid}/meta/{docId} {
       allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid)
-                            && docId == 'account'
-                            && request.resource.data.keys().hasOnly(['balance'])
-                            && isFiniteBalance(request.resource.data.balance)
-                            && request.resource.data.balance >= 0;
-      allow delete: if isOwner(uid); // needed for a full restore reset
+      allow create, update: if isOwner(uid) && (
+        (docId == 'account'
+          && request.resource.data.keys().hasOnly(['balance'])
+          && isFiniteBalance(request.resource.data.balance)
+          && request.resource.data.balance >= 0)
+        || (docId == 'settings'
+          && request.resource.data.keys().hasOnly(['analyticsOptOut'])
+          && request.resource.data.analyticsOptOut is bool)
+      );
+      allow delete: if isOwner(uid); // needed for a full restore reset / account deletion
     }
 
     // balances/{categoryId} holds one caixinha's running balance. Keyed by the

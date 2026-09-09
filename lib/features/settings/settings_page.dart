@@ -239,6 +239,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(l10n.privacySectionLabel, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              // Defaults to `false` (collection ON) while the stream hasn't
+              // resolved yet or the user is signed out — matches
+              // FirestoreService.watchAnalyticsOptOut's own default.
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l10n.analyticsOptOutLabel),
+                subtitle: Text(l10n.analyticsOptOutDescription, style: const TextStyle(fontSize: 12)),
+                value: !(ref.watch(analyticsOptOutProvider).value ?? false),
+                onChanged: (enabled) {
+                  final firestore = ref.read(firestoreServiceProvider);
+                  firestore?.setAnalyticsOptOut(!enabled);
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
                 l10n.dangerZoneSectionLabel,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(

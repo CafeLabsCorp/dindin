@@ -41,6 +41,17 @@ class AppShell extends ConsumerWidget {
     // someone else.
     ref.watch(recurringChargesCatchUpProvider);
 
+    // Applies the Analytics opt-out toggle (Ajustes -> Privacidade) to the
+    // SDK. `ref.watch` (not `ref.listen`) on purpose: it re-runs this on
+    // every build where the value changed, which covers BOTH the first
+    // resolved value (right after sign-in) and every later toggle with one
+    // mechanism — `AnalyticsService.setEnabled` is idempotent and cheap, so
+    // re-applying the same value on an unrelated rebuild costs nothing.
+    final analyticsOptOut = ref.watch(analyticsOptOutProvider).value;
+    if (analyticsOptOut != null) {
+      ref.read(analyticsServiceProvider).setEnabled(!analyticsOptOut);
+    }
+
     // Tell the user money just left their account. These charges are posted
     // with no interaction at all, so without this the only trace is rows
     // quietly appearing in a list they may not open. Listened from the shell

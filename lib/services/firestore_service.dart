@@ -92,6 +92,15 @@ class FirestoreService {
   DocumentReference<Map<String, dynamic>> get _account =>
       _db.doc('users/$uid/meta/account');
 
+  /// Device/account-independent APP preferences that aren't part of the
+  /// money model — today, only the Analytics opt-out toggle (Ajustes ->
+  /// Privacidade). A separate doc from `meta/account` on purpose: that one's
+  /// validator is deliberately narrow (`keys().hasOnly(['balance'])`) because
+  /// it anchors the money-integrity model, and mixing an unrelated field into
+  /// it would widen what a bug there could corrupt.
+  DocumentReference<Map<String, dynamic>> get _settings =>
+      _db.doc('users/$uid/meta/settings');
+
   /// A single caixinha's balance doc, keyed by the category id.
   DocumentReference<Map<String, dynamic>> _balance(String categoryId) =>
       _balances.doc(categoryId);
@@ -230,6 +239,21 @@ class FirestoreService {
         for (final d in s.docs) d.id: (d.data()['balance'] as num).toDouble(),
       },
     );
+  }
+
+  /// The Analytics opt-out toggle (Ajustes -> Privacidade, decision 7 — see
+  /// docs/BACKEND.md). Defaults to `false` (collection ON) when the doc
+  /// doesn't exist yet, matching Firebase Analytics' own default and the
+  /// product decision to instrument by default with an opt-out, not an
+  /// opt-in gate.
+  Stream<bool> watchAnalyticsOptOut() {
+    return _settings.snapshots().map(
+      (s) => s.data()?['analyticsOptOut'] as bool? ?? false,
+    );
+  }
+
+  Future<void> setAnalyticsOptOut(bool value) {
+    return _settings.set({'analyticsOptOut': value});
   }
 
   Future<AppDb> fetchAll() async {
@@ -1490,7 +1514,7 @@ class FirestoreService {
     final existingBalances = await _balances.get();
     await _deleteRefs([
       _account,
-      _db.doc('users/$uid/meta/settings'),
+      _settings,
       ...existingBalances.docs.map((d) => d.reference),
     ]);
 

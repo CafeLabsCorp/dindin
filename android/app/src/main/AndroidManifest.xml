@@ -1,4 +1,14 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Decision 7 (Analytics — ratified 2026-08-31, see docs/BACKEND.md):
+         AD_ID / Google Advertising signals are OFF. The `firebase-analytics`
+         Android SDK can pull in `com.google.android.gms:play-services-ads-identifier`
+         as an optional dependency, which declares this permission in ITS OWN
+         manifest; `tools:node="remove"` strips it back out of the merged
+         manifest so the app never requests the advertising id at all,
+         regardless of what any dependency's manifest asks for. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+
     <!-- android:label is the launcher label, shown under the icon on the
          device home screen. It is independent of the Play Store listing title
          (set in the Play Console) and of the web app's title in
@@ -37,6 +47,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Decision 7 (Analytics, docs/BACKEND.md): belt-and-suspenders
+             alongside the AD_ID permission removal above — even if some
+             future dependency re-adds that permission, these two flags keep
+             the SDK from collecting the advertising id or personalizing on
+             Google signals. -->
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -38,11 +38,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
     final auth = ref.read(authServiceProvider);
     try {
-      if (_isRegister) {
-        await auth.registerWithEmail(_emailController.text.trim(), _passwordController.text);
-      } else {
-        await auth.signInWithEmail(_emailController.text.trim(), _passwordController.text);
-      }
+      final credential = _isRegister
+          ? await auth.registerWithEmail(_emailController.text.trim(), _passwordController.text)
+          : await auth.signInWithEmail(_emailController.text.trim(), _passwordController.text);
+      _logAccountCreatedIfNew(credential);
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? e.code);
     } finally {
@@ -56,11 +55,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithGoogle();
+      final credential = await ref.read(authServiceProvider).signInWithGoogle();
+      _logAccountCreatedIfNew(credential);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Fires the `account_created` Analytics event (decision 7) exactly once
+  /// per account, regardless of which method created it: a fresh
+  /// email/password registration and a Google sign-in seen for the FIRST
+  /// time both set `additionalUserInfo.isNewUser` on the returned
+  /// [UserCredential] — an ordinary sign-in (email or returning Google user)
+  /// does not, so this is a no-op for every login after the first.
+  void _logAccountCreatedIfNew(UserCredential credential) {
+    if (credential.additionalUserInfo?.isNewUser == true) {
+      ref.read(analyticsServiceProvider).logAccountCreated();
     }
   }
 

@@ -11,6 +11,7 @@ import '../models/income.dart';
 import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
 import '../services/aggregation_service.dart';
+import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/import_export_service.dart';
@@ -32,7 +33,32 @@ final firestoreServiceProvider = Provider<FirestoreService?>((ref) {
 final importExportServiceProvider = Provider<ImportExportService?>((ref) {
   final firestore = ref.watch(firestoreServiceProvider);
   if (firestore == null) return null;
-  return ImportExportService(firestore);
+  return ImportExportService(firestore, analytics: ref.watch(analyticsServiceProvider));
+});
+
+/// Wraps `FirebaseAnalytics.instance` — see its own doc comment for the
+/// exact event/opt-out contract (decision 7, docs/BACKEND.md). Unlike the
+/// other services here it does NOT depend on [firestoreServiceProvider]: it
+/// has to exist (and, in particular, `setEnabled` has to be callable) even
+/// while signed out, since the opt-out preference itself lives per-account
+/// in Firestore and is applied via [analyticsOptOutProvider]'s listener in
+/// `AppShell`, not here.
+final analyticsServiceProvider = Provider<AnalyticsService>((ref) => AnalyticsService());
+
+/// The Analytics opt-out toggle (Ajustes -> Privacidade), streamed from the
+/// signed-in user's `meta/settings` doc. `.value` is `null` while signed out
+/// (same `Stream.empty()` convention as [categoriesProvider] and friends,
+/// deliberately — it keeps every consumer's `?? false` fallback the single
+/// place that decides the signed-out/not-yet-loaded default, instead of
+/// this provider ALSO resolving to a concrete value that would make
+/// `AppShell` try to touch the real `FirebaseAnalytics.instance` even before
+/// anyone is signed in). Before the doc has ever been written for a
+/// signed-in user, see `FirestoreService.watchAnalyticsOptOut` — that
+/// defaults to `false` (collection ON).
+final analyticsOptOutProvider = StreamProvider<bool>((ref) {
+  final firestore = ref.watch(firestoreServiceProvider);
+  if (firestore == null) return const Stream.empty();
+  return firestore.watchAnalyticsOptOut();
 });
 
 /// The general account balance, read from the O(1) denormalized

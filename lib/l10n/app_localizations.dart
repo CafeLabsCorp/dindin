@@ -1178,6 +1178,24 @@ abstract class AppLocalizations {
   /// **'Erro ao importar: {error}'**
   String importErrorMessage(String error);
 
+  /// No description provided for @privacySectionLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Privacidade'**
+  String get privacySectionLabel;
+
+  /// No description provided for @analyticsOptOutLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Compartilhar dados de uso anônimos'**
+  String get analyticsOptOutLabel;
+
+  /// No description provided for @analyticsOptOutDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ajuda a Café Labs a entender como o Dindin é usado (nenhum valor, saldo ou descrição de gasto é enviado). Você pode desligar a qualquer momento.'**
+  String get analyticsOptOutDescription;
+
   /// No description provided for @dangerZoneSectionLabel.
   ///
   /// In pt, this message translates to:

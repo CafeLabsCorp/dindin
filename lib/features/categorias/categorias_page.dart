@@ -79,6 +79,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
         goalAmount: goal,
         allowNegative: _kind == CategoryKind.spend ? _allowNegative : null,
       );
+      ref.read(analyticsServiceProvider).logCaixinhaCreated();
       _nameController.clear();
       _monthlyBudgetController.clear();
       _goalController.clear();

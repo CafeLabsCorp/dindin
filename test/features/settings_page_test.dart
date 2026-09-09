@@ -87,6 +87,29 @@ void main() {
     expect(find.text('Sign out'), findsNothing);
   });
 
+  group('privacidade / opt-out de analytics (item 7 da rodada Forge, decisão 7)', () {
+    testWidgets('mostra o toggle de compartilhamento de dados de uso, ligado por padrão', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.text('Privacidade'));
+
+      expect(find.text('Privacidade'), findsOneWidget);
+      expect(find.text('Compartilhar dados de uso anônimos'), findsOneWidget);
+      final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      expect(toggle.value, isTrue); // opt-out defaults to false -> switch ON
+    });
+
+    testWidgets('tocar o toggle sem estar logado não derruba a tela (firestore nulo é tratado)', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.byType(SwitchListTile));
+
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.pumpAndSettle();
+
+      // Sem exceção e sem crash — a tela continua íntegra.
+      expect(find.text('Privacidade'), findsOneWidget);
+    });
+  });
+
   group('exclusão de conta (item 5 da rodada Forge, decisão 3 — opção A)', () {
     testWidgets('mostra a Zona de perigo com o botão Excluir conta', (tester) async {
       await pumpPage(tester, startLocale: const Locale('pt'));

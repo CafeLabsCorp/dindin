@@ -662,6 +662,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get privacySectionLabel => 'Privacy';
+
+  @override
+  String get analyticsOptOutLabel => 'Share anonymous usage data';
+
+  @override
+  String get analyticsOptOutDescription =>
+      'Helps Café Labs understand how Dindin is used (no amount, balance, or expense description is ever sent). You can turn this off at any time.';
+
+  @override
   String get dangerZoneSectionLabel => 'Danger zone';
 
   @override

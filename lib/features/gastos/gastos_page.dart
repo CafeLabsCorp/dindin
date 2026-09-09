@@ -80,6 +80,13 @@ class _GastosPageState extends ConsumerState<GastosPage> {
       _submitting = true;
       _error = null;
     });
+    // Captured BEFORE the write: whether this account had zero expenses so
+    // far, i.e. whether the one about to be created is its FIRST ever — see
+    // AnalyticsService.logFirstExpenseLogged. Reads the already-loaded
+    // provider value (no extra round trip); if the stream hasn't resolved
+    // yet this under-counts rather than over-counts, an acceptable trade-off
+    // for a "mínimo" analytics event with no product decision riding on it.
+    final wasFirstExpense = ref.read(expensesProvider).value?.isEmpty ?? false;
     try {
       await firestore.createExpense(
         date: isoDateFrom(_date),
@@ -87,6 +94,9 @@ class _GastosPageState extends ConsumerState<GastosPage> {
         categoryId: _selection == _accountOption ? null : _selection,
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
       );
+      if (wasFirstExpense) {
+        ref.read(analyticsServiceProvider).logFirstExpenseLogged();
+      }
       _amountController.clear();
       _descriptionController.clear();
     } catch (e) {

@@ -205,6 +205,10 @@
   "exportErrorMessage": "Export error: {error}",
   "importErrorMessage": "Import error: {error}",
 
+  "privacySectionLabel": "Privacy",
+  "analyticsOptOutLabel": "Share anonymous usage data",
+  "analyticsOptOutDescription": "Helps Café Labs understand how Dindin is used (no amount, balance, or expense description is ever sent). You can turn this off at any time.",
+
   "dangerZoneSectionLabel": "Danger zone",
   "deleteAccountDescription": "Deleting your account erases all your data immediately — caixinhas, income, expenses, subscriptions, and installment purchases. This cannot be undone.",
   "deleteAccountButton": "Delete account",

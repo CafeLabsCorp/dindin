@@ -80,6 +80,7 @@ async function seed(fn) {
 }
 
 const accountDoc = (db, uid) => doc(db, `users/${uid}/meta/account`);
+const settingsDoc = (db, uid) => doc(db, `users/${uid}/meta/settings`);
 const balDoc = (db, uid, catId) => doc(db, `users/${uid}/balances/${catId}`);
 const catDoc = (db, uid, id) => doc(db, `users/${uid}/categories/${id}`);
 const incomeDoc = (db, uid, id) => doc(db, `users/${uid}/incomes/${id}`);
@@ -1964,5 +1965,58 @@ describe('full account deletion (B5)', () => {
     await assertFails(deleteDoc(accountDoc(mallory, 'alice')));
     await assertFails(deleteDoc(catDoc(mallory, 'alice', 'c1')));
     await assertFails(deleteDoc(incomeDoc(mallory, 'alice', 'i1')));
+  });
+});
+// -----------------------------------------------------------------------
+// 16. meta/settings — the Analytics opt-out toggle (decision 7)
+// -----------------------------------------------------------------------
+//
+// A second doc id under users/{uid}/meta/{docId}, alongside `account`. Kept
+// deliberately narrow and separate from `account`'s validator (see the rule
+// comment) — these tests exist mainly to prove that separation actually
+// holds: a `settings` write can't smuggle a `balance` field in, and an
+// `account` write can't smuggle `analyticsOptOut` in.
+
+describe('meta/settings (Analytics opt-out)', () => {
+  test('the owner can create, read, and update the settings doc', async () => {
+    const db = aliceDb();
+    await assertSucceeds(setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true }));
+    const snap = await getDoc(settingsDoc(db, 'alice'));
+    assert.equal(snap.data().analyticsOptOut, true);
+    await assertSucceeds(setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: false }));
+  });
+
+  test('analyticsOptOut must be a bool', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: 'true' }));
+  });
+
+  test('a settings write cannot smuggle in a balance field', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true, balance: 999 }));
+  });
+
+  test('an account write cannot smuggle in analyticsOptOut', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(accountDoc(db, 'alice'), { balance: 100, analyticsOptOut: true }));
+  });
+
+  test('a doc id other than account/settings under meta is always denied', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(doc(db, 'users/alice/meta/other'), { anything: true }));
+  });
+
+  test('another user can never read or write this settings doc', async () => {
+    const db = aliceDb();
+    await setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true });
+    const mallory = bobDb();
+    await assertFails(getDoc(settingsDoc(mallory, 'alice')));
+    await assertFails(setDoc(settingsDoc(mallory, 'alice'), { analyticsOptOut: false }));
+  });
+
+  test('the settings doc can be deleted by its owner (part of full account deletion)', async () => {
+    const db = aliceDb();
+    await setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true });
+    await assertSucceeds(deleteDoc(settingsDoc(db, 'alice')));
   });
 });

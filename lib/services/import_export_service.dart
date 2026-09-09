@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -5,6 +6,7 @@ import 'package:file_saver/file_saver.dart';
 import 'package:file_selector/file_selector.dart';
 
 import '../models/db.dart';
+import 'analytics_service.dart';
 import 'firestore_service.dart';
 
 /// Backup/restore for a user's data as a `.json` file in the same shape as
@@ -12,7 +14,12 @@ import 'firestore_service.dart';
 class ImportExportService {
   final FirestoreService firestore;
 
-  ImportExportService(this.firestore);
+  /// Optional so this class stays usable (and testable) with no Analytics
+  /// dependency at all — [exportToFile] just skips the `export_used` event
+  /// when null.
+  final AnalyticsService? analytics;
+
+  ImportExportService(this.firestore, {this.analytics});
 
   Future<void> exportToFile() async {
     final db = await firestore.fetchAll();
@@ -24,6 +31,10 @@ class ImportExportService {
       fileExtension: 'json',
       mimeType: MimeType.json,
     );
+    // Fire-and-forget, AFTER the save succeeds — an Analytics hiccup must
+    // never turn a working export into a reported failure. No file content,
+    // amount, or count is attached (see AnalyticsService's class doc).
+    unawaited(analytics?.logExportUsed());
   }
 
   /// Returns null if the user cancelled the file picker.
