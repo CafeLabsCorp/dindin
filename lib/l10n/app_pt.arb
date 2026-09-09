@@ -281,6 +281,18 @@
   "@importErrorMessage": {
     "placeholders": { "error": { "type": "String" } }
   },
+
+  "dangerZoneSectionLabel": "Zona de perigo",
+  "deleteAccountDescription": "Excluir sua conta apaga todos os seus dados imediatamente — caixinhas, receitas, gastos, assinaturas e parcelamentos. Não há como desfazer.",
+  "deleteAccountButton": "Excluir conta",
+  "deleteAccountConfirmTitle": "Excluir conta?",
+  "deleteAccountConfirmBody": "Isso apaga sua conta e todos os seus dados agora, para sempre — não existe período de carência nem recuperação depois. Se quiser guardar uma cópia antes, exporte um backup.",
+  "deleteAccountConfirmDeleteAction": "Excluir definitivamente",
+  "deleteAccountReauthRequiredMessage": "Por segurança, exclusão de conta exige um login recente. Saia e entre de novo, depois tente excluir a conta outra vez.",
+  "deleteAccountErrorMessage": "Erro ao excluir a conta: {error}",
+  "@deleteAccountErrorMessage": {
+    "placeholders": { "error": { "type": "String" } }
+  },
   "footerBrand": "Dindin — um produto Café Labs",
   "languageSectionLabel": "Idioma",
   "languageSystemOption": "Sistema",

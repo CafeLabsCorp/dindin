@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +10,9 @@ import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../widgets/app_card.dart';
 
+/// The outcome of the "Excluir conta" confirmation dialog below.
+enum _DeleteAccountDialogAction { cancel, export, delete }
+
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -19,6 +23,9 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _busy = false;
   String? _message;
+
+  bool _deleteBusy = false;
+  String? _deleteMessage;
 
   Future<void> _export() async {
     final l10n = AppLocalizations.of(context)!;
@@ -72,6 +79,82 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       setState(() => _message = l10n.importErrorMessage(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// The "Excluir conta" flow (B3, decision 3 — opção A: hard delete
+  /// imediato, sem carência). A single confirmation dialog offers exporting
+  /// a backup first (not required) alongside cancel/delete, matching the
+  /// spec exactly: "export oferecido antes de confirmar (não obrigatório)".
+  ///
+  /// Choosing "Exportar backup" closes this dialog and runs the SAME export
+  /// flow as the Backup card above, rather than keeping this dialog open
+  /// through an async operation — reuses `_export()` as-is instead of making
+  /// this dialog stateful. The user re-opens "Excluir conta" afterward to
+  /// actually delete; a two-tap trade-off for a lot less code, and this
+  /// action is rare enough that it doesn't need to be one tap.
+  Future<void> _openDeleteAccountDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final action = await showDialog<_DeleteAccountDialogAction>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.deleteAccountConfirmTitle),
+        content: Text(l10n.deleteAccountConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _DeleteAccountDialogAction.cancel),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _DeleteAccountDialogAction.export),
+            child: Text(l10n.exportBackupButton),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.pop(ctx, _DeleteAccountDialogAction.delete),
+            child: Text(l10n.deleteAccountConfirmDeleteAction),
+          ),
+        ],
+      ),
+    );
+
+    if (action == null || action == _DeleteAccountDialogAction.cancel) return;
+    if (action == _DeleteAccountDialogAction.export) {
+      await _export();
+      return;
+    }
+
+    setState(() {
+      _deleteBusy = true;
+      _deleteMessage = null;
+    });
+    try {
+      // Order matters (see AuthService.deleteAccount's doc comment): the
+      // Firestore subtree is wiped FIRST, the Auth identity LAST — the
+      // reverse order would strand `users/{uid}` unreachable forever (uids
+      // are never reissued).
+      final firestore = ref.read(firestoreServiceProvider);
+      if (firestore != null) {
+        await firestore.deleteAllUserData();
+      }
+      await ref.read(authServiceProvider).deleteAccount();
+      // On success, `authStateProvider` emits null and the router redirect
+      // (see app.dart) sends this screen away on its own — this widget may
+      // already be disposed by the time we get here, hence every `mounted`
+      // check below (and the lack of any navigation call here, mirroring
+      // how `signOut()` is handled elsewhere in this file).
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _deleteMessage = e.code == 'requires-recent-login'
+            ? l10n.deleteAccountReauthRequiredMessage
+            : l10n.deleteAccountErrorMessage(e.message ?? e.code);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteMessage = l10n.deleteAccountErrorMessage(e.toString()));
+    } finally {
+      if (mounted) setState(() => _deleteBusy = false);
     }
   }
 
@@ -148,6 +231,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               if (_message != null)
                 Padding(padding: const EdgeInsets.only(top: 12), child: Text(_message!)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.dangerZoneSectionLabel,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.deleteAccountDescription,
+                style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+                onPressed: _deleteBusy ? null : _openDeleteAccountDialog,
+                child: Text(l10n.deleteAccountButton),
+              ),
+              if (_deleteMessage != null)
+                Padding(padding: const EdgeInsets.only(top: 12), child: Text(_deleteMessage!)),
             ],
           ),
         ),

@@ -662,6 +662,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dangerZoneSectionLabel => 'Danger zone';
+
+  @override
+  String get deleteAccountDescription =>
+      'Deleting your account erases all your data immediately — caixinhas, income, expenses, subscriptions, and installment purchases. This cannot be undone.';
+
+  @override
+  String get deleteAccountButton => 'Delete account';
+
+  @override
+  String get deleteAccountConfirmTitle => 'Delete account?';
+
+  @override
+  String get deleteAccountConfirmBody =>
+      'This erases your account and all your data right now, permanently — there is no grace period or recovery afterward. If you\'d like to keep a copy first, export a backup.';
+
+  @override
+  String get deleteAccountConfirmDeleteAction => 'Delete permanently';
+
+  @override
+  String get deleteAccountReauthRequiredMessage =>
+      'For security, account deletion requires a recent sign-in. Sign out and back in, then try deleting your account again.';
+
+  @override
+  String deleteAccountErrorMessage(String error) {
+    return 'Error deleting account: $error';
+  }
+
+  @override
   String get footerBrand => 'Dindin — a Café Labs product';
 
   @override

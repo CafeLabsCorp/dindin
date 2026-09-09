@@ -42,6 +42,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// The lower AppCards (e.g. Zona de perigo) sit below the fold in the test
+  /// viewport's default size. `find.text` finds a widget anywhere in the
+  /// tree regardless of visibility, but `tester.tap` sends a pointer event
+  /// at that widget's on-screen offset — off-screen, that hits nothing (or
+  /// something else) instead of the target. So every test that TAPS
+  /// something below the fold must scroll THAT specific finder into view
+  /// first.
+  Future<void> scrollUntilVisible(WidgetTester tester, Finder finder) async {
+    await tester.scrollUntilVisible(finder, 300);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('renderiza a seção de idioma e o rótulo "Sair" em pt quando o locale é pt', (tester) async {
     await pumpPage(tester, startLocale: const Locale('pt'));
 
@@ -73,5 +85,41 @@ void main() {
 
     expect(find.text('Sair'), findsOneWidget);
     expect(find.text('Sign out'), findsNothing);
+  });
+
+  group('exclusão de conta (item 5 da rodada Forge, decisão 3 — opção A)', () {
+    testWidgets('mostra a Zona de perigo com o botão Excluir conta', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.text('Zona de perigo'));
+
+      expect(find.text('Zona de perigo'), findsOneWidget);
+      expect(find.text('Excluir conta'), findsOneWidget);
+    });
+
+    testWidgets('tocar em "Excluir conta" abre a confirmação com export oferecido e cancelar fecha sem apagar nada', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.text('Excluir conta'));
+
+      await tester.tap(find.text('Excluir conta'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Excluir conta?'), findsOneWidget);
+      expect(find.textContaining('não existe período de carência'), findsOneWidget);
+      // O export é OFERECIDO (não obrigatório) — aparece como uma ação ao
+      // lado de cancelar/excluir, dentro do PRÓPRIO diálogo (o Backup card
+      // por trás também tem um botão "Exportar backup", daí o `descendant`
+      // pra mirar só no diálogo).
+      final dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.text('Exportar backup')), findsOneWidget);
+      expect(find.text('Excluir definitivamente'), findsOneWidget);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      // O diálogo fecha e a tela de Ajustes continua normal — nada foi
+      // acionado.
+      expect(find.text('Excluir conta?'), findsNothing);
+      expect(find.text('Zona de perigo'), findsOneWidget);
+    });
   });
 }

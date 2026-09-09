@@ -62,4 +62,33 @@ class AuthService {
     }
     await _auth.signOut();
   }
+
+  /// Hard-deletes the signed-in Firebase Auth account (decision 3, ratified
+  /// 2026-08-31: option A, immediate, no carência/recovery). Callers MUST
+  /// call `FirestoreService.deleteAllUserData()` first — this only removes
+  /// the Auth identity, not `users/{uid}` in Firestore, and doing it in the
+  /// other order would strand the Firestore data unreachable forever (uids
+  /// are never reissued — see `scripts/sweep_orphans.mjs`, the server-side
+  /// safety net for exactly that failure mode).
+  ///
+  /// Can throw `FirebaseAuthException(code: 'requires-recent-login')` — Auth
+  /// account deletion requires a RECENT sign-in; the caller (see
+  /// `SettingsPage`) shows a message asking the user to sign out and back in
+  /// before retrying, rather than dead-ending on a generic error. A no-op if
+  /// already signed out.
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    if (!kIsWeb) {
+      // Best-effort: forgets the cached Google session so a future sign-in
+      // attempt on this device doesn't silently reuse credentials for an
+      // account that no longer exists.
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {
+        // Not fatal to account deletion either way.
+      }
+    }
+    await user.delete();
+  }
 }

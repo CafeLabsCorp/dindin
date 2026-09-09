@@ -204,6 +204,16 @@
   "importSuccessMessage": "Backup imported.",
   "exportErrorMessage": "Export error: {error}",
   "importErrorMessage": "Import error: {error}",
+
+  "dangerZoneSectionLabel": "Danger zone",
+  "deleteAccountDescription": "Deleting your account erases all your data immediately — caixinhas, income, expenses, subscriptions, and installment purchases. This cannot be undone.",
+  "deleteAccountButton": "Delete account",
+  "deleteAccountConfirmTitle": "Delete account?",
+  "deleteAccountConfirmBody": "This erases your account and all your data right now, permanently — there is no grace period or recovery afterward. If you'd like to keep a copy first, export a backup.",
+  "deleteAccountConfirmDeleteAction": "Delete permanently",
+  "deleteAccountReauthRequiredMessage": "For security, account deletion requires a recent sign-in. Sign out and back in, then try deleting your account again.",
+  "deleteAccountErrorMessage": "Error deleting account: {error}",
+
   "footerBrand": "Dindin — a Café Labs product",
   "languageSectionLabel": "Language",
   "languageSystemOption": "System",

@@ -1467,10 +1467,42 @@ class FirestoreService {
     ]);
   }
 
+  // -------------------------------------------------------------------------
+  // Full account deletion (B3/B5 — Play Store requirement + LGPD, decision 3
+  // ratified 2026-08-31: hard delete, immediate, no carência/recovery). The
+  // LAST step of an account deletion, right before
+  // `AuthService.deleteAccount()` calls `FirebaseAuth.currentUser.delete()`.
+  //
+  // Order matches what `firestore.rules` requires — see
+  // test/rules/rules.test.mjs, "full account deletion (B5)": balance docs
+  // MUST be gone, on their OWN already-committed batch, before the ledger
+  // delete — `catDebtFree` (which gates deleting an indebted category) reads
+  // the balance doc's PRE-COMMIT value, so tearing both down in the SAME
+  // commit does not help an indebted caixinha. Shares its chunking and its
+  // ledger-deletion step with [replaceAll]'s steps 1-2 (see
+  // [_deleteLedgerCollectionsChunked]) — the only difference is there is
+  // nothing to write back afterward.
+  // -------------------------------------------------------------------------
+  Future<void> deleteAllUserData() async {
+    // 1. Balance docs (+ the settings doc, which costs nothing to include),
+    //    on their own commit(s) — see [replaceAll]'s step 1 for why plain
+    //    doc-count chunking is safe here.
+    final existingBalances = await _balances.get();
+    await _deleteRefs([
+      _account,
+      _db.doc('users/$uid/meta/settings'),
+      ...existingBalances.docs.map((d) => d.reference),
+    ]);
+
+    // 2. The six ledger collections, chunked by distinct caixinha.
+    await _deleteLedgerCollectionsChunked();
+  }
+
   /// Deletes every doc in the six ledger collections. ASSUMES the balance
   /// docs are ALREADY gone (an earlier, already-committed batch) so every
-  /// delete here takes the rules' teardown path. Used by [replaceAll]'s
-  /// step 2, ahead of its fresh write.
+  /// delete here takes the rules' teardown path. Shared by [replaceAll]
+  /// (step 2, ahead of a fresh write) and [deleteAllUserData] (the only
+  /// step — nothing is rewritten after).
   Future<void> _deleteLedgerCollectionsChunked() async {
     final existingCategories = await _categories.get();
     await _deleteChunked([

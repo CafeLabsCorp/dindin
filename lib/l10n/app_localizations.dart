@@ -1178,6 +1178,54 @@ abstract class AppLocalizations {
   /// **'Erro ao importar: {error}'**
   String importErrorMessage(String error);
 
+  /// No description provided for @dangerZoneSectionLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Zona de perigo'**
+  String get dangerZoneSectionLabel;
+
+  /// No description provided for @deleteAccountDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Excluir sua conta apaga todos os seus dados imediatamente — caixinhas, receitas, gastos, assinaturas e parcelamentos. Não há como desfazer.'**
+  String get deleteAccountDescription;
+
+  /// No description provided for @deleteAccountButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Excluir conta'**
+  String get deleteAccountButton;
+
+  /// No description provided for @deleteAccountConfirmTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Excluir conta?'**
+  String get deleteAccountConfirmTitle;
+
+  /// No description provided for @deleteAccountConfirmBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Isso apaga sua conta e todos os seus dados agora, para sempre — não existe período de carência nem recuperação depois. Se quiser guardar uma cópia antes, exporte um backup.'**
+  String get deleteAccountConfirmBody;
+
+  /// No description provided for @deleteAccountConfirmDeleteAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Excluir definitivamente'**
+  String get deleteAccountConfirmDeleteAction;
+
+  /// No description provided for @deleteAccountReauthRequiredMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Por segurança, exclusão de conta exige um login recente. Saia e entre de novo, depois tente excluir a conta outra vez.'**
+  String get deleteAccountReauthRequiredMessage;
+
+  /// No description provided for @deleteAccountErrorMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Erro ao excluir a conta: {error}'**
+  String deleteAccountErrorMessage(String error);
+
   /// No description provided for @footerBrand.
   ///
   /// In pt, this message translates to:

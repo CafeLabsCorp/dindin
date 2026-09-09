@@ -2032,6 +2032,71 @@ void main() {
     );
   });
 
+  group('deleteAllUserData (B3/B5 — hard account deletion)', () {
+    test('wipes every collection and every balance doc, including a frozen debt', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+      final normal = await svc.createCategory(name: 'Mercado', recurring: true, kind: CategoryKind.spend);
+      await svc.createAllocation(categoryId: normal.id, amount: 600, date: '2026-01-02');
+      await svc.createExpense(date: '2026-01-03', amount: 100, categoryId: normal.id);
+
+      // A frozen debt (allowNegative off while negative) — the case that
+      // makes ORDER matter (catDebtFree reads the balance doc PRE-COMMIT, see
+      // test/rules/rules.test.mjs "full account deletion (B5)").
+      final debt = await svc.createCategory(
+        name: 'Dívida',
+        recurring: false,
+        kind: CategoryKind.spend,
+        allowNegative: true,
+      );
+      await svc.createAllocation(categoryId: debt.id, amount: 30, date: '2026-01-02');
+      await svc.createExpense(date: '2026-01-03', amount: 80, categoryId: debt.id); // -50
+      await svc.updateCategory(debt.id, allowNegative: false); // freeze it
+
+      await svc.createSubscription(name: 'Netflix', amount: 39.9, dueDay: 10);
+      await svc.createInstallmentPurchase(
+        name: 'Notebook',
+        totalAmount: 1200,
+        installments: 12,
+        purchaseDate: '2026-01-01',
+        firstChargeDate: '2026-02-01',
+      );
+
+      await svc.deleteAllUserData();
+
+      final db = await svc.fetchAll();
+      expect(db.categories, isEmpty);
+      expect(db.incomes, isEmpty);
+      expect(db.allocations, isEmpty);
+      expect(db.expenses, isEmpty);
+      expect(db.subscriptions, isEmpty);
+      expect(db.installmentPurchases, isEmpty);
+      expect((await fake.doc('users/u1/meta/account').get()).exists, isFalse);
+      expect((await fake.doc('users/u1/balances/${normal.id}').get()).exists, isFalse);
+      expect((await fake.doc('users/u1/balances/${debt.id}').get()).exists, isFalse);
+    });
+
+    test('also wipes a leftover settings doc', () async {
+      await fake.doc('users/u1/meta/settings').set({'analyticsOptOut': true});
+      await svc.deleteAllUserData();
+      expect((await fake.doc('users/u1/meta/settings').get()).exists, isFalse);
+    });
+
+    test('wiping an account with 25 distinct caixinhas succeeds (same chunking as replaceAll)', () async {
+      const n = 25;
+      for (var i = 0; i < n; i++) {
+        final cat = await svc.createCategory(name: 'cat $i', recurring: false);
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await svc.createAllocation(categoryId: cat.id, amount: 10, date: '2026-01-02');
+      }
+
+      await svc.deleteAllUserData();
+
+      final db = await svc.fetchAll();
+      expect(db.categories, isEmpty);
+      expect(db.allocations, isEmpty);
+    });
+  });
+
   group('watchAccountBalance / watchCategoryBalances (O(1) balance streams)', () {
     test('watchAccountBalance emits 0 before the account doc exists, then the real balance', () async {
       // A single continuous subscription across both states (doc absent,

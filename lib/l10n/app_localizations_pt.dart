@@ -660,6 +660,35 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get dangerZoneSectionLabel => 'Zona de perigo';
+
+  @override
+  String get deleteAccountDescription =>
+      'Excluir sua conta apaga todos os seus dados imediatamente — caixinhas, receitas, gastos, assinaturas e parcelamentos. Não há como desfazer.';
+
+  @override
+  String get deleteAccountButton => 'Excluir conta';
+
+  @override
+  String get deleteAccountConfirmTitle => 'Excluir conta?';
+
+  @override
+  String get deleteAccountConfirmBody =>
+      'Isso apaga sua conta e todos os seus dados agora, para sempre — não existe período de carência nem recuperação depois. Se quiser guardar uma cópia antes, exporte um backup.';
+
+  @override
+  String get deleteAccountConfirmDeleteAction => 'Excluir definitivamente';
+
+  @override
+  String get deleteAccountReauthRequiredMessage =>
+      'Por segurança, exclusão de conta exige um login recente. Saia e entre de novo, depois tente excluir a conta outra vez.';
+
+  @override
+  String deleteAccountErrorMessage(String error) {
+    return 'Erro ao excluir a conta: $error';
+  }
+
+  @override
   String get footerBrand => 'Dindin — um produto Café Labs';
 
   @override
