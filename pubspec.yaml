@@ -65,6 +65,9 @@ dependencies:
   collection: ^1.19.1
   font_awesome_flutter: ^11.0.0
   flutter_svg: ^2.3.0
+  firebase_analytics: ^12.5.0
+  firebase_app_check: ^0.4.7
+  url_launcher: ^6.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,7 +79,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
-  fake_cloud_firestore: ^4.1.1
+  fake_cloud_firestore: ^4.2.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
