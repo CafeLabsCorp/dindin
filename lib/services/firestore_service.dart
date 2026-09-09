@@ -14,6 +14,28 @@ import 'backup_validation.dart';
 import 'recurring_schedule.dart' as schedule;
 import 'restore_chunking.dart';
 
+/// A defensive ceiling on the small, user-managed lists (categories,
+/// subscriptions, installment purchases) — nobody has hundreds of caixinhas,
+/// so this never trims anything a real account has today; it only bounds the
+/// worst case. See docs/BACKEND.md, "read windowing".
+const _smallCollectionLimit = 500;
+
+/// A defensive ceiling on the LEDGER collections (incomes, allocations,
+/// expenses), which grow forever. `orderBy(date, descending: true)` means a
+/// limit here keeps the MOST RECENT entries — today's real accounts (~2,000
+/// docs combined across all three, per the Forge board's read-quota finding)
+/// sit comfortably under this per-collection limit, so nothing visible
+/// changes for them; it only stops an account with years of heavy history
+/// from eventually re-reading an unbounded ledger on every screen that lists
+/// transactions. It does NOT limit `fetchAll()` (export/backup, which must
+/// stay complete) and, since `providers.dart`'s `summaryProvider` now sources
+/// the headline balances from the O(1) `watchAccountBalance`/
+/// `watchCategoryBalances` streams instead of summing these lists, it does
+/// NOT affect the correctness of the balance shown on the Dashboard either —
+/// only very old entries in "histórico mensal" can fall outside this window.
+/// See docs/BACKEND.md, "read windowing".
+const _ledgerLimit = 2000;
+
 /// CRUD for a single user's data, mirroring the Next.js API routes under
 /// `src/app/api/*` — same validation rules, now enforced client-side against
 /// Firestore instead of the JSON file (see `next/src/app/api/**/route.ts`).
@@ -114,6 +136,7 @@ class FirestoreService {
   Stream<List<Category>> watchCategories() {
     return _categories
         .orderBy('createdAt')
+        .limit(_smallCollectionLimit)
         .snapshots()
         .map(
           (s) => s.docs.map((d) => Category.fromMap(d.id, d.data())).toList(),
@@ -123,19 +146,33 @@ class FirestoreService {
   Stream<List<Income>> watchIncomes() {
     return _incomes
         .orderBy('date', descending: true)
+        .limit(_ledgerLimit)
         .snapshots()
         .map((s) => s.docs.map((d) => Income.fromMap(d.id, d.data())).toList());
   }
 
   Stream<List<Allocation>> watchAllocations() {
-    return _allocations.snapshots().map(
-      (s) => s.docs.map((d) => Allocation.fromMap(d.id, d.data())).toList(),
-    );
+    // `orderBy('date', ...)` was added ALONGSIDE the `.limit()` below, not
+    // independently of it: a `.limit()` with no ordering returns an
+    // ARBITRARY subset (Firestore's default order is by document id), which
+    // could silently drop RECENT allocations while keeping ancient ones —
+    // exactly backwards for a "most recent N" window. No new composite index
+    // is needed: Firestore auto-creates the single-field index this ordering
+    // uses (see firestore.indexes.json's header — only cross-field queries
+    // are listed there).
+    return _allocations
+        .orderBy('date', descending: true)
+        .limit(_ledgerLimit)
+        .snapshots()
+        .map(
+          (s) => s.docs.map((d) => Allocation.fromMap(d.id, d.data())).toList(),
+        );
   }
 
   Stream<List<Expense>> watchExpenses() {
     return _expenses
         .orderBy('date', descending: true)
+        .limit(_ledgerLimit)
         .snapshots()
         .map(
           (s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
@@ -145,6 +182,7 @@ class FirestoreService {
   Stream<List<Subscription>> watchSubscriptions() {
     return _subscriptions
         .orderBy('createdAt')
+        .limit(_smallCollectionLimit)
         .snapshots()
         .map(
           (s) =>
@@ -155,12 +193,43 @@ class FirestoreService {
   Stream<List<InstallmentPurchase>> watchInstallmentPurchases() {
     return _installmentPurchases
         .orderBy('createdAt')
+        .limit(_smallCollectionLimit)
         .snapshots()
         .map(
           (s) => s.docs
               .map((d) => InstallmentPurchase.fromMap(d.id, d.data()))
               .toList(),
         );
+  }
+
+  /// The general account balance, read directly from the denormalized
+  /// `meta/account` doc — O(1) regardless of ledger size — instead of
+  /// summed from `watchIncomes`/`watchAllocations`/`watchExpenses` (which
+  /// are `.limit()`-ed above and would both cost far more reads AND give a
+  /// WRONG total for an account whose history exceeds that limit). This is
+  /// what `providers.dart`'s `summaryProvider` prefers for the Dashboard's
+  /// headline numbers — see its doc comment ("read windowing") and
+  /// docs/BACKEND.md. A missing doc (an account that has never had a
+  /// mutating write yet) reads as 0, same as [_readBalanceOnce].
+  Stream<double> watchAccountBalance() {
+    return _account.snapshots().map(
+      (s) => (s.data()?['balance'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  /// Every caixinha's current balance, the same O(1)-per-doc way, keyed by
+  /// category id. May be MISSING an entry for a category whose balance doc
+  /// hasn't reached this listener yet (e.g. the instant after
+  /// [createCategory] commits, before this stream's own snapshot arrives —
+  /// the two are written in the same batch but delivered by independent
+  /// listeners) — callers must default a missing id to 0, exactly like every
+  /// existing `summary.balancesByCategory[id] ?? 0` call site already does.
+  Stream<Map<String, double>> watchCategoryBalances() {
+    return _balances.snapshots().map(
+      (s) => {
+        for (final d in s.docs) d.id: (d.data()['balance'] as num).toDouble(),
+      },
+    );
   }
 
   Future<AppDb> fetchAll() async {

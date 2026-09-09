@@ -2032,6 +2032,32 @@ void main() {
     );
   });
 
+  group('watchAccountBalance / watchCategoryBalances (O(1) balance streams)', () {
+    test('watchAccountBalance emits 0 before the account doc exists, then the real balance', () async {
+      // A single continuous subscription across both states (doc absent,
+      // then created) — two separate `.first` calls around the mutation
+      // proved flaky against FakeFirebaseFirestore's snapshot delivery
+      // timing for a doc transitioning from absent to existing.
+      final values = svc.watchAccountBalance().take(2).toList();
+      await Future<void>.delayed(Duration.zero);
+      await svc.createIncome(date: '2026-01-01', amount: 250, source: IncomeSource.freela);
+      expect(await values, [0, 250]);
+    });
+
+    test('watchCategoryBalances reflects every caixinha balance doc, keyed by category id', () async {
+      final a = await svc.createCategory(name: 'A', recurring: false);
+      final b = await svc.createCategory(name: 'B', recurring: false);
+      await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+      await svc.createAllocation(categoryId: a.id, amount: 40, date: '2026-01-02');
+      await svc.createAllocation(categoryId: b.id, amount: 25, date: '2026-01-02');
+
+      final balances = await svc.watchCategoryBalances().first;
+      expect(balances[a.id], 40);
+      expect(balances[b.id], 25);
+    });
+  });
+
+
 }
 
 /// A [FirebaseFirestore] that forwards everything [FirestoreService] uses to

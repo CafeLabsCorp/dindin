@@ -35,6 +35,24 @@ final importExportServiceProvider = Provider<ImportExportService?>((ref) {
   return ImportExportService(firestore);
 });
 
+/// The general account balance, read from the O(1) denormalized
+/// `meta/account` doc — see `FirestoreService.watchAccountBalance`'s doc
+/// comment ("read windowing") for why [summaryProvider] prefers this over
+/// summing the (now `.limit()`-ed) ledger streams below.
+final accountBalanceProvider = StreamProvider<double>((ref) {
+  final firestore = ref.watch(firestoreServiceProvider);
+  if (firestore == null) return const Stream.empty();
+  return firestore.watchAccountBalance();
+});
+
+/// Every caixinha's current balance, the same O(1) way — see
+/// `FirestoreService.watchCategoryBalances`.
+final categoryBalancesProvider = StreamProvider<Map<String, double>>((ref) {
+  final firestore = ref.watch(firestoreServiceProvider);
+  if (firestore == null) return const Stream.empty();
+  return firestore.watchCategoryBalances();
+});
+
 final categoriesProvider = StreamProvider<List<Category>>((ref) {
   final firestore = ref.watch(firestoreServiceProvider);
   if (firestore == null) return const Stream.empty();
@@ -117,8 +135,26 @@ final recurringChargesCatchUpProvider = FutureProvider<RecurringChargeReport>((r
   }
 });
 
-/// Combines the 4 streams into the same summary shape as the Next.js
+/// Combines the 4 ledger streams into the same summary shape as the Next.js
 /// `/api/summary` route.
+///
+/// READ WINDOWING (see `FirestoreService.watchIncomes`/`watchAllocations`/
+/// `watchExpenses`'s `.limit()`, added to fix the Forge board's "achado
+/// econômico": unbounded listeners re-reading the whole ledger on every load
+/// were on track to exhaust the Spark plan's daily read quota with a single
+/// active user). Those three streams are now capped at the most recent
+/// [FirestoreService] worth of docs — fine for `currentMonth`/`history`
+/// (very old months can fall outside the window on a very long-lived
+/// account) but WRONG for `total`/`accountBalance`/`balancesByCategory` if
+/// they were summed from the same capped lists, silently understating the
+/// balance for any account with more history than the limit. So the
+/// headline numbers are sourced from the O(1) denormalized balance docs
+/// instead ([accountBalanceProvider]/[categoryBalancesProvider] — see their
+/// doc comments), which are exact regardless of ledger size, and this only
+/// falls back to the ledger sum while those streams haven't emitted yet
+/// (the first frame after sign-in, or in any test that doesn't override
+/// them — see `dashboard_goal_test.dart` and friends, which are unaffected
+/// by this change for exactly that reason).
 final summaryProvider = Provider<Summary?>((ref) {
   final categories = ref.watch(categoriesProvider).value;
   final incomes = ref.watch(incomesProvider).value;
@@ -133,5 +169,33 @@ final summaryProvider = Provider<Summary?>((ref) {
     allocations: allocations,
     expenses: expenses,
   );
-  return buildSummary(db);
+  final ledgerSummary = buildSummary(db);
+
+  final accountBalance = ref.watch(accountBalanceProvider).value;
+  final rawCategoryBalances = ref.watch(categoryBalancesProvider).value;
+  if (accountBalance == null || rawCategoryBalances == null) {
+    return ledgerSummary;
+  }
+
+  // Every category always gets an entry (defaulting to 0), matching what
+  // `aggregation_service.categoryBalances` already guarantees — a category
+  // can otherwise be briefly missing here right after creation, since its
+  // category doc and its balance doc arrive via two INDEPENDENT snapshot
+  // listeners even though `createCategory` writes both in one batch.
+  final categoryBalances = <String, double>{
+    for (final c in categories) c.id: 0.0,
+    ...rawCategoryBalances,
+  };
+  final total = round2(
+    accountBalance + categoryBalances.values.fold(0.0, (sum, v) => sum + v),
+  );
+
+  return Summary(
+    total: total,
+    accountBalance: accountBalance,
+    balancesByCategory: categoryBalances,
+    currentMonth: ledgerSummary.currentMonth,
+    history: ledgerSummary.history,
+    savedThisMonthByCat: ledgerSummary.savedThisMonthByCat,
+  );
 });
