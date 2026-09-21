@@ -101,6 +101,24 @@ void main() {
               Expense(id: 'e1', date: '2026-01-03', amount: 50, categoryId: 'c1'),
             ]),
           ),
+          // summaryProvider reads the unwindowed "all" providers, not the
+          // ones above (which only feed the list screens) — see their doc
+          // comments in providers.dart.
+          allIncomesProvider.overrideWith(
+            (ref) => Stream.value(const [
+              Income(id: 'i1', date: '2026-01-01', amount: 100, source: IncomeSource.freela),
+            ]),
+          ),
+          allAllocationsProvider.overrideWith(
+            (ref) => Stream.value(const [
+              Allocation(id: 'a1', categoryId: 'c1', amount: 10, date: '2026-01-02'),
+            ]),
+          ),
+          allExpensesProvider.overrideWith(
+            (ref) => Stream.value(const [
+              Expense(id: 'e1', date: '2026-01-03', amount: 50, categoryId: 'c1'),
+            ]),
+          ),
           subscriptionsProvider.overrideWith((ref) => Stream.value(const [])),
           installmentPurchasesProvider.overrideWith((ref) => Stream.value(const [])),
         ],

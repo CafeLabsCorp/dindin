@@ -40,6 +40,12 @@ void main() {
           expensesProvider.overrideWith((ref) => Stream.value(expenses)),
           incomesProvider.overrideWith((ref) => Stream.value(<Income>[])),
           allocationsProvider.overrideWith((ref) => Stream.value(allocations)),
+          // summaryProvider reads the unwindowed "all" providers, not the
+          // ones above (which only feed the list screens) — see their doc
+          // comments in providers.dart.
+          allExpensesProvider.overrideWith((ref) => Stream.value(expenses)),
+          allIncomesProvider.overrideWith((ref) => Stream.value(<Income>[])),
+          allAllocationsProvider.overrideWith((ref) => Stream.value(allocations)),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
