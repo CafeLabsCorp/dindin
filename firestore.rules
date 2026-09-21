@@ -364,11 +364,12 @@ service cloud.firestore {
     // Income only ever adds to the account. create/update/delete must move
     // meta/account by exactly the income's before->after delta and never below 0.
     function validIncome(d) {
-      return d.keys().hasOnly(['date', 'amount', 'source', 'description'])
+      return d.keys().hasOnly(['date', 'amount', 'source', 'description', 'createdAt'])
           && isIsoDate(d.date)
           && isNonNegNumber(d.amount)
           && isTag(d.source)
-          && (!('description' in d.keys()) || isDesc(d.description));
+          && (!('description' in d.keys()) || isDesc(d.description))
+          && (!('createdAt' in d.keys()) || isIsoDate(d.createdAt));
     }
 
     match /users/{uid}/incomes/{incomeId} {
@@ -445,14 +446,15 @@ service cloud.firestore {
     // they're only shape-checked here, and pinned immutable on update below.
     function validExpense(d) {
       return d.keys().hasOnly(['date', 'amount', 'categoryId', 'description',
-                               'sourceType', 'sourceId'])
+                               'sourceType', 'sourceId', 'createdAt'])
           && isIsoDate(d.date)
           && isNonNegNumber(d.amount)
           && (!('categoryId' in d.keys()) || isIdRef(d.categoryId))
           && (!('description' in d.keys()) || isDesc(d.description))
           && (!('sourceType' in d.keys()) || isTag(d.sourceType))
           && (!('sourceId' in d.keys()) || isIdRef(d.sourceId))
-          && (('sourceType' in d.keys()) == ('sourceId' in d.keys()));
+          && (('sourceType' in d.keys()) == ('sourceId' in d.keys()))
+          && (!('createdAt' in d.keys()) || isIsoDate(d.createdAt));
     }
     function isCaixinhaExpense(d) {
       return 'categoryId' in d.keys();

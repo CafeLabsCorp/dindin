@@ -43,6 +43,36 @@ const _smallCollectionLimit = 500;
 /// "read windowing".
 const _ledgerLimit = 2000;
 
+/// Re-sorts a `date`-ordered Firestore page so entries sharing the same
+/// [date] break ties by [createdAt] (most recently created first) instead of
+/// Firestore's unspecified order among equal `date` values — see
+/// `Income.createdAt`/`Expense.createdAt`'s doc comment. A doc with no
+/// `createdAt` (written before the field existed) sorts after ones that have
+/// it, so today's entries cluster above old undated ones without disturbing
+/// anything else. Client-side, not a compound Firestore `orderBy`, so it
+/// works uniformly across every doc regardless of whether `createdAt` is
+/// present — a Firestore range/order query on a field would instead silently
+/// DROP any doc missing it, which is exactly the older docs this needs to
+/// keep showing.
+List<T> _sortByDateThenCreatedAt<T>(
+  List<T> items,
+  String Function(T) date,
+  String? Function(T) createdAt,
+) {
+  final sorted = [...items];
+  sorted.sort((a, b) {
+    final byDate = date(b).compareTo(date(a));
+    if (byDate != 0) return byDate;
+    final aCreated = createdAt(a);
+    final bCreated = createdAt(b);
+    if (aCreated == null && bCreated == null) return 0;
+    if (aCreated == null) return 1;
+    if (bCreated == null) return -1;
+    return bCreated.compareTo(aCreated);
+  });
+  return sorted;
+}
+
 /// CRUD for a single user's data, mirroring the Next.js API routes under
 /// `src/app/api/*` — same validation rules, now enforced client-side against
 /// Firestore instead of the JSON file (see `next/src/app/api/**/route.ts`).
@@ -164,7 +194,13 @@ class FirestoreService {
         .orderBy('date', descending: true)
         .limit(_ledgerLimit)
         .snapshots()
-        .map((s) => s.docs.map((d) => Income.fromMap(d.id, d.data())).toList());
+        .map(
+          (s) => _sortByDateThenCreatedAt(
+            s.docs.map((d) => Income.fromMap(d.id, d.data())).toList(),
+            (i) => i.date,
+            (i) => i.createdAt,
+          ),
+        );
   }
 
   Stream<List<Allocation>> watchAllocations() {
@@ -191,7 +227,11 @@ class FirestoreService {
         .limit(_ledgerLimit)
         .snapshots()
         .map(
-          (s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
+          (s) => _sortByDateThenCreatedAt(
+            s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
+            (e) => e.date,
+            (e) => e.createdAt,
+          ),
         );
   }
 
@@ -202,7 +242,13 @@ class FirestoreService {
     return _incomes
         .orderBy('date', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => Income.fromMap(d.id, d.data())).toList());
+        .map(
+          (s) => _sortByDateThenCreatedAt(
+            s.docs.map((d) => Income.fromMap(d.id, d.data())).toList(),
+            (i) => i.date,
+            (i) => i.createdAt,
+          ),
+        );
   }
 
   /// The full allocation ledger, unwindowed — see [watchAllIncomes].
@@ -221,7 +267,11 @@ class FirestoreService {
         .orderBy('date', descending: true)
         .snapshots()
         .map(
-          (s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
+          (s) => _sortByDateThenCreatedAt(
+            s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
+            (e) => e.date,
+            (e) => e.createdAt,
+          ),
         );
   }
 
@@ -449,6 +499,7 @@ class FirestoreService {
       amount: amount,
       source: source,
       description: description,
+      createdAt: _now().toIso8601String(),
     );
     await _db.runTransaction((tx) async {
       final acct = await _readBalance(tx, _account);
@@ -467,13 +518,6 @@ class FirestoreService {
     String? description,
   }) async {
     if (amount < 0) throw StateError('income amount cannot be negative');
-    final income = Income(
-      id: id,
-      date: date,
-      amount: amount,
-      source: source,
-      description: description,
-    );
     await _db.runTransaction((tx) async {
       final snap = await tx.get(_incomes.doc(id));
       if (!snap.exists) throw StateError('income not found');
@@ -483,6 +527,16 @@ class FirestoreService {
       if (newAcct < -_eps) {
         throw StateError('lowering income would overdraw the account');
       }
+      final income = Income(
+        id: id,
+        date: date,
+        amount: amount,
+        source: source,
+        description: description,
+        // Carried over from the existing doc, not re-stamped — createdAt is
+        // when the entry was first made, not when it was last edited.
+        createdAt: snap.data()!['createdAt'] as String?,
+      );
       tx.set(_incomes.doc(id), income.toMap());
       tx.set(_account, {'balance': newAcct});
     });
@@ -743,6 +797,7 @@ class FirestoreService {
       amount: amount,
       categoryId: categoryId,
       description: description,
+      createdAt: _now().toIso8601String(),
     );
     await _db.runTransaction((tx) async {
       if (categoryId == null) {
@@ -783,13 +838,6 @@ class FirestoreService {
     String? description,
   }) async {
     if (amount < 0) throw StateError('expense amount cannot be negative');
-    final expense = Expense(
-      id: id,
-      date: date,
-      amount: amount,
-      categoryId: categoryId,
-      description: description,
-    );
     await _db.runTransaction((tx) async {
       final snap = await tx.get(_expenses.doc(id));
       if (!snap.exists) throw StateError('expense not found');
@@ -800,6 +848,16 @@ class FirestoreService {
           'moving an expense between caixinha and account is not supported; delete and recreate',
         );
       }
+      final expense = Expense(
+        id: id,
+        date: date,
+        amount: amount,
+        categoryId: categoryId,
+        description: description,
+        // Carried over from the existing doc, not re-stamped — createdAt is
+        // when the entry was first made, not when it was last edited.
+        createdAt: data['createdAt'] as String?,
+      );
       final old = (data['amount'] as num).toDouble();
       if (categoryId == null) {
         final acct = await _readBalance(tx, _account);

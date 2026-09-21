@@ -33,6 +33,15 @@ class Expense {
   /// guaranteed reference.
   final String? sourceId;
 
+  /// When this doc was actually created, as a full ISO-8601 timestamp — set
+  /// once at creation, never touched by an edit. [date] is the day the user
+  /// says the money left (freely editable, can be backdated); this is only a
+  /// tiebreaker for sorting same-[date] entries in the order they were
+  /// really entered (see `FirestoreService`'s ledger `watch*` methods).
+  /// Nullable because a doc written before this field existed has none —
+  /// those just fall back to Firestore's own (unspecified) order among ties.
+  final String? createdAt;
+
   const Expense({
     required this.id,
     required this.date,
@@ -41,6 +50,7 @@ class Expense {
     this.description,
     this.sourceType,
     this.sourceId,
+    this.createdAt,
   });
 
   /// Typed view of [sourceType]; null when this expense was entered by hand
@@ -59,6 +69,7 @@ class Expense {
       description: map['description'] as String?,
       sourceType: map['sourceType'] as String?,
       sourceId: map['sourceId'] as String?,
+      createdAt: map['createdAt'] as String?,
     );
   }
 
@@ -70,6 +81,7 @@ class Expense {
       if (description != null) 'description': description,
       if (sourceType != null) 'sourceType': sourceType,
       if (sourceId != null) 'sourceId': sourceId,
+      if (createdAt != null) 'createdAt': createdAt,
     };
   }
 

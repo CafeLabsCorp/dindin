@@ -2119,6 +2119,63 @@ void main() {
     });
   });
 
+  group('createdAt sort tiebreaker (organizar por data e hora)', () {
+    test('same-date incomes list most-recently-created first', () async {
+      final earlier = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 5, 10, 9));
+      final later = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 5, 10, 18));
+      final first = await earlier.createIncome(date: '2026-05-10', amount: 100, source: IncomeSource.freela);
+      final second = await later.createIncome(date: '2026-05-10', amount: 200, source: IncomeSource.freela);
+
+      final incomes = await svc.watchIncomes().first;
+      expect(incomes.map((i) => i.id), [second.id, first.id]);
+    });
+
+    test('same-date expenses list most-recently-created first', () async {
+      await svc.createIncome(date: '2026-05-01', amount: 1000, source: IncomeSource.freela);
+      final earlier = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 5, 10, 9));
+      final later = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 5, 10, 18));
+      final first = await earlier.createExpense(date: '2026-05-10', amount: 10);
+      final second = await later.createExpense(date: '2026-05-10', amount: 20);
+
+      final expenses = await svc.watchExpenses().first;
+      expect(expenses.map((e) => e.id), [second.id, first.id]);
+    });
+
+    test('a legacy doc with no createdAt sorts after same-date docs that have one', () async {
+      final withClock = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 5, 10, 9));
+      final timestamped = await withClock.createIncome(date: '2026-05-10', amount: 100, source: IncomeSource.freela);
+      // Simulates a doc written before this field existed — bypasses the
+      // service so it genuinely has no `createdAt` key, matching production
+      // history rather than a `createdAt: null` this model would never write.
+      await fake.collection('users/u1/incomes').add({
+        'date': '2026-05-10',
+        'amount': 50,
+        'source': IncomeSource.freela.value,
+      });
+
+      final incomes = await svc.watchIncomes().first;
+      expect(incomes.first.id, timestamped.id);
+      expect(incomes.last.createdAt, isNull);
+    });
+
+    test('updateIncome/updateExpense preserve the original createdAt instead of re-stamping it', () async {
+      final created = await svc.createIncome(date: '2026-05-10', amount: 100, source: IncomeSource.freela);
+      expect(created.createdAt, isNotNull);
+      await svc.updateIncome(created.id, date: '2026-05-11', amount: 150, source: IncomeSource.freela);
+      final reloaded = (await svc.watchIncomes().first).single;
+      expect(reloaded.createdAt, created.createdAt);
+
+      await svc.createIncome(date: '2026-05-01', amount: 1000, source: IncomeSource.freela);
+      final category = await svc.createCategory(name: 'Casa', recurring: false);
+      await svc.createAllocation(categoryId: category.id, amount: 100, date: '2026-05-02');
+      final expense = await svc.createExpense(date: '2026-05-10', amount: 10, categoryId: category.id);
+      expect(expense.createdAt, isNotNull);
+      await svc.updateExpense(expense.id, date: '2026-05-11', amount: 15, categoryId: category.id);
+      final reloadedExpense = (await svc.watchExpenses().first).single;
+      expect(reloadedExpense.createdAt, expense.createdAt);
+    });
+  });
+
   group('watchAnalyticsOptOut / setAnalyticsOptOut (decision 7)', () {
     test('defaults to false (collection ON) before the settings doc exists', () async {
       expect(await svc.watchAnalyticsOptOut().first, isFalse);
