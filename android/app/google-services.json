@@ -12,7 +12,28 @@
           "package_name": "com.cafelabs.dindin"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "368601445760-3msltuq24bhm3cg9lldm7u02s7pdu769.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cafelabs.dindin",
+            "certificate_hash": "e484f685ea43e439079635a43dbe1cf31160aaf6"
+          }
+        },
+        {
+          "client_id": "368601445760-fh6b7ntlbalchpf7jficfm4r1c4h5mor.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cafelabs.dindin",
+            "certificate_hash": "d3dd9214ce74c1804b35ea2bf6859156edf48f8e"
+          }
+        },
+        {
+          "client_id": "368601445760-3b72pd88q72jq8bp3eja9dpe85guphc8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDOh6SKVJQyJju9Oc6tDGcs0rFrhFch8aE"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "368601445760-3b72pd88q72jq8bp3eja9dpe85guphc8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
