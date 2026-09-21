@@ -12,6 +12,7 @@ import '../../services/recurring_schedule.dart' as schedule;
 import '../../theme/theme.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
+import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/charge_source_field.dart';
 import '../../widgets/responsive_form_row.dart';
@@ -49,7 +50,7 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
       setState(() => _error = l10n.nameRequiredError);
       return;
     }
-    final value = double.tryParse(_totalController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_totalController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -234,9 +235,8 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                     child: TextField(
                       controller: _totalController,
                       enabled: !_submitting,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [MoneyInputFormatter()],
                       decoration: InputDecoration(
                         labelText: l10n.amountLabel,
                         hintText: l10n.amountHint,
@@ -755,7 +755,7 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
 
   Future<void> _submitTyped() async {
     final l10n = AppLocalizations.of(context)!;
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_amountController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -794,7 +794,8 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
           TextField(
             controller: _amountController,
             enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
+            inputFormatters: [MoneyInputFormatter()],
             decoration: InputDecoration(
               labelText: l10n.amountLabel,
               hintText: l10n.amountHint,

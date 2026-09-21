@@ -35,9 +35,24 @@ String formatDate(String iso) {
   return DateFormat('dd/MM/yyyy', 'pt_BR').format(date);
 }
 
-/// Formats an amount the same way the create/edit forms parse it back
-/// (`double.tryParse(text.replaceAll(',', '.'))`), so pre-filling an edit
-/// form's amount field round-trips exactly.
+/// Formats an amount the way [MoneyInputFormatter] displays it once the
+/// user finishes typing it — grouped thousands, comma decimals — so
+/// pre-filling an edit form's masked amount field shows exactly what
+/// continuing to edit it would produce.
 String formatAmountInput(num value) {
-  return value.toStringAsFixed(2).replaceAll('.', ',');
+  return NumberFormat.currency(
+    locale: 'pt_BR',
+    symbol: '',
+    decimalDigits: 2,
+  ).format(value).trim();
+}
+
+/// Parses text produced by a [MoneyInputFormatter]-masked field (grouped
+/// thousands, comma decimals) back into a value — strips the thousands-
+/// separator dots before swapping the decimal comma for a dot, so
+/// `double.tryParse` can read it. Also reads a plain unmasked "1234,56" or
+/// "1234.56" fine, since neither has a stray dot for the strip to disturb.
+double? parseAmountInput(String text) {
+  final normalized = text.trim().replaceAll('.', '').replaceAll(',', '.');
+  return double.tryParse(normalized);
 }

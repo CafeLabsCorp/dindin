@@ -12,6 +12,7 @@ import '../../utils/date_range.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../utils/income_source_labels.dart';
+import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/edit_transaction_sheet.dart';
 import '../../widgets/responsive_form_row.dart';
@@ -43,7 +44,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_amountController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -141,7 +142,8 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                     width: 140.0,
                     child: TextField(
                       controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [MoneyInputFormatter()],
                       decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
                     ),
                   ),

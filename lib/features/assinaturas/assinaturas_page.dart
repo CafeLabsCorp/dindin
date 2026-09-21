@@ -11,6 +11,7 @@ import '../../services/recurring_schedule.dart' as schedule;
 import '../../theme/theme.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
+import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/charge_source_field.dart';
 import '../../widgets/responsive_form_row.dart';
@@ -54,7 +55,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
       setState(() => _error = l10n.nameRequiredError);
       return;
     }
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_amountController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -210,9 +211,8 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                     child: TextField(
                       controller: _amountController,
                       enabled: !_submitting,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [MoneyInputFormatter()],
                       decoration: InputDecoration(
                         labelText: l10n.amountLabel,
                         hintText: l10n.amountHint,
@@ -460,7 +460,7 @@ class _EditSubscriptionSheetState
     super.initState();
     _nameController = TextEditingController(text: widget.subscription.name);
     _amountController = TextEditingController(
-      text: widget.subscription.amount.toStringAsFixed(2).replaceAll('.', ','),
+      text: formatAmountInput(widget.subscription.amount),
     );
     _dueDay = widget.subscription.dueDay;
     _source = widget.subscription.categoryId ?? chargeSourceAccount;
@@ -480,7 +480,7 @@ class _EditSubscriptionSheetState
       setState(() => _error = l10n.nameRequiredError);
       return;
     }
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_amountController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -547,7 +547,8 @@ class _EditSubscriptionSheetState
           TextField(
             controller: _amountController,
             enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
+            inputFormatters: [MoneyInputFormatter()],
             decoration: InputDecoration(labelText: l10n.amountLabel),
           ),
           const SizedBox(height: 12),

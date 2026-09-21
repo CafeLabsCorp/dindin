@@ -13,6 +13,7 @@ import '../theme/theme.dart';
 import '../utils/errors.dart';
 import '../utils/format.dart';
 import '../utils/income_source_labels.dart';
+import '../utils/money_input_formatter.dart';
 import 'adaptive_form_sheet.dart';
 import 'responsive_form_row.dart';
 
@@ -113,7 +114,7 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_amountController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -227,7 +228,8 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
               child: TextField(
                 controller: _amountController,
                 enabled: !_submitting,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.number,
+                inputFormatters: [MoneyInputFormatter()],
                 decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
               ),
             ),

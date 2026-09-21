@@ -9,6 +9,7 @@ import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
+import '../../utils/money_input_formatter.dart';
 import '../../widgets/adaptive_form_sheet.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/caixinha_budget_bar.dart';
@@ -48,7 +49,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     if (_kind == CategoryKind.spend) {
       final budgetText = _monthlyBudgetController.text.trim();
       if (budgetText.isNotEmpty) {
-        budget = double.tryParse(budgetText.replaceAll(',', '.'));
+        budget = parseAmountInput(budgetText);
         if (budget == null || budget <= 0) {
           setState(() => _error = l10n.invalidBudgetOrBlankError);
           return;
@@ -57,7 +58,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     } else {
       final goalText = _goalController.text.trim();
       if (goalText.isNotEmpty) {
-        goal = double.tryParse(goalText.replaceAll(',', '.'));
+        goal = parseAmountInput(goalText);
         if (goal == null || goal <= 0) {
           setState(() => _error = l10n.invalidGoalOrBlankError);
           return;
@@ -205,9 +206,8 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
               if (_kind == CategoryKind.spend)
                 TextField(
                   controller: _monthlyBudgetController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [MoneyInputFormatter()],
                   decoration: InputDecoration(
                     labelText: l10n.monthlyBudgetLabel,
                     hintText: l10n.amountHint,
@@ -216,9 +216,8 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
               else
                 TextField(
                   controller: _goalController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [MoneyInputFormatter()],
                   decoration: InputDecoration(
                     labelText: l10n.goalAmountLabel,
                     hintText: l10n.goalAmountHint,
@@ -520,7 +519,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
     if (_kind == CategoryKind.spend) {
       final budgetText = _monthlyBudgetController.text.trim();
       if (budgetText.isNotEmpty) {
-        budget = double.tryParse(budgetText.replaceAll(',', '.'));
+        budget = parseAmountInput(budgetText);
         if (budget == null || budget <= 0) {
           setState(() => _error = l10n.invalidBudgetOrBlankError);
           return;
@@ -529,7 +528,7 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
     } else {
       final goalText = _goalController.text.trim();
       if (goalText.isNotEmpty) {
-        goal = double.tryParse(goalText.replaceAll(',', '.'));
+        goal = parseAmountInput(goalText);
         if (goal == null || goal <= 0) {
           setState(() => _error = l10n.invalidGoalOrBlankError);
           return;
@@ -623,7 +622,8 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           TextField(
             controller: _monthlyBudgetController,
             enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
+            inputFormatters: [MoneyInputFormatter()],
             decoration: InputDecoration(
               labelText: l10n.monthlyBudgetLabel,
               hintText: l10n.amountHint,
@@ -633,7 +633,8 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
           TextField(
             controller: _goalController,
             enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
+            inputFormatters: [MoneyInputFormatter()],
             decoration: InputDecoration(
               labelText: l10n.goalAmountLabel,
               hintText: l10n.goalAmountHint,

@@ -15,6 +15,7 @@ import '../../theme/theme.dart';
 import '../../utils/date_range.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
+import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/edit_transaction_sheet.dart';
 import '../../widgets/responsive_form_row.dart';
@@ -65,7 +66,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
 
   Future<void> _submit(List<Category> categories, num? availableBalance) async {
     final l10n = AppLocalizations.of(context)!;
-    final value = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    final value = parseAmountInput(_amountController.text);
     if (value == null || value <= 0) {
       setState(() => _error = l10n.invalidAmountError);
       return;
@@ -225,7 +226,8 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                     child: TextField(
                       controller: _amountController,
                       enabled: !blocked,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [MoneyInputFormatter()],
                       decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
                     ),
                   ),
