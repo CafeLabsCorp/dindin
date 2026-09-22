@@ -22,21 +22,65 @@ plus CI and rollback for rules/hosting, is now encoded in `scripts/deploy.sh`
 
 ## User data: export & deletion (privacy baseline)
 
-Before onboarding real users there is a working path for both:
-
 - **Export** — in-app: Ajustes → Exportar JSON produces the full ledger
   (`ImportExportService.exportToFile`). This is the user's complete data in a
-  portable, human-readable format.
-- **Deletion** — manual, documented process (acceptable at this stage):
-  1. The user can wipe-and-replace their own data by importing an empty/edited
-     backup (`replaceAll` clears the six ledger collections and resets the
-     balance docs).
-  2. Full account deletion (auth user + the entire `users/{uid}` subtree) is a
-     manual admin step: delete the Auth user in the Firebase console and delete
-     the `users/{uid}` document subtree (ledger + `meta/account` + `balances`).
-     The backfill script's `firebase-admin` setup can also script this if
-     needed. When a self-service "delete my account" button is added, it should
-     do exactly this.
+  portable, human-readable format. The account-deletion confirmation dialog
+  (below) offers this same export as an optional step before deleting.
+- **Wipe-and-replace** — the user can also reset their own data in place by
+  importing an empty/edited backup (`replaceAll` clears the six ledger
+  collections and resets the balance docs) without deleting the account.
+- **Full account deletion (B3/B5 — Play Store requirement + LGPD)** —
+  self-service, in-app: Ajustes → Privacidade → "Excluir conta"
+  (`SettingsPage._openDeleteAccountDialog`). Decision 3 (ratified
+  2026-08-31, opção A): **hard delete, immediate, no carência/recovery** —
+  there is no "deactivated" state. The confirmation dialog offers exporting a
+  backup first (not required) alongside cancel/delete.
+  1. `FirestoreService.deleteAllUserData()` wipes the entire `users/{uid}`
+     subtree: `meta/account` + every `balances/{catId}` doc **first, on their
+     own committed batch(es)**, then the six ledger collections, chunked the
+     same way `replaceAll` is (see "Batch chunking" — a category's/
+     allocation's/expense's delete counts as one document-access against the
+     rules' 20-access ceiling, same as a write does; doc-count-only chunking
+     here would reproduce the restore data-loss bug below).
+  2. `AuthService.deleteAccount()` then calls `FirebaseAuth.currentUser.delete()`
+     to remove the Auth identity. **Order matters and is enforced by
+     `firestore.rules` itself**, not just by convention: `catDebtFree()` (which
+     gates deleting an indebted category) reads the balance doc's PRE-COMMIT
+     value, so an indebted caixinha's `categories/{id}` delete is rejected
+     while its `balances/{id}` doc still exists — the balance docs MUST be
+     gone, in an already-committed batch, before the ledger delete. Deleting
+     the Auth user before the Firestore data would instead strand
+     `users/{uid}` unreachable forever (uids are never reissued).
+  3. `user.delete()` can throw `FirebaseAuthException(code:
+     'requires-recent-login')` — Auth account deletion requires a *recent*
+     sign-in. The UI surfaces this as "sign out and back in, then retry"
+     rather than a generic error; the Firestore data is already gone by this
+     point (safe — `scripts/sweep_orphans.mjs` below is exactly the backstop
+     for a deletion that dies between steps 1 and 2).
+  - No tombstone record is written or expected after a successful deletion —
+    there is nothing left under `users/{uid}` for anyone to read (rules key
+    on `request.auth.uid`, and a deleted uid is never reissued), so an empty
+    subtree already proves the deletion happened. `scripts/sweep_orphans.mjs`
+    doesn't look for a tombstone either: it detects an incomplete/interrupted
+    deletion purely by "this uid has data under `users/{uid}` but no Auth
+    user" — see the script's header.
+  - Covered end-to-end by `test/rules/rules.test.mjs`, `describe('full
+    account deletion (B5)')` (the prescribed order against the real
+    emulator, including a frozen-debt caixinha, plus the order-matters
+    negative cases and cross-user isolation);
+    `test/services/firestore_service_test.dart`, `group('deleteAllUserData
+    (B3/B5 — hard account deletion)')`; and
+    `test/features/settings_page_test.dart` (dialog open/cancel/export-then-
+    close flow).
+  - **Backstop for a deletion that dies partway** (app killed, network drops,
+    the required re-auth is refused): `scripts/sweep_orphans.mjs`, a
+    maintainer-run Admin SDK script (Cloud Functions would need Blaze, which
+    is deliberately not in use — see "Option B" below). Detects any uid with
+    Firestore data but no Auth user and deletes the leftover subtree; also
+    cleans up an Auth user deleted by hand from the Firebase console (which
+    never touches Firestore). `--dry-run` by default; requires `--confirm` to
+    write. Run periodically (see its header for the invocation and
+    credentials).
 
 ## Data model additions (all additive / backward-compatible)
 

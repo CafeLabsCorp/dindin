@@ -25,22 +25,71 @@ deploy/rollback.
 
 ## Dados do usuário: exportação e exclusão (baseline de privacidade)
 
-Antes de aceitar usuários reais existe um caminho funcional pras duas coisas:
-
 - **Exportação** — no app: Ajustes → Exportar JSON produz o ledger completo
   (`ImportExportService.exportToFile`). São os dados completos do usuário
-  num formato portável e legível por humanos.
-- **Exclusão** — processo manual, documentado (aceitável neste estágio):
-  1. O usuário pode limpar-e-substituir os próprios dados importando um
-     backup vazio/editado (`replaceAll` limpa as seis coleções do ledger
-     e reseta os docs de saldo).
-  2. Exclusão completa de conta (usuário de auth + toda a subárvore
-     `users/{uid}`) é um passo manual de admin: apagar o usuário de Auth no
-     console do Firebase e apagar a subárvore de documento `users/{uid}`
-     (ledger + `meta/account` + `balances`). A configuração
-     `firebase-admin` do script de backfill também pode scriptar isso se
-     necessário. Quando um botão de "excluir minha conta" self-service for
-     adicionado, ele deve fazer exatamente isso.
+  num formato portável e legível por humanos. O diálogo de confirmação da
+  exclusão de conta (abaixo) oferece essa mesma exportação como passo
+  opcional antes de excluir.
+- **Limpar e substituir** — o usuário também pode resetar os próprios dados
+  sem excluir a conta, importando um backup vazio/editado (`replaceAll`
+  limpa as seis coleções do ledger e reseta os docs de saldo).
+- **Exclusão completa de conta (B3/B5 — exigência da Play Store + LGPD)** —
+  self-service, dentro do app: Ajustes → Privacidade → "Excluir conta"
+  (`SettingsPage._openDeleteAccountDialog`). Decisão 3 (ratificada em
+  2026-08-31, opção A): **hard delete, imediato, sem carência/recuperação**
+  — não existe estado de "conta desativada". O diálogo de confirmação
+  oferece exportar um backup antes (não obrigatório), junto de
+  cancelar/excluir.
+  1. `FirestoreService.deleteAllUserData()` apaga toda a subárvore
+     `users/{uid}`: `meta/account` + todo doc `balances/{catId}` **primeiro,
+     no(s) próprio(s) batch(es) já commitado(s)**, e só depois as seis
+     coleções do ledger, fatiadas do mesmo jeito que `replaceAll` já faz
+     (ver "Batch chunking" — o delete de uma categoria/alocação/gasto conta
+     como um acesso-a-documento contra o teto de 20 acessos das rules, igual
+     uma escrita conta; fatiar só por contagem de docs aqui reproduziria o
+     bug de perda de dados do restore, abaixo).
+  2. `AuthService.deleteAccount()` então chama
+     `FirebaseAuth.currentUser.delete()` pra remover a identidade de Auth. **A
+     ordem importa e é imposta pelo próprio `firestore.rules`**, não só por
+     convenção: `catDebtFree()` (que trava a exclusão de uma categoria
+     endividada) lê o valor PRE-COMMIT do doc de saldo, então o delete de
+     `categories/{id}` de uma caixinha endividada é recusado enquanto seu doc
+     `balances/{id}` ainda existir — os docs de saldo PRECISAM estar
+     apagados, num batch já commitado, antes do delete do ledger. Apagar o
+     usuário de Auth antes dos dados do Firestore deixaria `users/{uid}`
+     inalcançável pra sempre (uids nunca são reemitidos).
+  3. `user.delete()` pode lançar `FirebaseAuthException(code:
+     'requires-recent-login')` — apagar a conta de Auth exige um login
+     *recente*. A UI mostra isso como "saia e entre de novo, depois tente de
+     novo" em vez de um erro genérico; os dados do Firestore já foram
+     apagados nesse ponto (seguro — `scripts/sweep_orphans.mjs` abaixo é
+     exatamente a rede de segurança pra uma exclusão que morre entre os
+     passos 1 e 2).
+  - Nenhum registro-tombstone é escrito nem esperado depois de uma exclusão
+    bem-sucedida — não sobra nada legível sob `users/{uid}` pra ninguém ler
+    (as rules travam em `request.auth.uid`, e um uid apagado nunca é
+    reemitido), então uma subárvore vazia já prova que a exclusão aconteceu.
+    O `scripts/sweep_orphans.mjs` também não procura por um tombstone:
+    detecta uma exclusão incompleta/interrompida só por "esse uid tem dado
+    sob `users/{uid}` mas nenhum usuário de Auth" — ver o cabeçalho do
+    script.
+  - Coberto de ponta a ponta por `test/rules/rules.test.mjs`,
+    `describe('full account deletion (B5)')` (a ordem prescrita contra o
+    emulador real, incluindo uma caixinha com dívida congelada, mais os
+    casos negativos de "a ordem importa" e isolamento entre usuários);
+    `test/services/firestore_service_test.dart`, `group('deleteAllUserData
+    (B3/B5 — hard account deletion)')`; e
+    `test/features/settings_page_test.dart` (fluxo do diálogo —
+    abrir/cancelar/exportar-e-fechar).
+  - **Rede de segurança pra uma exclusão que morre no meio do caminho** (app
+    morto, rede cai, o re-login exigido é recusado): `scripts/sweep_orphans.mjs`,
+    um script Admin SDK rodado por um mantenedor (Cloud Functions exigiria
+    Blaze, que deliberadamente não está em uso — ver "Option B" abaixo).
+    Detecta qualquer uid com dado no Firestore mas sem usuário de Auth e
+    apaga a subárvore que sobrou; também limpa um usuário de Auth apagado à
+    mão pelo console do Firebase (que nunca toca o Firestore). `--dry-run`
+    por padrão; exige `--confirm` pra escrever. Rodar periodicamente (ver o
+    cabeçalho do script pra invocação e credenciais).
 
 ## Adições ao modelo de dados (todas aditivas / retrocompatíveis)
 
