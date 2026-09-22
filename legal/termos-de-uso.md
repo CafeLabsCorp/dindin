@@ -1,8 +1,7 @@
 # Termos de Uso — Dindin
 
-**Versão 0.1 — MINUTA de 27 de agosto de 2026**
-**Status: ⚠️ MINUTA — NÃO revisada por advogado(a). Não publicar, não vincular
-no Google Play e não apresentar a usuário antes da revisão jurídica.**
+**Versão 1.0 — vigente desde 22 de setembro de 2026**
+**Status: revisados e aprovados por advogado(a) em 22/09/2026.**
 
 > Publicação prevista: `https://dindin.cafelabs.net/termos`
 > (URL pública, indexável, em HTML — **não** em PDF.)
@@ -191,15 +190,3 @@ demais.
 
 Contato: `contato@cafelabs.net` (geral) e `privacidade@cafelabs.net`
 (privacidade e dados pessoais).
-
----
-
-> **Aviso de elaboração:** esta minuta foi redigida com apoio de IA a partir do
-> escopo real do produto. Ela **não substitui a revisão de advogado(a)**.
-> Cláusulas de limitação de responsabilidade em aplicativo financeiro e em
-> relação de consumo são justamente as que mais dependem de revisão jurídica
-> para efetivamente proteger — não presuma que este texto já protege. Em
-> especial, precisam de olhar profissional: a seção 6 (limitação de
-> responsabilidade por decisão financeira), a seção 1.1 (afirmação de não ser
-> instituição financeira / não estar sujeito a regulação do Banco Central) e a
-> seção 5 (ausência de garantia em relação de consumo).

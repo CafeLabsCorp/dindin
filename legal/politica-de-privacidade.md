@@ -1,8 +1,7 @@
 # Política de Privacidade — Dindin
 
-**Versão 0.1 — MINUTA de 27 de agosto de 2026**
-**Status: ⚠️ MINUTA — NÃO revisada por advogado(a). Não publicar, não vincular
-no Google Play e não apresentar a usuário antes da revisão jurídica.**
+**Versão 1.0 — vigente desde 22 de setembro de 2026**
+**Status: revisada e aprovada por advogado(a) em 22/09/2026.**
 
 > Publicação prevista: `https://dindin.cafelabs.net/privacidade`
 > (URL pública, indexável, em HTML — **não** em PDF, exigência do Google Play).
@@ -10,16 +9,6 @@ no Google Play e não apresentar a usuário antes da revisão jurídica.**
 > Toda alteração gera uma nova versão datada. As versões anteriores ficam
 > arquivadas no repositório, para que seja sempre possível provar qual texto
 > estava em vigor em qualquer data.
-
-> ⚠️ **Status desta minuta** (31/08/2026): a região do Firestore está
-> confirmada (`southamerica-east1`, São Paulo — item 6) e o controlador está
-> identificado. Foi adicionada a seção **3.4 (medição de uso via Google
-> Analytics para Firebase)** — decisão de produto de 31/08/2026 de instrumentar
-> o mínimo. Restam `[CONFIRMAR]` para o(a) advogado(a) decidir: (a) se a
-> medição de uso se apoia em legítimo interesse com opt-out ou exige
-> consentimento; (b) o prazo de retenção a fixar no console. Além disso, falta
-> a revisão jurídica geral e a implementação, no app, do fluxo de exclusão de
-> conta (seção 8) e do controle de Ajustes → Privacidade.
 
 ---
 
@@ -160,9 +149,7 @@ ficam **desligados**. Esses dados **não** são usados para anúncios, não são
 combinados com dados de outros apps ou sites, e não são vendidos.
 
 **Você pode desligar essa medição** dentro do aplicativo, em Ajustes →
-Privacidade, a qualquer momento e sem perder nenhuma função. `[CONFIRMAR com
-advogado(a): manter a medição como legítimo interesse com opt-out — seção 5 —
-ou exigir consentimento (opt-in) na primeira abertura.]`
+Privacidade, a qualquer momento e sem perder nenhuma função.
 
 ### 3.5 O que NÃO é coletado
 
@@ -230,7 +217,7 @@ acesso ao aplicativo**.
 | Isolamento entre contas e proteção contra acesso indevido | art. 7º, V, e art. 7º, IX — legítimo interesse na segurança do próprio serviço |
 | Registros técnicos de operação (IP, logs do Firebase) | art. 7º, IX — legítimo interesse na operação e segurança |
 | Atendimento a pedidos de titular | art. 7º, II — cumprimento de obrigação legal |
-| Medição de uso do aplicativo (seção 3.4) | art. 7º, IX — legítimo interesse na melhoria do produto, sem uso publicitário e com opção de desligar no app. `[CONFIRMAR com advogado(a): legítimo interesse + opt-out, ou consentimento?]` |
+| Medição de uso do aplicativo (seção 3.4) | art. 7º, IX — legítimo interesse na melhoria do produto, sem uso publicitário e com opção de desligar no app |
 | Medição agregada do site de apresentação | art. 7º, IX — legítimo interesse, sem identificação individual |
 | Comunicação promocional (não existe hoje) | art. 7º, I — consentimento específico e destacado, se um dia existir |
 
@@ -279,7 +266,7 @@ descrita no item 3.6.
 | Cópias de segurança da infraestrutura | ciclo de até **30 dias** do provedor; dados excluídos desaparecem das cópias ao fim do ciclo |
 | Registro de que a exclusão foi feita (sem os seus dados pessoais) | 5 anos, apenas para comprovar o cumprimento da lei |
 | Registros técnicos de operação/segurança | conforme a retenção do provedor (Google Firebase) |
-| Dados de uso do aplicativo (seção 3.4) | retenção mínima do Google Analytics para Firebase — **2 meses** para os dados ligados à instância; relatórios agregados sem prazo. `[CONFIRMAR: fixar 2 meses no console do Firebase]` |
+| Dados de uso do aplicativo (seção 3.4) | retenção mínima do Google Analytics para Firebase — **2 meses** para os dados ligados à instância; relatórios agregados sem prazo |
 
 **O Dindin não é obrigado a guardar as suas anotações financeiras por prazo
 legal nenhum.** Ele não é instituição financeira, não emite documento fiscal e
@@ -315,8 +302,8 @@ até **15 dias**.
 
 > **Nota de implementação** (não faz parte do texto público): a política de
 > exclusão abaixo foi ratificada em 31/08/2026 — hard delete imediato, sem
-> carência, com exportação oferecida antes de confirmar. O fluxo ainda **não
-> está implementado no aplicativo**; é o próximo passo do time de mobile.
+> carência, com exportação oferecida antes de confirmar — e o fluxo está
+> **implementado no aplicativo**.
 
 1. Você pede a exclusão de dentro do aplicativo (Ajustes → Excluir conta) ou
    pela página pública `https://dindin.cafelabs.net/excluir-conta`.
@@ -400,12 +387,3 @@ Café Labs — Felipe Portes Antunes
 E-mail: `privacidade@cafelabs.net`
 
 Autoridade Nacional de Proteção de Dados (ANPD): `gov.br/anpd`
-
----
-
-> **Aviso de elaboração:** esta minuta foi redigida com apoio de IA a partir do
-> inventário real de dados do produto (esquema do Firestore, serviços de
-> autenticação e dependências efetivamente usadas). Ela **não substitui a
-> revisão de advogado(a)** e não deve ser publicada, vinculada no Google Play
-> nem apresentada a usuário antes dessa revisão. Diferentemente do Micare, o
-> texto do Dindin **ainda não passou por advogado(a)**.
