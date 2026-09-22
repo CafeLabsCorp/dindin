@@ -1,12 +1,21 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:dindin/features/settings/settings_page.dart';
 import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/providers/locale_provider.dart';
 import 'package:dindin/providers/providers.dart';
+import 'package:dindin/services/auth_service.dart';
 import 'package:dindin/theme/theme.dart';
+
+class _MockAuthService extends Mock implements AuthService {}
+
+class _MockUser extends Mock implements User {}
+
+class _MockUserInfo extends Mock implements UserInfo {}
 
 void main() {
   // localeProvider is seeded to a known value (not left at its real default
@@ -14,14 +23,32 @@ void main() {
   // whatever locale the machine running the tests is set to, which isn't pt
   // on every machine/CI runner. Same reasoning as the fix applied to the
   // other widget tests after the i18n rollout.
-  Future<void> pumpPage(WidgetTester tester, {required Locale startLocale}) async {
+  //
+  // [user]/[authService] default to null/a bare mock stubbed only for
+  // `reloadCurrentUser()` (called unconditionally from `initState`) — every
+  // test that doesn't care about the email-verification banner gets the
+  // same signed-out-shaped behavior these tests had before that banner
+  // existed.
+  Future<void> pumpPage(
+    WidgetTester tester, {
+    required Locale startLocale,
+    User? user,
+    AuthService? authService,
+  }) async {
+    final auth = authService ?? _MockAuthService();
+    if (authService == null) {
+      when(() => auth.reloadCurrentUser()).thenAnswer((_) async {});
+    }
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          // Signed-out: settings_page.dart only ever `.value`s this to render
-          // an email/display name (falls back to '—'), so a null user keeps
-          // this test independent of any real Firebase/auth setup.
-          authStateProvider.overrideWith((ref) => Stream.value(null)),
+          // Signed-out by default: settings_page.dart only ever `.value`s
+          // this to render an email/display name (falls back to '—') and to
+          // decide the email-verification banner, so a null user keeps
+          // every test that doesn't pass [user] independent of any real
+          // Firebase/auth setup.
+          authStateProvider.overrideWith((ref) => Stream.value(user)),
+          authServiceProvider.overrideWith((ref) => auth),
           localeProvider.overrideWith((ref) => startLocale),
         ],
         // Reads localeProvider the same way DindinApp's real
@@ -40,6 +67,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  /// A password-account [User] mock, stubbed with the fields the
+  /// email-verification banner and the "Conta" card actually read.
+  _MockUser passwordUser({required bool emailVerified}) {
+    final providerInfo = _MockUserInfo();
+    when(() => providerInfo.providerId).thenReturn(EmailAuthProvider.PROVIDER_ID);
+    final user = _MockUser();
+    when(() => user.email).thenReturn('ana@example.com');
+    when(() => user.displayName).thenReturn(null);
+    when(() => user.emailVerified).thenReturn(emailVerified);
+    when(() => user.providerData).thenReturn([providerInfo]);
+    return user;
   }
 
   /// The lower AppCards (Privacidade, Legal, Zona de perigo) sit below the
@@ -179,6 +219,88 @@ void main() {
       // acionado.
       expect(find.text('Excluir conta?'), findsNothing);
       expect(find.text('Zona de perigo'), findsOneWidget);
+    });
+  });
+
+  group('verificação de e-mail (auditoria de segurança 2026-09-22) — não-bloqueante', () {
+    testWidgets('sem usuário logado, o aviso não aparece', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'));
+      await scrollUntilVisible(tester, find.text('Privacidade'));
+
+      expect(find.text('Reenviar e-mail de verificação'), findsNothing);
+    });
+
+    testWidgets('conta de e-mail/senha já verificada não mostra o aviso', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'), user: passwordUser(emailVerified: true));
+      await scrollUntilVisible(tester, find.text('Privacidade'));
+
+      expect(find.text('Reenviar e-mail de verificação'), findsNothing);
+    });
+
+    testWidgets('conta Google não verificada NÃO mostra o aviso (decisão: só se aplica a e-mail/senha)', (tester) async {
+      final providerInfo = _MockUserInfo();
+      when(() => providerInfo.providerId).thenReturn(GoogleAuthProvider.PROVIDER_ID);
+      final googleUser = _MockUser();
+      when(() => googleUser.email).thenReturn('ana@gmail.com');
+      when(() => googleUser.displayName).thenReturn('Ana');
+      when(() => googleUser.emailVerified).thenReturn(false);
+      when(() => googleUser.providerData).thenReturn([providerInfo]);
+
+      await pumpPage(tester, startLocale: const Locale('pt'), user: googleUser);
+      await scrollUntilVisible(tester, find.text('Privacidade'));
+
+      expect(find.text('Reenviar e-mail de verificação'), findsNothing);
+    });
+
+    testWidgets('conta de e-mail/senha não verificada mostra o aviso com o botão de reenvio', (tester) async {
+      await pumpPage(tester, startLocale: const Locale('pt'), user: passwordUser(emailVerified: false));
+      await scrollUntilVisible(tester, find.text('Privacidade'));
+
+      expect(find.textContaining('ainda não foi confirmado'), findsOneWidget);
+      expect(find.text('Reenviar e-mail de verificação'), findsOneWidget);
+    });
+
+    testWidgets('tocar em "Reenviar" chama sendEmailVerification e mostra a mensagem de sucesso', (tester) async {
+      final authService = _MockAuthService();
+      when(() => authService.reloadCurrentUser()).thenAnswer((_) async {});
+      when(() => authService.sendEmailVerification()).thenAnswer((_) async {});
+
+      await pumpPage(
+        tester,
+        startLocale: const Locale('pt'),
+        user: passwordUser(emailVerified: false),
+        authService: authService,
+      );
+      await scrollUntilVisible(tester, find.text('Reenviar e-mail de verificação'));
+
+      await tester.tap(find.text('Reenviar e-mail de verificação'));
+      await tester.pumpAndSettle();
+
+      verify(() => authService.sendEmailVerification()).called(1);
+      expect(find.textContaining('Confira sua caixa de entrada'), findsOneWidget);
+    });
+
+    testWidgets('rate limit do Firebase (too-many-requests) vira uma mensagem amigável, sem exception não tratada', (tester) async {
+      final authService = _MockAuthService();
+      when(() => authService.reloadCurrentUser()).thenAnswer((_) async {});
+      when(() => authService.sendEmailVerification()).thenThrow(
+        FirebaseAuthException(code: 'too-many-requests'),
+      );
+
+      await pumpPage(
+        tester,
+        startLocale: const Locale('pt'),
+        user: passwordUser(emailVerified: false),
+        authService: authService,
+      );
+      await scrollUntilVisible(tester, find.text('Reenviar e-mail de verificação'));
+
+      await tester.tap(find.text('Reenviar e-mail de verificação'));
+      await tester.pumpAndSettle();
+
+      // Nenhuma exception sobe e derruba o teste (tester.pumpAndSettle já
+      // faria isso falhar) — a tela mostra a mensagem amigável de rate limit.
+      expect(find.textContaining('Muitas tentativas'), findsOneWidget);
     });
   });
 }

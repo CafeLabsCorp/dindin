@@ -688,6 +688,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Helps Café Labs understand how Dindin is used (no amount, balance, or expense description is ever sent). You can turn this off at any time.';
 
   @override
+  String get emailNotVerifiedMessage =>
+      'Your email hasn\'t been confirmed yet. This doesn\'t limit what you can do in the app, but confirming it helps make sure you can recover your account.';
+
+  @override
+  String get resendVerificationEmailButton => 'Resend verification email';
+
+  @override
+  String get verificationEmailSentMessage =>
+      'Verification email sent. Check your inbox (and spam folder).';
+
+  @override
+  String get verificationEmailRateLimitedMessage =>
+      'Too many attempts in a short time. Wait a few minutes before requesting another email.';
+
+  @override
+  String verificationEmailErrorMessage(String error) {
+    return 'Couldn\'t send the email right now: $error';
+  }
+
+  @override
   String get dangerZoneSectionLabel => 'Danger zone';
 
   @override

@@ -82,6 +82,37 @@ plus CI and rollback for rules/hosting, is now encoded in `scripts/deploy.sh`
     write. Run periodically (see its header for the invocation and
     credentials).
 
+## Email verification (non-blocking)
+
+Closes the "Verificação de e-mail não implementada" finding from the
+2026-09-22 security audit. Scope ratified by Felipe: **non-blocking** —
+nothing in the app gates on a confirmed e-mail (solo-use personal-finance
+app, no invite/account sharing), so this is pure Firebase Auth — it does not
+touch `firestore.rules`.
+
+- **Automatic send** — `AuthService.registerWithEmail` calls
+  `sendEmailVerification()` right after `createUserWithEmailAndPassword`
+  succeeds. Best-effort: if sending fails (e.g. a network blip), signup still
+  goes through — the unverified state stays visible and retryable
+  afterward. Does NOT apply to "Sign in with Google": those accounts are
+  already verified by Google, and `AuthService.needsEmailVerification`
+  explicitly excludes any account whose `providerData` doesn't include the
+  password provider (`EmailAuthProvider.PROVIDER_ID`).
+- **Warning** — Ajustes → Privacidade shows a discreet banner with a "Resend
+  verification email" button when `AuthService.needsEmailVerification` is
+  true for the signed-in user. `User.emailVerified` is a snapshot taken at
+  sign-in and doesn't update on its own — `AuthService.reloadCurrentUser()`
+  is called when Ajustes opens and when the app resumes from the background
+  (`SettingsPage` uses `WidgetsBindingObserver`), to pick up a confirmation
+  that happened outside this session (e.g. the link tapped in a mail app).
+- **Rate limit** — Firebase Auth already rate-limits resends on its own
+  (`too-many-requests`); the UI turns that code into a friendly message
+  instead of letting the exception propagate.
+- Covered by `test/services/auth_service_test.dart` (automatic send for
+  email/password only, `needsEmailVerification`, reload, rate limit) and
+  `test/features/settings_page_test.dart`, `group('verificação de e-mail
+  ...')` (conditional banner, resend, rate-limit message).
+
 ## Data model additions (all additive / backward-compatible)
 
 - `categories/{id}.monthlyBudget` — optional `number` (BRL). Soft monthly

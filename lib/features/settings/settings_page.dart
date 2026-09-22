@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../providers/locale_provider.dart';
@@ -30,12 +31,78 @@ class SettingsPage extends ConsumerStatefulWidget {
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends ConsumerState<SettingsPage> {
+class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBindingObserver {
   bool _busy = false;
   String? _message;
 
   bool _deleteBusy = false;
   String? _deleteMessage;
+
+  bool _verificationBusy = false;
+  String? _verificationMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // `Ajustes` lives inside `StatefulShellRoute.indexedStack` (see app.dart)
+    // — its state stays alive across tab switches, so `initState` only runs
+    // once per app session, not every time this tab is revisited. Combined
+    // with `didChangeAppLifecycleState` below, this covers the two moments
+    // that actually matter: landing here fresh, and coming back from
+    // wherever the user tapped the confirmation link (usually a mail app).
+    _refreshEmailVerified();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshEmailVerified();
+  }
+
+  /// `User.emailVerified` is a snapshot taken at sign-in time and doesn't
+  /// update on its own — see `AuthService.reloadCurrentUser`. Best-effort:
+  /// failing silently (e.g. offline) just leaves the last-known status on
+  /// screen instead of surfacing a spurious error for something that isn't
+  /// user-initiated.
+  Future<void> _refreshEmailVerified() async {
+    try {
+      await ref.read(authServiceProvider).reloadCurrentUser();
+    } catch (_) {
+      // Best-effort — see doc comment above.
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _verificationBusy = true;
+      _verificationMessage = null;
+    });
+    try {
+      await ref.read(authServiceProvider).sendEmailVerification();
+      if (!mounted) return;
+      setState(() => _verificationMessage = l10n.verificationEmailSentMessage);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _verificationMessage = e.code == 'too-many-requests'
+            ? l10n.verificationEmailRateLimitedMessage
+            : l10n.verificationEmailErrorMessage(e.message ?? e.code);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _verificationMessage = l10n.verificationEmailErrorMessage(e.toString()));
+    } finally {
+      if (mounted) setState(() => _verificationBusy = false);
+    }
+  }
 
   Future<void> _export() async {
     final l10n = AppLocalizations.of(context)!;
@@ -277,6 +344,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   firestore?.setAnalyticsOptOut(!enabled);
                 },
               ),
+              // Security audit finding "Verificação de e-mail não
+              // implementada" (2026-09-22) — non-blocking by design: this is
+              // the only place the unverified state surfaces, nothing else
+              // in the app gates on it. Reads `user` (from
+              // `authStateProvider`, watched above) rather than constructing
+              // `authServiceProvider` here — `reload()`'s effect on
+              // `emailVerified` shows up on this SAME `User` object (see
+              // `AuthService.reloadCurrentUser`'s doc comment), and every
+              // other widget test in this file overrides only
+              // `authStateProvider`, not `authServiceProvider`.
+              if (AuthService.needsEmailVerification(user)) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.tokens.statusWarning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.tokens.statusWarning.withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.emailNotVerifiedMessage, style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _verificationBusy ? null : _resendVerificationEmail,
+                        child: Text(l10n.resendVerificationEmailButton),
+                      ),
+                      if (_verificationMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(_verificationMessage!, style: const TextStyle(fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

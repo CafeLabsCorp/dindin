@@ -291,6 +291,14 @@
   "privacySectionLabel": "Privacidade",
   "analyticsOptOutLabel": "Compartilhar dados de uso anônimos",
   "analyticsOptOutDescription": "Ajuda a Café Labs a entender como o Dindin é usado (nenhum valor, saldo ou descrição de gasto é enviado). Você pode desligar a qualquer momento.",
+  "emailNotVerifiedMessage": "Seu e-mail ainda não foi confirmado. Isso não limita o uso do app, mas confirmar ajuda a garantir que você consiga recuperar sua conta.",
+  "resendVerificationEmailButton": "Reenviar e-mail de verificação",
+  "verificationEmailSentMessage": "E-mail de verificação enviado. Confira sua caixa de entrada (e o spam).",
+  "verificationEmailRateLimitedMessage": "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de pedir outro e-mail.",
+  "verificationEmailErrorMessage": "Não foi possível enviar o e-mail agora: {error}",
+  "@verificationEmailErrorMessage": {
+    "placeholders": { "error": { "type": "String" } }
+  },
 
   "dangerZoneSectionLabel": "Zona de perigo",
   "deleteAccountDescription": "Excluir sua conta apaga todos os seus dados imediatamente — caixinhas, receitas, gastos, assinaturas e parcelamentos. Não há como desfazer.",

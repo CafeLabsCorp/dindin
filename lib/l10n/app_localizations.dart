@@ -1226,6 +1226,36 @@ abstract class AppLocalizations {
   /// **'Ajuda a Café Labs a entender como o Dindin é usado (nenhum valor, saldo ou descrição de gasto é enviado). Você pode desligar a qualquer momento.'**
   String get analyticsOptOutDescription;
 
+  /// No description provided for @emailNotVerifiedMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Seu e-mail ainda não foi confirmado. Isso não limita o uso do app, mas confirmar ajuda a garantir que você consiga recuperar sua conta.'**
+  String get emailNotVerifiedMessage;
+
+  /// No description provided for @resendVerificationEmailButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Reenviar e-mail de verificação'**
+  String get resendVerificationEmailButton;
+
+  /// No description provided for @verificationEmailSentMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'E-mail de verificação enviado. Confira sua caixa de entrada (e o spam).'**
+  String get verificationEmailSentMessage;
+
+  /// No description provided for @verificationEmailRateLimitedMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de pedir outro e-mail.'**
+  String get verificationEmailRateLimitedMessage;
+
+  /// No description provided for @verificationEmailErrorMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível enviar o e-mail agora: {error}'**
+  String verificationEmailErrorMessage(String error);
+
   /// No description provided for @dangerZoneSectionLabel.
   ///
   /// In pt, this message translates to:

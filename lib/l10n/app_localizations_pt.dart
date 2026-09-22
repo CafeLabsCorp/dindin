@@ -686,6 +686,26 @@ class AppLocalizationsPt extends AppLocalizations {
       'Ajuda a Café Labs a entender como o Dindin é usado (nenhum valor, saldo ou descrição de gasto é enviado). Você pode desligar a qualquer momento.';
 
   @override
+  String get emailNotVerifiedMessage =>
+      'Seu e-mail ainda não foi confirmado. Isso não limita o uso do app, mas confirmar ajuda a garantir que você consiga recuperar sua conta.';
+
+  @override
+  String get resendVerificationEmailButton => 'Reenviar e-mail de verificação';
+
+  @override
+  String get verificationEmailSentMessage =>
+      'E-mail de verificação enviado. Confira sua caixa de entrada (e o spam).';
+
+  @override
+  String get verificationEmailRateLimitedMessage =>
+      'Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de pedir outro e-mail.';
+
+  @override
+  String verificationEmailErrorMessage(String error) {
+    return 'Não foi possível enviar o e-mail agora: $error';
+  }
+
+  @override
   String get dangerZoneSectionLabel => 'Zona de perigo';
 
   @override

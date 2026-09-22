@@ -91,6 +91,37 @@ deploy/rollback.
     por padrão; exige `--confirm` pra escrever. Rodar periodicamente (ver o
     cabeçalho do script pra invocação e credenciais).
 
+## Verificação de e-mail (não-bloqueante)
+
+Fecha o achado "Verificação de e-mail não implementada" da auditoria de
+segurança de 2026-09-22. Escopo ratificado por Felipe: **não-bloqueante** —
+nada no app trava por causa de e-mail não confirmado (app de finanças pessoais
+de uso solo, sem convite/compartilhamento de conta), então isso é puro
+Firebase Auth — não mexe em `firestore.rules`.
+
+- **Envio automático** — `AuthService.registerWithEmail` chama
+  `sendEmailVerification()` logo após `createUserWithEmailAndPassword` ter
+  sucesso. Melhor esforço: se o envio falhar (ex.: blip de rede), o cadastro
+  continua normalmente — o estado não verificado fica visível e reenviável
+  depois. Não se aplica a quem entra com "Entrar com Google": essas contas já
+  vêm verificadas pelo Google, e `AuthService.needsEmailVerification`
+  descarta explicitamente qualquer conta cujo `providerData` não inclua o
+  provider de senha (`EmailAuthProvider.PROVIDER_ID`).
+- **Aviso** — Ajustes → Privacidade mostra um banner discreto com botão
+  "Reenviar e-mail de verificação" quando `AuthService.needsEmailVerification`
+  é verdadeiro pro usuário logado. `User.emailVerified` é um snapshot do
+  sign-in que não atualiza sozinho — `AuthService.reloadCurrentUser()` é
+  chamado ao abrir Ajustes e quando o app volta de segundo plano
+  (`SettingsPage` usa `WidgetsBindingObserver`) pra pegar uma confirmação
+  feita fora dessa sessão (ex.: o link clicado no app de e-mail).
+- **Rate limit** — o Firebase Auth já limita reenvios sozinho (`too-many-
+  requests`); a UI trata esse código com uma mensagem amigável em vez de
+  deixar a exception subir.
+- Coberto por `test/services/auth_service_test.dart` (envio automático só
+  pra e-mail/senha, `needsEmailVerification`, reload, rate limit) e
+  `test/features/settings_page_test.dart`, `group('verificação de e-mail
+  ...')` (banner condicional, reenvio, mensagem de rate limit).
+
 ## Adições ao modelo de dados (todas aditivas / retrocompatíveis)
 
 - `categories/{id}.monthlyBudget` — `number` opcional (BRL). Limite mensal

@@ -214,6 +214,11 @@
   "privacySectionLabel": "Privacy",
   "analyticsOptOutLabel": "Share anonymous usage data",
   "analyticsOptOutDescription": "Helps Café Labs understand how Dindin is used (no amount, balance, or expense description is ever sent). You can turn this off at any time.",
+  "emailNotVerifiedMessage": "Your email hasn't been confirmed yet. This doesn't limit what you can do in the app, but confirming it helps make sure you can recover your account.",
+  "resendVerificationEmailButton": "Resend verification email",
+  "verificationEmailSentMessage": "Verification email sent. Check your inbox (and spam folder).",
+  "verificationEmailRateLimitedMessage": "Too many attempts in a short time. Wait a few minutes before requesting another email.",
+  "verificationEmailErrorMessage": "Couldn't send the email right now: {error}",
 
   "dangerZoneSectionLabel": "Danger zone",
   "deleteAccountDescription": "Deleting your account erases all your data immediately — caixinhas, income, expenses, subscriptions, and installment purchases. This cannot be undone.",
