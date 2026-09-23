@@ -240,12 +240,22 @@ service cloud.firestore {
       return before.get('kind', 'spend') == 'spend'
           && after.get('kind', 'spend') == 'save';
     }
+    // The balance floor, with the same 1e-9 float tolerance as catDebtFree and
+    // the client (FirestoreService._eps). Balances are running double sums, so a
+    // doc can hold e.g. 48.129999999999995 while the UI shows R$ 48,13; spending
+    // exactly that "48.13" lands at -7e-15, which a strict `>= 0` rejected with a
+    // raw permission error even though the client's own check had passed. The
+    // exact delta linkage is untouched, so this can never accumulate: every
+    // write still has to land at >= -1e-9, not 1e-9 below the previous one.
+    function nonNegBal(v) {
+      return v >= -0.000000001;
+    }
     // The account balance doc must, after the commit, either not exist
     // (genesis/teardown) or have moved by exactly `delta` and stay >= 0.
     function accountDeltaOk(uid, delta) {
       return getAfter(acctDoc(uid)) == null
           || (getAfter(acctDoc(uid)).data.balance == balBefore(acctDoc(uid)) + delta
-              && getAfter(acctDoc(uid)).data.balance >= 0);
+              && nonNegBal(getAfter(acctDoc(uid)).data.balance));
     }
     // Same, for one caixinha's balance doc. The DELTA linkage (getAfter == before
     // + delta) is unconditional and MUST stay so — it is the anti-race guarantee.
@@ -260,7 +270,7 @@ service cloud.firestore {
     function catDeltaOk(uid, cat, delta) {
       return getAfter(balDoc(uid, cat)) == null
           || (getAfter(balDoc(uid, cat)).data.balance == balBefore(balDoc(uid, cat)) + delta
-              && (getAfter(balDoc(uid, cat)).data.balance >= 0
+              && (nonNegBal(getAfter(balDoc(uid, cat)).data.balance)
                   || delta >= 0
                   || catAllowsNeg(uid, cat)));
     }
@@ -271,7 +281,7 @@ service cloud.firestore {
       return getAfter(balDoc(uid, cat)) == null;
     }
     function accountNonNeg(uid) {
-      return getAfter(acctDoc(uid)) == null || getAfter(acctDoc(uid)).data.balance >= 0;
+      return getAfter(acctDoc(uid)) == null || nonNegBal(getAfter(acctDoc(uid)).data.balance);
     }
 
     // meta/account holds the general account balance; meta/settings holds
@@ -288,7 +298,7 @@ service cloud.firestore {
         (docId == 'account'
           && request.resource.data.keys().hasOnly(['balance'])
           && isFiniteBalance(request.resource.data.balance)
-          && request.resource.data.balance >= 0)
+          && nonNegBal(request.resource.data.balance))
         || (docId == 'settings'
           && request.resource.data.keys().hasOnly(['analyticsOptOut'])
           && request.resource.data.analyticsOptOut is bool)
@@ -315,7 +325,7 @@ service cloud.firestore {
       allow create, update: if isOwner(uid)
                             && request.resource.data.keys().hasOnly(['balance'])
                             && isFiniteBalance(request.resource.data.balance)
-                            && (request.resource.data.balance >= 0
+                            && (nonNegBal(request.resource.data.balance)
                                 || request.resource.data.balance >= balBefore(balDoc(uid, categoryId))
                                 || catAllowsNeg(uid, categoryId)
                                 || (resource == null && catMayHoldNeg(uid, categoryId)));

@@ -442,6 +442,13 @@ negativos, `createdAt` imutável) ela adiciona:
   por padrão, EXCETO pra uma caixinha `spend` que optou por
   `allowNegative` — ver "allowNegative (dívida por caixinha)" abaixo pro
   condicional exato.
+  Todo piso `>= 0` das rules é na verdade `>= -1e-9` (`nonNegBal`), a
+  mesma tolerância de ponto flutuante do cliente (`FirestoreService._eps`):
+  saldos são somas acumuladas de doubles, então um doc pode guardar
+  `48.129999999999995` enquanto a UI mostra R$ 48,13, e gastar esse "48,13"
+  inteiro cai em `-7e-15`. Um `>= 0` estrito negava isso com erro cru de
+  permissão (bug reportado em 2026-09-23). O vínculo de delta exato não
+  mudou, então a tolerância não acumula num negativo real.
 - **Vinculação de delta por escrita via `getAfter()`.** Cada create/update/
   delete do ledger precisa mover o(s) doc(s) de saldo afetado(s) por
   exatamente seu delta (ex.: um expense de conta exige

@@ -413,6 +413,13 @@ immutable `createdAt`) it adds:
   `balances/{catId}` is `>= 0` by default too, EXCEPT for a `spend` caixinha
   that has opted into `allowNegative` — see "allowNegative (dívida por
   caixinha)" below for the exact conditional.
+  Every `>= 0` floor in the rules is really `>= -1e-9` (`nonNegBal`), the
+  same float tolerance the client uses (`FirestoreService._eps`): balances
+  are running double sums, so a doc can hold `48.129999999999995` while the
+  UI shows R$ 48,13, and spending that "48.13" in full lands at `-7e-15`. A
+  strict `>= 0` rejected that with a raw permission error (bug reported
+  2026-09-23). The exact delta linkage is unchanged, so the tolerance can't
+  accumulate into a real negative.
 - **Per-write delta linkage via `getAfter()`.** Each ledger create/update/
   delete must move the affected balance doc(s) by exactly its delta (e.g. an
   account expense requires `getAfter(account).balance == before − amount &&

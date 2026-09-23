@@ -171,6 +171,57 @@ describe('per-write balance delta (getAfter linkage)', () => {
 
     await assertFails(deleteDoc(allocDoc(db, 'alice', 'a1')));
   });
+
+  // Regression (2026-09-23): the account held 150 - 101.87 = 48.129999999999995
+  // (float dust from a running sum), shown in the UI as R$ 48,13. Allocating
+  // that "48.13" in full lands the account at -7.1e-15, which a strict `>= 0`
+  // floor rejected with a raw permission error.
+  test('spending the whole balance through float dust succeeds', async () => {
+    const db = aliceDb();
+    const dusty = 150 - 101.87;
+    await seed(async (sdb) => {
+      await setDoc(catDoc(sdb, 'alice', 'c1'), {
+        name: 'Gasto Livre',
+        recurring: false,
+        createdAt: '2026-01-01',
+      });
+      await setDoc(balDoc(sdb, 'alice', 'c1'), { balance: 0 });
+      await setDoc(accountDoc(sdb, 'alice'), { balance: dusty });
+    });
+
+    const batch = writeBatch(db);
+    batch.set(allocDoc(db, 'alice', 'a1'), {
+      categoryId: 'c1',
+      amount: 48.13,
+      date: '2026-01-02',
+    });
+    batch.set(accountDoc(db, 'alice'), { balance: dusty - 48.13 });
+    batch.set(balDoc(db, 'alice', 'c1'), { balance: 48.13 });
+    await assertSucceeds(batch.commit());
+  });
+
+  test('the float tolerance does not let the account go a cent negative', async () => {
+    const db = aliceDb();
+    await seed(async (sdb) => {
+      await setDoc(catDoc(sdb, 'alice', 'c1'), {
+        name: 'Gasto Livre',
+        recurring: false,
+        createdAt: '2026-01-01',
+      });
+      await setDoc(balDoc(sdb, 'alice', 'c1'), { balance: 0 });
+      await setDoc(accountDoc(sdb, 'alice'), { balance: 48.13 });
+    });
+
+    const batch = writeBatch(db);
+    batch.set(allocDoc(db, 'alice', 'a1'), {
+      categoryId: 'c1',
+      amount: 48.14,
+      date: '2026-01-02',
+    });
+    batch.set(accountDoc(db, 'alice'), { balance: 48.13 - 48.14 });
+    batch.set(balDoc(db, 'alice', 'c1'), { balance: 48.14 });
+    await assertFails(batch.commit());
+  });
 });
 
 // -----------------------------------------------------------------------
