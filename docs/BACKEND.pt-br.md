@@ -65,22 +65,99 @@ deploy/rollback.
      apagados nesse ponto (seguro — `scripts/sweep_orphans.mjs` abaixo é
      exatamente a rede de segurança pra uma exclusão que morre entre os
      passos 1 e 2).
-  - Nenhum registro-tombstone é escrito nem esperado depois de uma exclusão
-    bem-sucedida — não sobra nada legível sob `users/{uid}` pra ninguém ler
-    (as rules travam em `request.auth.uid`, e um uid apagado nunca é
-    reemitido), então uma subárvore vazia já prova que a exclusão aconteceu.
-    O `scripts/sweep_orphans.mjs` também não procura por um tombstone:
-    detecta uma exclusão incompleta/interrompida só por "esse uid tem dado
-    sob `users/{uid}` mas nenhum usuário de Auth" — ver o cabeçalho do
-    script.
+  - Nenhum registro-tombstone que IDENTIFIQUE o usuário é escrito ou
+    esperado depois de uma exclusão bem-sucedida — não sobra nada legível sob
+    `users/{uid}` pra ninguém ler (as rules travam em `request.auth.uid`, e
+    um uid apagado nunca é reemitido), então uma subárvore vazia já prova que
+    a exclusão aconteceu. O `scripts/sweep_orphans.mjs` também não procura
+    por um tombstone: detecta uma exclusão incompleta/interrompida só por
+    "esse uid tem dado sob `users/{uid}` mas nenhum usuário de Auth" — ver o
+    cabeçalho do script. O que É escrito é o registro anônimo
+    `accountDeletionLog` descrito abaixo — uma trilha de auditoria de que uma
+    exclusão aconteceu, sem nada nela que identifique quem.
   - Coberto de ponta a ponta por `test/rules/rules.test.mjs`,
     `describe('full account deletion (B5)')` (a ordem prescrita contra o
     emulador real, incluindo uma caixinha com dívida congelada, mais os
-    casos negativos de "a ordem importa" e isolamento entre usuários);
+    casos negativos de "a ordem importa" e isolamento entre usuários) e
+    `describe('accountDeletionLog (create-only, anonymous audit trail)')`;
     `test/services/firestore_service_test.dart`, `group('deleteAllUserData
-    (B3/B5 — hard account deletion)')`; e
+    (B3/B5 — hard account deletion)')` (incluindo o
+    `group('accountDeletionLog entry (Privacy Policy §7)')` aninhado); e
     `test/features/settings_page_test.dart` (fluxo do diálogo —
     abrir/cancelar/exportar-e-fechar).
+
+### `accountDeletionLog` — prova de exclusão, sem dado pessoal (2026-09-23)
+
+Fecha uma lacuna que a auditoria de segurança de 2026-09-22 revelou:
+`legal/politica-de-privacidade.md`, seção 7, já promete, como texto legal
+publicado, "Registro de que a exclusão foi feita (sem os seus dados
+pessoais) | 5 anos" — mas até agora nada escrevia esse registro. A limpeza do
+`scripts/sweep_orphans.mjs` também era silenciosa (só stdout, sem trilha
+persistida), que era o achado original, mais estreito, da auditoria; os dois
+são fechados pela mesma coleção.
+
+**Schema** — `accountDeletionLog/{autoId}`, uma coleção TOP-LEVEL (não
+aninhada sob `users/{uid}`, pra que o uid prestes a ser apagado nunca acabe
+indo parar no caminho do documento):
+```
+{
+  deletedAt: Timestamp,  // FieldValue.serverTimestamp() — nunca fornecido pelo cliente
+  origin:    string,     // 'self-service' | 'admin-sweep'
+}
+```
+Nenhum uid, e-mail, ou outro identificador — cru ou em hash — é guardado.
+Essa foi uma escolha deliberada, não um esquecimento: um hash de um uid
+auto-gerado do Firebase é, na prática, irreversível (128 bits de entropia),
+então seria *defensável*, mas o texto da própria política promete "sem os
+seus dados pessoais" incondicionalmente, e a única coisa que esse registro
+precisa provar é que *uma* exclusão aconteceu, num dado momento, por um dado
+motivo — nunca *de quem*. Não incluir nenhum campo de uid/hash é ao mesmo
+tempo a implementação mais simples e a única que nunca pode ser lida como
+quebra dessa frase.
+
+**Rules** (`firestore.rules`, bloco `accountDeletionLog`): CREATE-ONLY. O
+`create` exige `request.auth != null` e valida exatamente o formato acima,
+fechado com `keys().hasOnly` (então um campo `uid` ou `email` nunca pode ser
+contrabandeado) e `deletedAt == request.time` (então só o relógio do próprio
+commit do servidor pode setá-lo — um cliente não consegue retrodatar nem
+forjar um). `read`, `update` e `delete` são `false` incondicionalmente, pra
+todo mundo, inclusive o autor do próprio documento: essa coleção não tem
+nenhum leitor legítimo dentro do app, e a auditoria de verdade dela (a
+retenção de 5 anos que a política promete) é uma operação de Admin SDK /
+console do Firebase, totalmente fora do alcance de qualquer cliente.
+
+**Escrito a partir de dois lugares**, sempre na mesma requisição/commit da
+exclusão que está atestando, nunca como uma chamada separada:
+- `FirestoreService.deleteAllUserData()` (self-service, `origin:
+  'self-service'`) — no MESMO batch do primeiro commit do passo 1 (o que
+  sempre inclui `meta/account` + `meta/settings`). Precisa acontecer ali:
+  `AuthService.deleteAccount()` roda logo depois, e assim que ela terminar
+  esse cliente deixa de estar autenticado e nunca mais conseguiria escrever
+  aqui — e empacotar junto do primeiro commit da exclusão de verdade faz com
+  que o log nunca possa afirmar que uma exclusão aconteceu quando não
+  aconteceu (os dois commitam juntos ou nenhum dos dois commita).
+- `scripts/sweep_orphans.mjs` (`origin: 'admin-sweep'`) — escrito dentro de
+  `sweepUser()`, uma vez por uid efetivamente limpo (ou seja, `total > 0` em
+  modo de escrita; um `--dry-run` não escreve nada, igual a qualquer outra
+  escrita desse script). Roda com o Admin SDK, que ignora `firestore.rules`
+  por completo, então é o próprio código do script que mantém o formato da
+  escrita idêntico ao que a rule validaria de qualquer forma.
+
+**Retenção**: a Política de Privacidade promete 5 anos, não "pra sempre" —
+essa coleção ainda não tem TTL configurado. Configurar um (política de TTL
+nativa do Firestore, chaveada em `deletedAt`) é um passo de infra/console
+fora do código deste repositório e é um follow-up separado, não obrigatório
+pra que a promessa seja cumprida hoje (nada hoje *lê* essa coleção além de
+uma auditoria de mantenedor, então uma coleção sem limite ainda não é um
+problema de correção — só eventualmente de teto de armazenamento, a mesma
+classe de preocupação de "Abuse / overload posture" acima, que vale revisitar
+bem antes de 5 anos de registros chegarem perto dele).
+
+**Isso é uma mudança em `firestore.rules` e portanto NÃO entra em produção
+sozinha** — só vai pro `dindin-cafelabs` através do fluxo completo
+backup -> backfill -> rules do `scripts/deploy.sh` (ver "Deploy gate" acima e
+`docs/DEPLOY.pt-br.md`), que tem um passo de backup confirmado por humano por
+design.
   - **Rede de segurança pra uma exclusão que morre no meio do caminho** (app
     morto, rede cai, o re-login exigido é recusado): `scripts/sweep_orphans.mjs`,
     um script Admin SDK rodado por um mantenedor (Cloud Functions exigiria

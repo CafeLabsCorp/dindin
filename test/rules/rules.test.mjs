@@ -30,10 +30,13 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  serverTimestamp,
   setDoc,
   updateDoc,
   writeBatch,
@@ -2069,5 +2072,111 @@ describe('meta/settings (Analytics opt-out)', () => {
     const db = aliceDb();
     await setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true });
     await assertSucceeds(deleteDoc(settingsDoc(db, 'alice')));
+  });
+});
+
+// -----------------------------------------------------------------------
+// 17. accountDeletionLog — anonymous "a deletion happened" audit trail
+// -----------------------------------------------------------------------
+//
+// Backs the Privacy Policy §7 promise ("Registro de que a exclusão foi feita
+// (sem os seus dados pessoais) | 5 anos") — see docs/BACKEND.md and the
+// `accountDeletionLog` block in firestore.rules. Top-level collection, not
+// nested under users/{uid} (that would put a uid in the path). CREATE-ONLY:
+// nobody, not even a doc's own author, may ever read/update/delete one back
+// through the client SDK — real auditing is an Admin SDK / console-only
+// operation, which bypasses these rules entirely (see
+// scripts/sweep_orphans.mjs).
+
+describe('accountDeletionLog (create-only, anonymous audit trail)', () => {
+  const logs = (db) => collection(db, 'accountDeletionLog');
+
+  /** Seeds one entry bypassing rules, and returns its full path. */
+  async function seedLogPath() {
+    let path;
+    await seed(async (sdb) => {
+      const ref = doc(collection(sdb, 'accountDeletionLog'));
+      await setDoc(ref, { deletedAt: new Date(), origin: 'admin-sweep' });
+      path = ref.path;
+    });
+    return path;
+  }
+
+  test('a signed-in user can create a correctly-shaped self-service entry', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      addDoc(logs(db), { deletedAt: serverTimestamp(), origin: 'self-service' }),
+    );
+  });
+
+  test('an unauthenticated client cannot create an entry', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      addDoc(collection(db, 'accountDeletionLog'), {
+        deletedAt: serverTimestamp(),
+        origin: 'self-service',
+      }),
+    );
+  });
+
+  test('origin must be one of the two known values', async () => {
+    const db = aliceDb();
+    await assertFails(
+      addDoc(logs(db), { deletedAt: serverTimestamp(), origin: 'something-else' }),
+    );
+  });
+
+  test('deletedAt must be the server commit time, not a client-supplied timestamp', async () => {
+    const db = aliceDb();
+    // A client cannot backdate (or otherwise forge) when a deletion
+    // happened: only FieldValue.serverTimestamp() satisfies the rule.
+    await assertFails(
+      addDoc(logs(db), { deletedAt: new Date('2020-01-01'), origin: 'self-service' }),
+    );
+  });
+
+  test('no extra field can be smuggled in — not a uid, not an email, nothing', async () => {
+    const db = aliceDb();
+    await assertFails(
+      addDoc(logs(db), {
+        deletedAt: serverTimestamp(),
+        origin: 'self-service',
+        uid: 'alice',
+      }),
+    );
+    await assertFails(
+      addDoc(logs(db), {
+        deletedAt: serverTimestamp(),
+        origin: 'self-service',
+        email: 'alice@example.com',
+      }),
+    );
+  });
+
+  test('missing a required field is refused', async () => {
+    const db = aliceDb();
+    await assertFails(addDoc(logs(db), { origin: 'self-service' }));
+    await assertFails(addDoc(logs(db), { deletedAt: serverTimestamp() }));
+  });
+
+  test('nobody can read a single entry back, including its own author', async () => {
+    const path = await seedLogPath();
+    const alice = aliceDb();
+    await assertFails(getDoc(doc(alice, path)));
+    const mallory = bobDb();
+    await assertFails(getDoc(doc(mallory, path)));
+  });
+
+  test('nobody can list the collection', async () => {
+    await seedLogPath();
+    const alice = aliceDb();
+    await assertFails(getDocs(logs(alice)));
+  });
+
+  test('nobody can update or delete an entry, including its own author', async () => {
+    const path = await seedLogPath();
+    const alice = aliceDb();
+    await assertFails(updateDoc(doc(alice, path), { origin: 'self-service' }));
+    await assertFails(deleteDoc(doc(alice, path)));
   });
 });

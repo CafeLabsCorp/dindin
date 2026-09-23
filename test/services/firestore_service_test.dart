@@ -2095,6 +2095,64 @@ void main() {
       expect(db.categories, isEmpty);
       expect(db.allocations, isEmpty);
     });
+
+    // Closes the 2026-09-22 security audit finding: the Privacy Policy (§7)
+    // promises "Registro de que a exclusão foi feita (sem os seus dados
+    // pessoais) | 5 anos" — these tests are the evidence that promise is
+    // actually kept, not just documented.
+    group('accountDeletionLog entry (Privacy Policy §7)', () {
+      test('writes exactly one anonymous log entry, with no identifying field', () async {
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+
+        await svc.deleteAllUserData();
+
+        final logs = await fake.collection('accountDeletionLog').get();
+        expect(logs.docs, hasLength(1));
+        final data = logs.docs.single.data();
+        expect(data.keys, unorderedEquals(['deletedAt', 'origin']));
+        expect(data['origin'], 'self-service');
+        expect(data['deletedAt'], isA<Timestamp>());
+        // No uid, email, or any other identifier anywhere in the doc.
+        expect(data.containsKey('uid'), isFalse);
+        expect(data.containsKey('email'), isFalse);
+      });
+
+      test('still writes exactly one log entry for a totally empty account', () async {
+        // No categories/incomes/etc. were ever created for this uid — the
+        // log entry must not depend on there being data to delete.
+        await svc.deleteAllUserData();
+
+        final logs = await fake.collection('accountDeletionLog').get();
+        expect(logs.docs, hasLength(1));
+      });
+
+      test('still exactly one log entry when the balance-doc step spans multiple 400-doc batches', () async {
+        // Seeded directly (not via createCategory) so the test stays fast and
+        // isolates exactly the thing under test: the [refs] loop in
+        // deleteAllUserData chunks by plain doc count at 400, and the log
+        // entry must be attached to only the FIRST chunk, not one per chunk.
+        const n = 405;
+        for (var i = 0; i < n; i++) {
+          await fake.doc('users/u1/balances/cat$i').set({'balance': 0.0});
+        }
+
+        await svc.deleteAllUserData();
+
+        final remaining = await fake.collection('users/u1/balances').get();
+        expect(remaining.docs, isEmpty);
+        final logs = await fake.collection('accountDeletionLog').get();
+        expect(logs.docs, hasLength(1));
+      });
+
+      test('the log entry is written to a top-level collection, not under users/u1', () async {
+        await svc.deleteAllUserData();
+
+        final underUser = await fake.collection('users/u1/accountDeletionLog').get();
+        expect(underUser.docs, isEmpty);
+        final topLevel = await fake.collection('accountDeletionLog').get();
+        expect(topLevel.docs, hasLength(1));
+      });
+    });
   });
 
   group('watchAllIncomes / watchAllAllocations / watchAllExpenses (unwindowed)', () {

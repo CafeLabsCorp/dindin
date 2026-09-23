@@ -626,6 +626,50 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    // --- accountDeletionLog --------------------------------------------------
+    // An anonymous, CREATE-ONLY audit trail proving an account deletion
+    // happened, with NO personal data — backs the Privacy Policy §7 promise
+    // ("Registro de que a exclusão foi feita (sem os seus dados pessoais) |
+    // 5 anos"). See docs/BACKEND.md, "accountDeletionLog".
+    //
+    // Deliberately a TOP-LEVEL collection, not nested under users/{uid}:
+    // nesting it there would put the (about-to-be-deleted) uid in the
+    // document PATH itself, which is exactly the identifier the policy
+    // promises not to keep. No uid, hash, email, or any other identifier is
+    // accepted in the document body either (keys().hasOnly below).
+    //
+    // `deletedAt` must equal request.time — the Firestore-server commit
+    // time, which only FieldValue.serverTimestamp() produces — so a client
+    // can never backdate or forge when a deletion happened; every other
+    // ledger doc in this schema stores dates as client ISO strings, but an
+    // audit log's own timestamp is exactly the one value that must not be
+    // client-supplied.
+    //
+    // Written from two places: FirestoreService.deleteAllUserData() (the
+    // self-service flow, origin 'self-service'), in the SAME commit as the
+    // first batch of the deletion itself — required, because after
+    // AuthService.deleteAccount() runs this client is no longer
+    // authenticated and could never write here; and scripts/sweep_orphans.mjs
+    // (origin 'admin-sweep'), which runs with the Admin SDK and so bypasses
+    // these rules entirely — its writes are validated by the script's own
+    // code, not by this block.
+    //
+    // No `read` is ever granted, to anyone, including the document's own
+    // author: this collection has no legitimate in-app reader (the account
+    // that wrote a 'self-service' entry is, by the time the entry exists,
+    // already signed out / about to be deleted), and real auditing of it is
+    // an Admin SDK / Firebase console operation, outside any client's reach.
+    function validAccountDeletionLog(d) {
+      return d.keys().hasOnly(['deletedAt', 'origin'])
+          && d.deletedAt == request.time
+          && d.origin in ['self-service', 'admin-sweep'];
+    }
+
+    match /accountDeletionLog/{logId} {
+      allow create: if request.auth != null && validAccountDeletionLog(request.resource.data);
+      allow read, update, delete: if false;
+    }
+
     // Everything else under the user subtree (and everywhere else) is denied
     // by default — no catch-all allow.
   }

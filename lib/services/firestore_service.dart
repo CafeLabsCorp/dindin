@@ -125,6 +125,14 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _balances =>
       _db.collection('users/$uid/balances');
 
+  /// The anonymous "a deletion happened" audit trail — see
+  /// [deleteAllUserData]'s doc comment and docs/BACKEND.md,
+  /// "accountDeletionLog". Top-level (NOT under `users/$uid`) on purpose: the
+  /// whole point is to carry no identifier, and nesting it under the uid
+  /// would put one right in the document path.
+  CollectionReference<Map<String, dynamic>> get _accountDeletionLog =>
+      _db.collection('accountDeletionLog');
+
   /// The general account balance doc.
   DocumentReference<Map<String, dynamic>> get _account =>
       _db.doc('users/$uid/meta/account');
@@ -1572,16 +1580,51 @@ class FirestoreService {
   // [_deleteLedgerCollectionsChunked]) — the only difference is there is
   // nothing to write back afterward.
   // -------------------------------------------------------------------------
+  /// Wipes the entire `users/$uid` subtree AND records that the deletion
+  /// happened, in an anonymous, create-only `accountDeletionLog` entry with
+  /// no personal data — this is what backs the Privacy Policy §7 promise
+  /// ("Registro de que a exclusão foi feita (sem os seus dados pessoais) |
+  /// 5 anos"). See docs/BACKEND.md, "accountDeletionLog", and
+  /// `firestore.rules`'s `accountDeletionLog` block.
+  ///
+  /// The log entry is written in the SAME commit as the first batch of step
+  /// 1 below (the one that always includes `meta/account` and
+  /// `meta/settings`), not as a separate call before or after it. That
+  /// matters twice over:
+  ///   * it must happen WHILE THIS CLIENT IS STILL AUTHENTICATED — the caller
+  ///     (`SettingsPage`) runs this BEFORE `AuthService.deleteAccount()`,
+  ///     and `firestore.rules` requires `request.auth != null` to create an
+  ///     entry here, so writing it any later would be too late.
+  ///   * bundling it with the real deletion's first commit means the log can
+  ///     never claim a deletion happened when it didn't (a separate write
+  ///     that succeeded before the deletion failed would be exactly that
+  ///     lie) — the two either commit together or not at all.
   Future<void> deleteAllUserData() async {
-    // 1. Balance docs (+ the settings doc, which costs nothing to include),
-    //    on their own commit(s) — see [replaceAll]'s step 1 for why plain
-    //    doc-count chunking is safe here.
+    // 1. Balance docs (+ the settings doc, which costs nothing to include)
+    //    and the accountDeletionLog entry, on their own commit(s) — see
+    //    [replaceAll]'s step 1 for why plain doc-count chunking is safe for
+    //    the balance/settings deletes. `refs` always has at least 2 entries
+    //    (account + settings), so the log entry — attached only to the FIRST
+    //    chunk — always lands in a real, already-committed batch.
     final existingBalances = await _balances.get();
-    await _deleteRefs([
+    final refs = [
       _account,
       _settings,
       ...existingBalances.docs.map((d) => d.reference),
-    ]);
+    ];
+    for (var i = 0; i < refs.length; i += 400) {
+      final batch = _db.batch();
+      for (final ref in refs.skip(i).take(400)) {
+        batch.delete(ref);
+      }
+      if (i == 0) {
+        batch.set(_accountDeletionLog.doc(), {
+          'deletedAt': FieldValue.serverTimestamp(),
+          'origin': 'self-service',
+        });
+      }
+      await batch.commit();
+    }
 
     // 2. The six ledger collections, chunked by distinct caixinha.
     await _deleteLedgerCollectionsChunked();

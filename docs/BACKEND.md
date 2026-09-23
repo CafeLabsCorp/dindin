@@ -57,21 +57,96 @@ plus CI and rollback for rules/hosting, is now encoded in `scripts/deploy.sh`
      rather than a generic error; the Firestore data is already gone by this
      point (safe — `scripts/sweep_orphans.mjs` below is exactly the backstop
      for a deletion that dies between steps 1 and 2).
-  - No tombstone record is written or expected after a successful deletion —
-    there is nothing left under `users/{uid}` for anyone to read (rules key
-    on `request.auth.uid`, and a deleted uid is never reissued), so an empty
-    subtree already proves the deletion happened. `scripts/sweep_orphans.mjs`
-    doesn't look for a tombstone either: it detects an incomplete/interrupted
-    deletion purely by "this uid has data under `users/{uid}` but no Auth
-    user" — see the script's header.
+  - No tombstone IDENTIFYING the user is written or expected after a
+    successful deletion — there is nothing left under `users/{uid}` for
+    anyone to read (rules key on `request.auth.uid`, and a deleted uid is
+    never reissued), so an empty subtree already proves the deletion
+    happened. `scripts/sweep_orphans.mjs` doesn't look for a tombstone either:
+    it detects an incomplete/interrupted deletion purely by "this uid has
+    data under `users/{uid}` but no Auth user" — see the script's header.
+    What IS written is the anonymous `accountDeletionLog` entry described
+    below — an audit trail that a deletion happened, with nothing in it that
+    identifies who.
   - Covered end-to-end by `test/rules/rules.test.mjs`, `describe('full
     account deletion (B5)')` (the prescribed order against the real
     emulator, including a frozen-debt caixinha, plus the order-matters
-    negative cases and cross-user isolation);
+    negative cases and cross-user isolation) and `describe('accountDeletionLog
+    (create-only, anonymous audit trail)')`;
     `test/services/firestore_service_test.dart`, `group('deleteAllUserData
-    (B3/B5 — hard account deletion)')`; and
+    (B3/B5 — hard account deletion)')` (including its nested
+    `group('accountDeletionLog entry (Privacy Policy §7)')`); and
     `test/features/settings_page_test.dart` (dialog open/cancel/export-then-
     close flow).
+
+### `accountDeletionLog` — proof of deletion, with no personal data (2026-09-23)
+
+Closes a gap the 2026-09-22 security audit surfaced: `legal/politica-de-
+privacidade.md` §7 already promises, as published legal text, "Registro de
+que a exclusão foi feita (sem os seus dados pessoais) | 5 anos" — but until
+now nothing wrote that record. `scripts/sweep_orphans.mjs`'s cleanup was also
+silent (stdout only, no persisted trail), which was the audit's original,
+narrower finding; both are closed by the same collection.
+
+**Schema** — `accountDeletionLog/{autoId}`, a TOP-LEVEL collection (not
+nested under `users/{uid}`, so the about-to-be-deleted uid never ends up in
+the document path):
+```
+{
+  deletedAt: Timestamp,  // FieldValue.serverTimestamp() — never client-supplied
+  origin:    string,     // 'self-service' | 'admin-sweep'
+}
+```
+No uid, email, or other identifier — client or hash — is stored. This was a
+deliberate call, not an oversight: a hash of a Firebase auto-id uid is
+realistically irreversible (128 bits of entropy), so it would have been
+*defensible*, but the policy's own wording promises "sem os seus dados
+pessoais" unconditionally, and the only thing this record needs to prove is
+that *a* deletion happened at a given time, for a given reason — never
+*whose*. Omitting any uid/hash field is both the simplest implementation and
+the one that can never be read as breaking that sentence.
+
+**Rules** (`firestore.rules`, `accountDeletionLog` block): CREATE-ONLY.
+`create` requires `request.auth != null` and validates the exact shape above,
+closed with `keys().hasOnly` (so a `uid` or `email` field can never be
+smuggled in) and `deletedAt == request.time` (so only the server's own commit
+clock can set it — a client can't backdate or forge one). `read`, `update`,
+and `delete` are `false` unconditionally, for everyone, including a doc's own
+author: this collection has no legitimate in-app reader, and real auditing of
+it (the 5-year retention the policy promises) is an Admin SDK / Firebase
+console operation, entirely outside any client's reach.
+
+**Written from two places**, always in the same request/commit as the
+deletion it is attesting to, never as a separate call:
+- `FirestoreService.deleteAllUserData()` (self-service, `origin:
+  'self-service'`) — in the SAME batch as the first commit of step 1 (the
+  one that always includes `meta/account` + `meta/settings`). It has to
+  happen there: `AuthService.deleteAccount()` runs right after, and once that
+  completes this client is no longer authenticated and could never write
+  here — and bundling it with the real deletion's first commit means the log
+  can never claim a deletion happened when it didn't (they commit together or
+  not at all).
+- `scripts/sweep_orphans.mjs` (`origin: 'admin-sweep'`) — written inside
+  `sweepUser()`, once per uid actually swept (i.e. `total > 0` in write mode;
+  a `--dry-run` writes nothing, matching every other write in that script).
+  Runs under the Admin SDK, which bypasses `firestore.rules` entirely, so the
+  script's own code is what keeps its write's shape identical to what the
+  rule would validate anyway.
+
+**Retention**: the Privacy Policy promises 5 years, not "forever" — this
+collection has no TTL configured yet. Setting one (Firestore native TTL
+policies, keyed on `deletedAt`) is an infra/console step outside this
+repo's code and is a separate follow-up, not required for the promise to be
+kept today (nothing currently *reads* this collection for anything other than
+a maintainer audit, so an unbounded collection is not yet a correctness
+problem — only an eventual storage-cap one, same class of concern as
+"Abuse / overload posture" above, worth revisiting well before 5 years' worth
+of entries could approach it).
+
+**This is a `firestore.rules` change and therefore does NOT take effect in
+production on its own** — it ships to `dindin-cafelabs` only via
+`scripts/deploy.sh`'s full backup -> backfill -> rules flow (see
+"Deploy gate" above and `docs/DEPLOY.md`), which has a human-confirmed backup
+step by design.
   - **Backstop for a deletion that dies partway** (app killed, network drops,
     the required re-auth is refused): `scripts/sweep_orphans.mjs`, a
     maintainer-run Admin SDK script (Cloud Functions would need Blaze, which

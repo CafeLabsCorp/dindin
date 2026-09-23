@@ -57,7 +57,7 @@
  */
 import { initializeApp, applicationDefault } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
@@ -140,6 +140,24 @@ async function sweepUser(uid, { write }) {
     total += 1;
     console.log("    users/{uid} root document: 1 doc");
     if (write) await base.delete();
+  }
+
+  // Record that this deletion happened — anonymous, no uid/email — same
+  // accountDeletionLog collection FirestoreService.deleteAllUserData()
+  // writes to for the self-service flow (see docs/BACKEND.md and
+  // firestore.rules' accountDeletionLog block). The Admin SDK bypasses
+  // Security Rules, so this write goes through even though the rule
+  // requires request.auth != null (there is no "auth" here at all) — the
+  // shape below is kept identical to what the rule validates anyway, so an
+  // admin-written entry is indistinguishable from a self-service one except
+  // for `origin`. Only written when something was actually deleted, not for
+  // an orphan uid that turned out to have zero documents.
+  if (write && total > 0) {
+    await db.collection("accountDeletionLog").add({
+      deletedAt: FieldValue.serverTimestamp(),
+      origin: "admin-sweep",
+    });
+    console.log("    accountDeletionLog: 1 entry recorded");
   }
 
   return total;
