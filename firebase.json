@@ -1,1 +1,63 @@
-{"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"hosting":{"public":"build/web","ignore":["firebase.json","**/.*"],"rewrites":[{"source":"**","destination":"/index.html"}]},"flutter":{"platforms":{"android":{"default":{"projectId":"dindin-cafelabs","appId":"1:368601445760:android:8daf38873eb6df02b5fd65","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"dindin-cafelabs","configurations":{"android":"1:368601445760:android:8daf38873eb6df02b5fd65","web":"1:368601445760:web:207d40c10e9774e1b5fd65","windows":"1:368601445760:web:2f4f902da94cced5b5fd65"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://www.gstatic.com https://fonts.gstatic.com https://*.googleapis.com https://accounts.google.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; frame-src https://accounts.google.com https://dindin-cafelabs.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          },
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+          }
+        ]
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "dindin-cafelabs",
+          "appId": "1:368601445760:android:8daf38873eb6df02b5fd65",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "dindin-cafelabs",
+          "configurations": {
+            "android": "1:368601445760:android:8daf38873eb6df02b5fd65",
+            "web": "1:368601445760:web:207d40c10e9774e1b5fd65",
+            "windows": "1:368601445760:web:2f4f902da94cced5b5fd65"
+          }
+        }
+      }
+    }
+  }
+}
