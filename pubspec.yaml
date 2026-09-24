@@ -57,7 +57,7 @@ dependencies:
   fl_chart: ^1.2.0
   intl: any
   firebase_core: ^4.11.0
-  firebase_auth: ^6.5.4
+  firebase_auth: ^6.7.0
   cloud_firestore: ^6.6.0
   google_sign_in: ^7.2.0
   file_selector: ^1.1.0
