@@ -254,6 +254,12 @@ abstract class AppLocalizations {
   /// **'Entrar com Google'**
   String get signInWithGoogle;
 
+  /// No description provided for @googleSignInErrorMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível entrar com o Google agora. Tente novamente em alguns instantes.'**
+  String get googleSignInErrorMessage;
+
   /// No description provided for @dashboardTitle.
   ///
   /// In pt, this message translates to:

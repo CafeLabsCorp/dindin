@@ -22,6 +22,8 @@ class _MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
 class _MockGoogleSignIn extends Mock implements GoogleSignIn {}
 
+class _MockGoogleSignInAccount extends Mock implements GoogleSignInAccount {}
+
 class _MockUserCredential extends Mock implements UserCredential {}
 
 class _MockUser extends Mock implements User {}
@@ -30,11 +32,20 @@ class _MockUserInfo extends Mock implements UserInfo {}
 
 void main() {
   late _MockFirebaseAuth auth;
+  late _MockGoogleSignIn googleSignIn;
   late AuthService service;
+
+  setUpAll(() {
+    // Needed because `signInWithCredential` takes a non-nullable
+    // `AuthCredential`, and mocktail's `any()` requires a registered
+    // fallback for any non-built-in type used that way.
+    registerFallbackValue(GoogleAuthProvider.credential(idToken: 'fallback-id-token'));
+  });
 
   setUp(() {
     auth = _MockFirebaseAuth();
-    service = AuthService(auth: auth, googleSignIn: _MockGoogleSignIn());
+    googleSignIn = _MockGoogleSignIn();
+    service = AuthService(auth: auth, googleSignIn: googleSignIn);
   });
 
   _MockUserInfo providerInfo(String providerId) {
@@ -139,6 +150,89 @@ void main() {
       // Must not throw.
       await service.reloadCurrentUser();
     });
+  });
+
+  group('signInWithGoogle (native platforms — see the 2026-09 Play Store login bug)', () {
+    // Context: the distributed (Play Store internal-testing) build throws
+    // `GoogleSignInException(code GoogleSignInExceptionCode.canceled, [16]
+    // Account reauth failed., null)` from the `_googleSignIn.authenticate()`
+    // call below, for every account tried, both on silent reauth and on a
+    // fully interactive "choose an account" tap. Root cause (see
+    // docs/DEPLOY.md / tarefas board): NOT this Dart code — the exact
+    // string "Account reauth failed" does not appear anywhere in the
+    // `google_sign_in_android`/`play-services-auth`/`credentials-play-services-auth`
+    // bytecode resolved by this project, meaning it is produced at runtime
+    // by the Google Play services module installed on-device (Credential
+    // Manager's Google ID provider backend), not by anything shipped in the
+    // APK. These tests don't (and can't, without a real device signed with
+    // the Play App Signing key) reproduce the underlying Play services
+    // failure — they instead lock in the two things that ARE this class's
+    // responsibility: the exception must propagate to the caller instead of
+    // being swallowed, and `initialize()` must run exactly once no matter
+    // how many sign-in attempts happen.
+    test('authenticates and exchanges the ID token for a Firebase credential', () async {
+      when(
+        () => googleSignIn.initialize(serverClientId: any(named: 'serverClientId')),
+      ).thenAnswer((_) async {});
+      final account = _MockGoogleSignInAccount();
+      when(
+        () => account.authentication,
+      ).thenReturn(const GoogleSignInAuthentication(idToken: 'id-token-123'));
+      when(() => googleSignIn.authenticate()).thenAnswer((_) async => account);
+      final credential = _MockUserCredential();
+      when(() => auth.signInWithCredential(any())).thenAnswer((_) async => credential);
+
+      final result = await service.signInWithGoogle();
+
+      expect(result, same(credential));
+      final captured =
+          verify(() => auth.signInWithCredential(captureAny())).captured.single as AuthCredential;
+      expect(captured.providerId, GoogleAuthProvider.PROVIDER_ID);
+    });
+
+    test('calls initialize() exactly once across repeated sign-in attempts', () async {
+      when(
+        () => googleSignIn.initialize(serverClientId: any(named: 'serverClientId')),
+      ).thenAnswer((_) async {});
+      final account = _MockGoogleSignInAccount();
+      when(
+        () => account.authentication,
+      ).thenReturn(const GoogleSignInAuthentication(idToken: 'id-token-123'));
+      when(() => googleSignIn.authenticate()).thenAnswer((_) async => account);
+      when(() => auth.signInWithCredential(any())).thenAnswer((_) async => _MockUserCredential());
+
+      await service.signInWithGoogle();
+      await service.signInWithGoogle();
+
+      verify(() => googleSignIn.initialize(serverClientId: any(named: 'serverClientId'))).called(1);
+    });
+
+    test(
+      'propagates GoogleSignInException instead of swallowing it '
+      '(regression guard for the live "canceled / Account reauth failed" bug: '
+      'the UI must still find out sign-in failed)',
+      () async {
+        when(
+          () => googleSignIn.initialize(serverClientId: any(named: 'serverClientId')),
+        ).thenAnswer((_) async {});
+        when(() => googleSignIn.authenticate()).thenThrow(
+          const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+            description: '[16] Account reauth failed.',
+          ),
+        );
+
+        await expectLater(
+          service.signInWithGoogle(),
+          throwsA(
+            isA<GoogleSignInException>()
+                .having((e) => e.code, 'code', GoogleSignInExceptionCode.canceled)
+                .having((e) => e.description, 'description', '[16] Account reauth failed.'),
+          ),
+        );
+        verifyNever(() => auth.signInWithCredential(any()));
+      },
+    );
   });
 
   group('sendEmailVerification (Ajustes -> Privacidade -> "Reenviar")', () {

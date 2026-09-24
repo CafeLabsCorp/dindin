@@ -31,6 +31,7 @@
   "haveAccountToggle": "Já tenho conta",
   "createAccountToggle": "Criar uma conta",
   "signInWithGoogle": "Entrar com Google",
+  "googleSignInErrorMessage": "Não foi possível entrar com o Google agora. Tente novamente em alguns instantes.",
 
   "dashboardTitle": "Dashboard",
   "dashboardSubtitle": "Visão geral da conta e do mês atual.",

@@ -1,8 +1,11 @@
+import 'dart:developer' as developer;
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../providers/providers.dart';
@@ -57,6 +60,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     try {
       final credential = await ref.read(authServiceProvider).signInWithGoogle();
       _logAccountCreatedIfNew(credential);
+    } on GoogleSignInException catch (e, stackTrace) {
+      // Never show this raw (e.g. "GoogleSignInException(code
+      // GoogleSignInExceptionCode.canceled, [16] Account reauth failed.,
+      // null)") — logged in full for diagnosis (see auth_service_test.dart's
+      // "signInWithGoogle" group and docs/DEPLOY.md for the live bug this
+      // guards), but the user only ever sees a short, actionable message.
+      developer.log(
+        'Google sign-in failed',
+        name: 'dindin.auth',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      setState(() => _error = AppLocalizations.of(context)!.googleSignInErrorMessage);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {

@@ -28,6 +28,7 @@
   "haveAccountToggle": "I already have an account",
   "createAccountToggle": "Create an account",
   "signInWithGoogle": "Sign in with Google",
+  "googleSignInErrorMessage": "Couldn't sign in with Google right now. Please try again in a moment.",
 
   "dashboardTitle": "Dashboard",
   "dashboardSubtitle": "Overview of the account and the current month.",

@@ -89,6 +89,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get signInWithGoogle => 'Entrar com Google';
 
   @override
+  String get googleSignInErrorMessage =>
+      'Não foi possível entrar com o Google agora. Tente novamente em alguns instantes.';
+
+  @override
   String get dashboardTitle => 'Dashboard';
 
   @override
