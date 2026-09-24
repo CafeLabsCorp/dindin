@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "368601445760-h73q9g5hqma20e2q8pudmqifp12b4kpu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cafelabs.dindin",
+            "certificate_hash": "28e1776a77b8e9d287afef4a26d2ec262f8c75b5"
+          }
+        },
+        {
           "client_id": "368601445760-3b72pd88q72jq8bp3eja9dpe85guphc8.apps.googleusercontent.com",
           "client_type": 3
         }
