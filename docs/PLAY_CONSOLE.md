@@ -1,0 +1,213 @@
+# Play Console setup and Google Sign-In troubleshooting
+
+This documents the parts of getting Dindin onto the Play Store that aren't
+about building/uploading the `.aab` (see `DEPLOY.md` for that) — the Play
+Console listing itself, and the Google Cloud OAuth configuration Google
+Sign-In depends on. Written up in September 2026 after both took several
+rounds of trial and error to get right.
+
+## Leaving "Rascunho" (Draft) status
+
+A new Play Console app stays in Draft until every item in "Termine de
+configurar seu app" is done. The ones that aren't obvious from the checklist
+labels alone:
+
+- **Content rating (IARC questionnaire)** — answer honestly about what the
+  app does (finance tracking, no user-generated content, no ads at launch).
+- **Target audience** — age groups the app is intended for; also asks
+  whether the app appeals to children (it doesn't, for a personal-finance
+  app).
+- **Financial features declaration** — Dindin declares personal budgeting /
+  expense tracking; it does not move real money, so it isn't a payments or
+  lending app under Play's financial-features policy.
+- **Health apps declaration** — not applicable, but Play asks explicitly;
+  answer "no health features."
+- **Advertising ID declaration** — Dindin doesn't use the Advertising ID
+  (confirmed removed from the manifest during the `mobile` security round,
+  see the board). Declare "not used."
+- **Data Safety form** — see below; this is the one most tied to actual app
+  behavior and needs to match the Privacy Policy (`dindin.cafelabs.net/privacidade`)
+  exactly, not just be "roughly right."
+
+### Data Safety form
+
+Fill both the "Coletados" (collected) and "Compartilhados" (shared) tabs.
+What Dindin actually collects, matching what's in the shipped Privacy
+Policy:
+
+- **User IDs** (Firebase Auth UID, email) — collected, required, not shared.
+- **Financial info** (transactions, balances, budget categories — the core
+  app data) — collected, required, not shared, encrypted in transit.
+- **Approximate location** — only if/when a feature actually reads it;
+  otherwise declare "not collected." Check against current code before
+  answering, this form is a compliance surface, not a guess.
+- **App interactions / device identifiers** — from Firebase Analytics (the
+  4-event minimal instrumentation from the `mobile` security round) and
+  Firebase App Check (Play Integrity). Both opt-out-able from Ajustes →
+  Privacidade.
+
+None of Dindin's data is sold or shared with third parties for advertising.
+All of it is deletable via the self-service account deletion flow (Ajustes
+→ Privacidade → "Zona de perigo") — the Data Safety form has a checkbox for
+this ("users can request data deletion") that should be `true`.
+
+### Store listing assets
+
+- **Icon** (512×512): generated from `assets/icon/logo_1024.png` with a
+  dark background (`#16130F`, the app's `darkBackground` from
+  `lib/theme/colors.dart`) to match the app's own theme, rather than a
+  transparent or light background.
+- **Feature graphic** (1024×500): hand-built SVG using the same brand
+  colors (`darkPrimary #7FCB9E`, `darkBackground #16130F`,
+  `darkSurface #201C17`), wordmark + tagline, rendered to PNG with `sharp`.
+- **Screenshots**: captured from a real device running the internal test
+  build — no shortcut for this one, has to be the actual app.
+
+### Testing tracks
+
+- **Internal testing**: instant, no review, good for the developer's own
+  devices. Not enough on its own — Play requires **closed testing** before
+  production for a personal developer account.
+- **Closed testing (Alpha)**: needs **12 opted-in testers for 14 continuous
+  days** before you can request production access. Testers must actively
+  opt in via the track's join link, not just be listed as emails.
+- Uploading the same `.aab` to a second track after it's already uploaded
+  to one: use **"Adicionar da biblioteca"** (add from library) to reuse the
+  already-uploaded artifact, instead of bumping `versionCode` and
+  rebuilding. Play refuses to accept the same `versionCode` twice across
+  *any* track, including drafts.
+- **Link the Privacy Policy** in the store listing (not just in-app) before
+  requesting production access — it's a separate field from the Data
+  Safety form's citations.
+
+## Google Sign-In: Google Cloud OAuth configuration
+
+This is the part that isn't in `DEPLOY.md`'s Android section because it's
+not about the Firebase project or the signing key directly — it's the
+**Google Cloud "Google Auth Platform"** console (formerly "OAuth consent
+screen," reorganized into several pages as of late 2026), which Firebase
+Auth's Google provider depends on separately from the Firebase Console.
+
+Console → project `dindin-cafelabs` → hamburger menu → **APIs e serviços →
+Tela de permissão OAuth** (lands on `Google Auth Platform`).
+
+### What has to be configured, and where
+
+| Page | What it controls | What Dindin needed |
+|---|---|---|
+| **Público-alvo** | Publishing status (Testing vs. Production), test-user allowlist | Must be "Em produção" for any Google account to sign in without being on an allowlist |
+| **Branding** | App name, logo, homepage/privacy/terms links, authorized domains | All three link fields are required (`*`) once branding needs to display to users; each domain used in those links must also appear in "Domínios autorizados" |
+| **Clientes** | The actual OAuth 2.0 client IDs — one per Android signing key (debug/upload/Play App Signing) plus one Web client used as `serverClientId` | Must have exactly the SHA-1 fingerprints that will actually sign the distributed APK; auto-created by Firebase, but worth cross-checking by hand |
+| **Central de verificação** | Whether Google requires the app to go through verification review | Not required for Dindin — it only requests non-sensitive scopes (`email`, `profile`, `openid`), confirmed via the "Data access status" card |
+
+### The three Android SHA-1 fingerprints, and why all three exist
+
+`android/app/google-services.json` has one `oauth_client` entry per
+signing key that might sign a build reaching a real device:
+
+1. **Debug key** — whatever's in the default debug keystore on a
+   developer's machine (`~/.android/debug.keystore`). Needed so `flutter
+   run` against a debug build can sign in during development.
+2. **Upload key** — the key `scripts/release_android.sh` signs the `.aab`
+   with before uploading to Play (see `DEPLOY.md` → "Two keys, and only
+   one of them is yours"). Play re-signs with the App Signing key before
+   distributing, so this fingerprint matters less once Play App Signing is
+   active, but it's what Play itself checks against on upload.
+3. **Play App Signing key** — the key Google actually uses to sign the
+   `.apk`/`.aab` split that reaches a user's device once it's downloaded
+   from the Play Store. **This is the one that has to match for Google
+   Sign-In to work on anything installed from the Play Store**, including
+   internal/closed testing. Get it from Play Console → **Testar e lançar →
+   Configuração → Integridade do app** (the "chave de assinatura do app,"
+   not the "certificado da chave de upload" further down the same page —
+   they're easy to mix up, and only one of them actually matters for
+   Play-distributed installs).
+
+All three go into Firebase Console → Authentication → Sign-in method →
+Google → add fingerprint, which regenerates `google-services.json` with a
+new `oauth_client` entry per fingerprint. Re-download it into
+`android/app`, and if it changes the artifact meaningfully (new OAuth
+client added), bump `versionCode` — Play won't let you re-upload the same
+code with a different `google-services.json` baked in.
+
+### Debugging "GoogleSignInException(... [16] Account reauth failed...)"
+
+This showed up on the Play-distributed internal test build only — never on
+debug builds, never on web. Full investigation trail, in case it recurs or
+recurs on another CafeLabs Android app using `google_sign_in` v7's
+Credential Manager-based flow:
+
+**What `[16] Account reauth failed` actually means**: `16` is
+`CommonStatusCodes.CANCELED` from Google Play services — a generic bucket,
+not literally "user tapped cancel." The `google_sign_in_android` plugin
+maps anything in this bucket to `GoogleSignInExceptionCode.canceled`
+regardless of the real underlying cause, so the error text is misleading
+by design, not a bug in this app. Confirmed the string itself is produced
+by the on-device Google Play services module (Credential Manager's Google
+ID provider), not by any code in this app's dependency tree — searched the
+decompiled `play-services-auth`, `credentials-play-services-auth`, and
+`google_sign_in_android` bytecode and it appears nowhere shipped in the
+APK.
+
+**Documented common causes** (per `google_sign_in_android`'s own
+troubleshooting README, and two closed Flutter issues reporting the exact
+same error — [#174744](https://github.com/flutter/flutter/issues/174744),
+[#184918](https://github.com/flutter/flutter/issues/184918)), all verified
+for Dindin and ruled out one by one:
+
+- ❌ Wrong/missing SHA fingerprint → verified the Play App Signing SHA-1
+  hex-for-hex against what's registered.
+- ❌ Wrong package name → `applicationId`/`namespace` both
+  `com.cafelabs.dindin`, matches all three Android OAuth clients.
+- ❌ Missing/wrong `serverClientId` → the Web client ID hardcoded in
+  `lib/services/auth_service.dart` matches the `client_type: 3` entry in
+  `google-services.json`.
+- ❌ Account-specific (stale grant, needs re-auth at the Google Account
+  level) → ruled out by testing 3 different Google accounts, none of which
+  had ever granted Dindin access before.
+- ❌ Device-specific (Play Services cache/version) → ruled out by testing
+  on two different physical Android devices (phone + tablet), same result
+  on both.
+- ❌ OAuth consent screen not verified/branded → branding was genuinely
+  incomplete (missing required homepage + privacy policy links, and the
+  domain `cafelabs.net` wasn't in the authorized-domains list) and got
+  fixed, but the error persisted afterward — so this was a real, separate
+  problem worth having fixed, just not *the* cause of this specific error.
+
+**The actual fix, found 2026-09-24**: the SHA-1 shown in Play Console's
+"chave de assinatura do app" section — the value hex-compared above and
+believed correct — was **not** the certificate the Play-distributed APK is
+actually signed with. `keytool -printcert -jarfile` can't read it at all
+(Play-distributed APKs carry only v2/v3 signatures, which `keytool`
+doesn't parse), so the only way to get the real answer was to pull the
+actual installed `base.apk` via `adb` from a phone that installed the app
+*from the Play Store* and read its certificate directly
+(`scripts/apk_cert.py`, added for this). That produced a completely
+different SHA-1 (`1E:2A:0F:A1:...`) than the one copied from the console
+UI and registered in Firebase (`28:E1:77:6A:...`). Registering the
+`adb`-verified fingerprint fixed sign-in immediately — no new build
+needed, worked across every account and device already tried. Full repro
+steps and the up-to-date fingerprint table live in `docs/DEPLOY.md` →
+"Google Sign-In fails only for Play installs", not duplicated here.
+
+**The lesson**: never trust a fingerprint copied from a console UI as
+ground truth for what's actually signing a Play-distributed build — verify
+against the real installed APK's certificate. Every other cause on the
+documented checklist above (package name, `serverClientId`, account, device,
+consent-screen branding) really was fine; the failure was entirely a
+transcription/assumption problem about which certificate was live, not a
+missing configuration step.
+
+Open, non-blocking follow-ups: confirm where the wrong `28:E1:77:6A:...`
+value actually came from (misread column in the console? a stale key?) and
+decide whether to remove it from Firebase; re-download
+`google-services.json` into `android/app/` to reflect the new fingerprints
+(cosmetic — Firebase checks server-side, so sign-in already works without
+this).
+
+Meanwhile, `lib/features/auth/login_page.dart` was fixed regardless of
+root cause: it used to show this raw exception text on screen (which is
+how the bug became visible in the first place). It now catches
+`GoogleSignInException` specifically, logs it in full via `dart:developer`
+for diagnosis, and shows a short localized message instead — see commit
+`b7a8c3f`.
