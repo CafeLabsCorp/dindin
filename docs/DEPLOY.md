@@ -4,7 +4,10 @@
 
 Operational guide for a solo maintainer running/debugging Dindin's deploy
 without rebuilding context. Read `docs/BACKEND.md` first for *why* the deploy
-order is what it is — this file is the *how*, plus CI and rollback.
+order is what it is — this file is the *how*, plus CI and rollback. For the
+Play Console listing itself (Data Safety, store assets, testing tracks) and
+Google Sign-In's OAuth configuration/troubleshooting, see
+`docs/PLAY_CONSOLE.md`.
 
 Two distribution channels ship from this one repository, and they behave
 nothing alike:
@@ -164,9 +167,12 @@ Practical consequences:
    re-signs the app with the *app signing key*, so the SHA-1 Firebase must
    know about is the app signing key's, taken from the Play Console after the
    first upload. If only your upload/debug key's SHA-1 is registered, sign-in
-   works perfectly on your machine and fails with `ApiException: 10
-   (DEVELOPER_ERROR)` for every single user who installed from the store. This
-   is currently unregistered — see "Blocking before the first upload".
+   works perfectly on your machine and fails for every single user who
+   installed from the store. With `google_sign_in` 7.x (Credential Manager)
+   the symptom is `GoogleSignInException(code: canceled)` /
+   `[16] Account reauth failed`, not the classic `ApiException: 10
+   (DEVELOPER_ERROR)`, so it does not look like a fingerprint problem. See
+   "Google Sign-In fails only for Play installs" below.
 
 ### Generate the upload key (once, by the maintainer only)
 
@@ -369,10 +375,47 @@ anything else.
    your Android app → Add fingerprint → paste → **re-download
    `google-services.json` into `android/app/`** and commit it. Without this,
    Google Sign-In fails for every store install. Add your upload key's SHA-1
-   too, so locally built release APKs keep working.
+   too, so locally built release APKs keep working. Then **verify** with a
+   real Play install (next section) — do not trust the value copied from the
+   console until the installed app's certificate matches it.
 9. **Roll out in stages**, not at 100% — see below.
 
 For a later, routine release, only steps 7 and 9 apply.
+
+### Google Sign-In fails only for Play installs
+
+A sideloaded release APK is signed with the **upload key**; the app installed
+from Play is re-signed by Google. So "the APK I installed by hand logs in fine"
+proves nothing about the Play build. Check the certificate that actually signed
+the app on the phone:
+
+1. Uninstall the app, install it **from Play**, connect the phone over `adb`.
+   Play installs show `split_config.*.apk` entries in `adb shell pm path`; a
+   sideloaded APK shows only `base.apk`.
+2. Pull the base APK and read its certificate:
+
+   ```bash
+   adb pull "$(adb shell pm path com.cafelabs.dindin | grep base.apk | sed 's/package://' | tr -d '\r')" play.apk
+   python3 scripts/apk_cert.py play.apk
+   ```
+
+   `keytool -printcert -jarfile` prints nothing here: Play APKs carry only
+   v2/v3 signatures, which keytool does not read.
+3. Add the printed SHA-1 and SHA-256 in Firebase → Project settings → Android
+   app. It takes effect server-side within minutes — no new build needed.
+   Re-download `google-services.json` to keep the repo in sync.
+
+This is how the Sept 2026 sign-in bug was solved: the SHA-1 copied from the
+console (`28:E1:77…`) was not the one Play actually used (`1E:2A:0F…`).
+
+Fingerprints registered in Firebase today:
+
+| Key | SHA-1 | Used by |
+|---|---|---|
+| Debug (`~/.android/debug.keystore`) | `D3:DD:92:14:…:8F:8E` | `flutter run` |
+| Upload (`~/keys/dindin/dindin-upload-key.jks`) | `E4:84:F6:85:…:60:AA:F6` | locally built release APKs |
+| Play app signing (verified on a device) | `1E:2A:0F:A1:…:20:A2:6D` | installs from Play |
+| Copied from Play Console, origin unconfirmed | `28:E1:77:6A:…:8C:75:B5` | unknown — keep until confirmed |
 
 ### Rollback on Play — there isn't one
 
@@ -555,19 +598,16 @@ per-install or per-download cost, ever. Nothing to monitor financially.
   after publication, and it cannot be reused even if you delete the app entry
   and start over. It matches `namespace`, `applicationId`, and the package in
   `android/app/google-services.json`. Confirm you are happy with it *now*.
-- **Google Sign-In SHA-1 is not registered at all.**
-  `android/app/google-services.json` currently has an empty `oauth_client`
-  list, which means no certificate fingerprint is registered for the Android
-  app in Firebase — sign-in will fail on device today, and will keep failing
-  for Play installs until the *app signing key* SHA-1 is added (see step 8 of
-  the upload runbook). Treat this as a launch blocker.
+- **Google Sign-In fingerprints** — done (Sept 2026). Debug, upload and the
+  Play app signing certificate verified on a device are all registered; see
+  "Google Sign-In fails only for Play installs".
 - **`android:label`** is now `"Dindin"` (was the lowercase template value
   `dindin`). This is only the launcher label; the Play listing title and
   `web/index.html`'s `<title>` are two separate strings — `web/index.html`
   still says `dindin`. Pick one spelling across all three. This one is
   changeable later, unlike the package name.
 - **App icon** — the adaptive icon is correctly configured (foreground inset
-  16%, background `#FCFCFB`), so the launcher icon is fine. Play separately
+  16%, dark background `#16130F`), so the launcher icon is fine. Play separately
   requires a 512x512 32-bit PNG store icon uploaded in the console, with no
   transparency and no rounded corners baked in.
 - **Privacy policy URL and account-deletion path** — both mandatory for an app
