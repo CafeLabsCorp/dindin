@@ -57,17 +57,59 @@ publicidade. Tudo é excluível via o fluxo de exclusão de conta self-service
 Dados tem uma checkbox pra isso ("usuários podem solicitar exclusão de
 dados") que deve ficar `true`.
 
-### Assets da ficha na loja
+### Ficha da loja (página "Detalhes do app" padrão, pt-BR)
 
-- **Ícone** (512×512): gerado a partir de `assets/icon/logo_1024.png` com
-  fundo escuro (`#16130F`, o `darkBackground` de `lib/theme/colors.dart`)
-  pra combinar com o tema do próprio app, em vez de fundo transparente ou
-  claro.
-- **Gráfico de destaque** (1024×500): SVG feito à mão com as mesmas cores
-  da marca (`darkPrimary #7FCB9E`, `darkBackground #16130F`, `darkSurface
-  #201C17`), logotipo + slogan, renderizado pra PNG com `sharp`.
-- **Screenshots**: capturados de um aparelho real rodando o build de teste
-  interno — não tem atalho pra esse, tem que ser o app de verdade.
+Preenchida em 2026-09-24. Texto como foi publicado (só pt-BR):
+
+**Nome:** `Dindin: finanças por caixinhas`
+
+**Descrição curta:** `Organize suas finanças em caixinhas: gastos, receitas e assinaturas.`
+
+**Descrição completa:**
+
+```
+Dindin é um caderno digital de finanças pessoais, baseado em "caixinhas" (envelopes).
+
+Divida o que você ganha entre caixinhas com propósitos diferentes — gastar ou guardar — e registre o que sai de cada uma. Você sempre sabe quanto tem disponível, sem precisar abrir planilha nenhuma.
+
+PRINCIPAIS RECURSOS
+• Caixinhas: organize seu dinheiro por categoria, com meta e limite opcionais
+• Receitas e gastos: lance manualmente, com data, valor e descrição
+• Assinaturas e parcelamentos: o Dindin lança os gastos automaticamente nas datas certas
+• Saldo em tempo real: saiba sempre quanto tem em cada caixinha e na conta
+• Exportar e importar em JSON: seus dados são seus, leve pra onde quiser
+• Multiplataforma: use no navegador (app.dindin.cafelabs.net) ou no Android
+
+PRIVACIDADE EM PRIMEIRO LUGAR
+O Dindin não se conecta ao seu banco, não pede cartão, não pede CPF e não movimenta dinheiro de verdade — é só uma ferramenta de organização. Você digita, o Dindin soma. Seus dados não são vendidos.
+
+É gratuito, feito pela Café Labs.
+```
+
+Ficou de fora da ficha de propósito: "sem anúncios". O app não tem anúncio
+hoje, mas a ficha não deve travar isso — atenção que os Termos de Uso (§3,
+preço) e a Política de Privacidade (§3.4) *prometem* hoje que não há
+anúncios, então pôr anúncio no futuro exige revisar esses dois também, além
+da declaração "contém anúncios" e do Data Safety na Play.
+
+**Gráficos** — gerados por `scripts/play_store_assets.mjs` (usa `sharp`,
+devDependency de `scripts/`, e as fontes Fraunces/Work Sans do próprio app):
+
+- `node play_store_assets.mjs graphics <pasta>` → `icone-512.png` (fundo
+  escuro `#16130F`, igual ao ícone adaptativo) e
+  `grafico-destaque-1024x500.png` (logo + nome + slogan). Os dois sem canal
+  alfa, como a Play exige pro gráfico de destaque.
+- `node play_store_assets.mjs screenshots <pasta> <legendas.json>` →
+  emoldura prints crus do celular em 1080×1920 (9:16) com legenda em cima.
+  A Play só aceita 16:9 ou 9:16; o 1080×2340 (19,5:9) nativo do S23 é
+  recusado direto. Legendas usadas: "Saiba quanto tem / em cada caixinha"
+  (Dashboard), "Metas, limites / e histórico do mês", "Assinaturas lançadas
+  / no automático", "Compras parceladas / sob controle", "Todos os gastos, /
+  filtrados por período", "Seus dados, / seu controle" (Ajustes).
+
+As imagens geradas **não são commitadas**: são reproduzíveis, binário
+incha o histórico do git pra sempre, e os prints podem mostrar dados reais
+de conta. As versões publicadas ficam no Google Drive da empresa.
 
 ### Trilhas de teste
 
