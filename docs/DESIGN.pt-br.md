@@ -347,14 +347,11 @@ alinhem verticalmente numa coluna. Não aplicado aos valores hero únicos do
   `primaryContainer` é 4.08:1 — todos abaixo do 4.5:1 exigido nesse
   tamanho).
 
-**Logo existente** (`assets/logo.svg`): uma ilustração de cofrinho/moeda em
-`#1BAF7A` (verde) + `#1A6B4E` (verde escuro) + `#FFC800` (dourado) +
-`#A4830C` (dourado escuro). Isso fica bem ao lado da nova paleta — já está
-na mesma família de matiz verde/dourado do `primary`/`Âmbar`, só um verde
-mais brilhante/saturado que o novo `primary` (`#2E6F4D`). Ajustar o verde do
-logo pra bater com `primary` exatamente é um follow-up cosmético, não-
-bloqueante — hoje eles leem como "relacionados mas não idênticos" em vez de
-"a mesma cor".
+**Logo** (`assets/logo.svg`): saco de dinheiro recolorido em 2026-10-07 com a
+paleta do app: `#2E6F4D` (`primary`) + `#14392A` (`onPrimaryContainer`, sombra) +
+`#E0A542` (Âmbar do tema escuro) + `#A8660A` (Âmbar do tema claro, sombra). A
+versão pra fundo escuro (verde `#7FCB9E` = `darkPrimary`, `$` escuro) mora no
+catálogo de marca do `cafelabs-vault` (`marca/dindin/`).
 
 ---
 
