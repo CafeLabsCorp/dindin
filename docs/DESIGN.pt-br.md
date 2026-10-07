@@ -347,11 +347,11 @@ alinhem verticalmente numa coluna. Não aplicado aos valores hero únicos do
   `primaryContainer` é 4.08:1 — todos abaixo do 4.5:1 exigido nesse
   tamanho).
 
-**Logo** (`assets/logo.svg`): saco de dinheiro recolorido em 2026-10-07 com a
-paleta do app: `#2E6F4D` (`primary`) + `#14392A` (`onPrimaryContainer`, sombra) +
-`#E0A542` (Âmbar do tema escuro) + `#A8660A` (Âmbar do tema claro, sombra). A
-versão pra fundo escuro (verde `#7FCB9E` = `darkPrimary`, `$` escuro) mora no
-catálogo de marca do `cafelabs-vault` (`marca/dindin/`).
+**Logo** (`assets/logo.svg`): saco de dinheiro com uma paleta única nos dois fundos
+(definida com o Felipe em 2026-10-07): `#3E8A62` (verde), `#24563C` (sombra do verde),
+`#E8B04A` (dourado) e `#A8660A` (sombra do dourado). Não usa o `primary` do app
+(`#2E6F4D`) de propósito: esse verde ficava escuro demais pra um símbolo grande.
+Catálogo completo em `cafelabs-vault/marca/dindin/`.
 
 ---
 
