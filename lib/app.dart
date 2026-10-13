@@ -27,10 +27,31 @@ class DindinApp extends ConsumerStatefulWidget {
 }
 
 class _DindinAppState extends ConsumerState<DindinApp> {
+  final _authRefresh = _GoRouterRefreshStream();
+
+  @override
+  void initState() {
+    super.initState();
+    // `listenManual`, NOT `ref.listen`: a listener registered with `ref.listen`
+    // during build is dropped the next time the widget rebuilds — and this
+    // widget rebuilds whenever the language changes. The router would then
+    // stop hearing about sign-in/sign-out: signing out left the old screen up
+    // and signing in again never left the login screen, until the app was
+    // restarted. This one lives as long as the State.
+    ref.listenManual(authStateProvider, (_, _) => _authRefresh.refresh());
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    _authRefresh.dispose();
+    super.dispose();
+  }
+
   late final GoRouter _router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
-    refreshListenable: _GoRouterRefreshStream(ref),
+    refreshListenable: _authRefresh,
     redirect: (context, state) {
       final signedIn = ref.read(authStateProvider).value != null;
       final loggingIn = state.matchedLocation == '/login';
@@ -85,7 +106,5 @@ class _DindinAppState extends ConsumerState<DindinApp> {
 /// Bridges Riverpod's [authStateProvider] stream into a [Listenable] so
 /// go_router re-evaluates `redirect` whenever the auth state changes.
 class _GoRouterRefreshStream extends ChangeNotifier {
-  _GoRouterRefreshStream(WidgetRef ref) {
-    ref.listen(authStateProvider, (_, _) => notifyListeners());
-  }
+  void refresh() => notifyListeners();
 }
