@@ -16,6 +16,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/charge_source_field.dart';
 import '../../widgets/responsive_form_row.dart';
 import '../../widgets/saved_feedback.dart';
+import '../../widgets/catch_up_refresh.dart';
 
 /// Fixed recurring monthly charges, on their own screen.
 ///
@@ -77,6 +78,9 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
       _nameController.clear();
       _amountController.clear();
       if (mounted) showSavedSnackBar(context, l10n.savedSubscription);
+      // Bill it right away if its day has already come, instead of waiting for
+      // the next app open or a pull-to-refresh.
+      ref.invalidate(recurringChargesCatchUpProvider);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));
@@ -104,9 +108,14 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
       ),
     );
     if (confirmed != true) return;
-    await ref
-        .read(firestoreServiceProvider)!
-        .deleteSubscription(subscription.id);
+    try {
+      await ref
+          .read(firestoreServiceProvider)!
+          .deleteSubscription(subscription.id);
+      if (mounted) showSavedSnackBar(context, l10n.removedSubscription);
+    } catch (e) {
+      if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
+    }
   }
 
   Future<void> _toggleAutoCharge(
@@ -115,7 +124,15 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
   ) async {
     final firestore = ref.read(firestoreServiceProvider);
     if (firestore == null) return;
-    await firestore.setSubscriptionAutoCharge(subscription.id, enabled);
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      await firestore.setSubscriptionAutoCharge(subscription.id, enabled);
+      if (mounted) {
+        showSavedSnackBar(context, enabled ? l10n.autoChargeOnMessage : l10n.autoChargeOffMessage);
+      }
+    } catch (e) {
+      if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
+    }
   }
 
   /// Posts whatever is pending for [subscription] right now — the manual
@@ -135,6 +152,8 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.chargeNowInsufficientBalance)),
         );
+      } else {
+        showSavedSnackBar(context, AppLocalizations.of(context)!.chargedNowMessage);
       }
     } finally {
       if (mounted) setState(() => _chargingIds.remove(subscription.id));
@@ -165,138 +184,142 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
     final showPending = catchUpState.hasValue;
     final today = ref.watch(todayProvider);
 
-    return ListView(
-      children: [
-        PageHeader(
-          title: l10n.subscriptionsTitle,
-          subtitle: l10n.subscriptionsSubtitle,
-          onOpenMenu: AppNavigation.of(context)?.openMenu,
-          menuLabel: l10n.navMenu,
-        ),
-        const SizedBox(height: 24),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 200.0,
-                    child: TextField(
-                      controller: _nameController,
-                      enabled: !_submitting,
-                      decoration: InputDecoration(
-                        labelText: l10n.subscriptionNameLabel,
-                        hintText: l10n.subscriptionNameHint,
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _dueDay,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: l10n.subscriptionDueDayLabel,
-                      ),
-                      items: [
-                        for (var d = 1; d <= 31; d++)
-                          DropdownMenuItem(value: d, child: Text('$d')),
-                      ],
-                      onChanged: _submitting
-                          ? null
-                          : (v) => setState(() => _dueDay = v ?? _dueDay),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: TextField(
-                      controller: _amountController,
-                      enabled: !_submitting,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [MoneyInputFormatter()],
-                      decoration: InputDecoration(
-                        labelText: l10n.amountLabel,
-                        hintText: l10n.amountHint,
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 180.0,
-                    child: ChargeSourceField(
-                      categories: categories,
-                      value: _source,
-                      onChanged: _submitting
-                          ? null
-                          : (v) => setState(() => _source = v),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _submitting ? null : _submit,
-                child: Text(l10n.submitSubscriptionButton),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-            ],
+    return CatchUpRefresh(
+      child: ListView(
+        // Always scrollable, so pull-to-refresh works even when the content fits.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          PageHeader(
+            title: l10n.subscriptionsTitle,
+            subtitle: l10n.subscriptionsSubtitle,
+            onOpenMenu: AppNavigation.of(context)?.openMenu,
+            menuLabel: l10n.navMenu,
           ),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.subscriptionsListTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              subscriptionsAsync.when(
-                data: (subscriptions) {
-                  if (subscriptions.isEmpty) {
-                    return EmptyState(l10n.subscriptionsEmptyState);
-                  }
-                  return Column(
-                    children: [
-                      for (var i = 0; i < subscriptions.length; i++)
-                        _SubscriptionRow(
-                          subscription: subscriptions[i],
-                          categories: categories,
-                          pendingCharges: showPending
-                              ? schedule
-                                    .pendingDueDates(subscriptions[i], today)
-                                    .length
-                              : 0,
-                          charging: _chargingIds.contains(subscriptions[i].id),
-                          onEdit: () => _edit(subscriptions[i], categories),
-                          onDelete: () => _delete(subscriptions[i]),
-                          onToggleAutoCharge: (enabled) =>
-                              _toggleAutoCharge(subscriptions[i], enabled),
-                          onChargeNow: () => _chargeNow(subscriptions[i]),
-                          divider: i > 0,
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ResponsiveFormRow(
+                  fields: [
+                    (
+                      width: 200.0,
+                      child: TextField(
+                        controller: _nameController,
+                        enabled: !_submitting,
+                        decoration: InputDecoration(
+                          labelText: l10n.subscriptionNameLabel,
+                          hintText: l10n.subscriptionNameHint,
                         ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
-              ),
-            ],
+                      ),
+                    ),
+                    (
+                      width: 140.0,
+                      child: DropdownButtonFormField<int>(
+                        initialValue: _dueDay,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: l10n.subscriptionDueDayLabel,
+                        ),
+                        items: [
+                          for (var d = 1; d <= 31; d++)
+                            DropdownMenuItem(value: d, child: Text('$d')),
+                        ],
+                        onChanged: _submitting
+                            ? null
+                            : (v) => setState(() => _dueDay = v ?? _dueDay),
+                      ),
+                    ),
+                    (
+                      width: 140.0,
+                      child: TextField(
+                        controller: _amountController,
+                        enabled: !_submitting,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [MoneyInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: l10n.amountLabel,
+                          hintText: l10n.amountHint,
+                        ),
+                      ),
+                    ),
+                    (
+                      width: 180.0,
+                      child: ChargeSourceField(
+                        categories: categories,
+                        value: _source,
+                        onChanged: _submitting
+                            ? null
+                            : (v) => setState(() => _source = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(l10n.submitSubscriptionButton),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.subscriptionsListTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                subscriptionsAsync.when(
+                  data: (subscriptions) {
+                    if (subscriptions.isEmpty) {
+                      return EmptyState(l10n.subscriptionsEmptyState);
+                    }
+                    return Column(
+                      children: [
+                        for (var i = 0; i < subscriptions.length; i++)
+                          _SubscriptionRow(
+                            subscription: subscriptions[i],
+                            categories: categories,
+                            pendingCharges: showPending
+                                ? schedule
+                                      .pendingDueDates(subscriptions[i], today)
+                                      .length
+                                : 0,
+                            charging: _chargingIds.contains(subscriptions[i].id),
+                            onEdit: () => _edit(subscriptions[i], categories),
+                            onDelete: () => _delete(subscriptions[i]),
+                            onToggleAutoCharge: (enabled) =>
+                                _toggleAutoCharge(subscriptions[i], enabled),
+                            onChargeNow: () => _chargeNow(subscriptions[i]),
+                            divider: i > 0,
+                          ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -20,6 +20,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/edit_transaction_sheet.dart';
 import '../../widgets/responsive_form_row.dart';
 import '../../widgets/saved_feedback.dart';
+import '../../widgets/catch_up_refresh.dart';
 
 /// Sentinel for the "Conta" dropdown entry — an expense charged directly
 /// against the account balance instead of a caixinha.
@@ -123,7 +124,12 @@ class _GastosPageState extends ConsumerState<GastosPage> {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(firestoreServiceProvider)!.deleteExpense(id);
+    try {
+      await ref.read(firestoreServiceProvider)!.deleteExpense(id);
+      if (mounted) showSavedSnackBar(context, l10n.removedExpense);
+    } catch (e) {
+      if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
+    }
   }
 
   void _editExpense(Expense expense, List<Category> categories) {
@@ -168,225 +174,229 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final blocked = _blockedByFrozenDebt(categories, availableBalance);
     final filterActive = _filterFrom != null || _filterTo != null;
 
-    return ListView(
-      children: [
-        PageHeader(
-          title: l10n.gastosTitle,
-          subtitle: l10n.gastosSubtitle,
-          onOpenMenu: AppNavigation.of(context)?.openMenu,
-          menuLabel: l10n.navMenu,
-        ),
-        const SizedBox(height: 24),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.recurringEntryTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              // Informational only now. It started life as the entry point to
-              // Assinaturas/Parcelamentos, but both are top-level destinations
-              // since — so the buttons would just duplicate the nav bar. What
-              // stays is the number, which is real context while you're
-              // logging a gasto: this much of the month is already spoken for.
-              Text(
-                l10n.recurringEntryCommitted(formatCurrency(committed)),
-                style: TextStyle(color: context.tokens.muted),
-              ),
-            ],
+    return CatchUpRefresh(
+      child: ListView(
+        // Always scrollable, so pull-to-refresh works even when the content fits.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          PageHeader(
+            title: l10n.gastosTitle,
+            subtitle: l10n.gastosSubtitle,
+            onOpenMenu: AppNavigation.of(context)?.openMenu,
+            menuLabel: l10n.navMenu,
           ),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _date,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) setState(() => _date = picked);
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.dateLabel),
-                        child: Text(formatDate(isoDateFrom(_date))),
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: TextField(
-                      controller: _amountController,
-                      enabled: !blocked,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [MoneyInputFormatter()],
-                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
-                    ),
-                  ),
-                  (
-                    width: 200.0,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selection,
-                      isExpanded: true,
-                      decoration: InputDecoration(labelText: l10n.expenseSourceLabel),
-                      items: [
-                        DropdownMenuItem(value: _accountOption, child: Text(l10n.accountLabel)),
-                        for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _selection = v ?? _accountOption;
-                        _error = null;
-                      }),
-                    ),
-                  ),
-                  (
-                    width: 220.0,
-                    child: TextField(
-                      controller: _descriptionController,
-                      enabled: !blocked,
-                      decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel, hintText: l10n.expenseDescriptionHint),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.availableLabel(formatCurrency(availableBalance)),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: availableBalance < 0 ? context.tokens.statusCritical : context.tokens.subtle,
-                  fontWeight: availableBalance < 0 ? FontWeight.w600 : FontWeight.w400,
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.recurringEntryTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
-              ),
-              if (blocked)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    l10n.frozenDebtBlockLong,
-                    style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
-                  ),
+                const SizedBox(height: 4),
+                // Informational only now. It started life as the entry point to
+                // Assinaturas/Parcelamentos, but both are top-level destinations
+                // since — so the buttons would just duplicate the nav bar. What
+                // stays is the number, which is real context while you're
+                // logging a gasto: this much of the month is already spoken for.
+                Text(
+                  l10n.recurringEntryCommitted(formatCurrency(committed)),
+                  style: TextStyle(color: context.tokens.muted),
                 ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _submitting || blocked ? null : () => _submit(categories, availableBalance),
-                child: Text(l10n.submitExpenseButton),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _filterFrom ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          final range = rangeAfterPickingFrom(picked, _filterTo);
-                          setState(() {
-                            _filterFrom = range.from;
-                            _filterTo = range.to;
-                          });
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.filterFromLabel),
-                        child: Text(_filterFrom == null ? '—' : formatDate(isoDateFrom(_filterFrom!))),
+          const SizedBox(height: 16),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ResponsiveFormRow(
+                  fields: [
+                    (
+                      width: 160.0,
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _date,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) setState(() => _date = picked);
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: l10n.dateLabel),
+                          child: Text(formatDate(isoDateFrom(_date))),
+                        ),
                       ),
                     ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _filterTo ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          final range = rangeAfterPickingTo(picked, _filterFrom);
-                          setState(() {
-                            _filterFrom = range.from;
-                            _filterTo = range.to;
-                          });
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.filterToLabel),
-                        child: Text(_filterTo == null ? '—' : formatDate(isoDateFrom(_filterTo!))),
-                      ),
-                    ),
-                  ),
-                  if (filterActive)
                     (
                       width: 140.0,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
+                      child: TextField(
+                        controller: _amountController,
+                        enabled: !blocked,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [MoneyInputFormatter()],
+                        decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(l10n.expensesListTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              expensesAsync.when(
-                data: (expenses) {
-                  if (expenses.isEmpty) return EmptyState(l10n.expensesEmptyState);
-                  final filtered = expenses.where((e) => isDateWithinRange(e.date, _filterFrom, _filterTo)).toList();
-                  if (filtered.isEmpty) {
-                    return EmptyState(
-                      _filteredEmptyMessage(l10n, _filterFrom, _filterTo),
-                      action: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
-                    );
-                  }
-                  return Column(
-                    children: [
-                      for (var i = 0; i < filtered.length; i++)
-                        _ExpenseRow(
-                          expense: filtered[i],
-                          categoryName: categoryName,
-                          onTap: () => _editExpense(filtered[i], categories),
-                          onDelete: () => _delete(filtered[i].id),
-                          divider: i > 0,
-                        ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
-              ),
-            ],
+                    (
+                      width: 200.0,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selection,
+                        isExpanded: true,
+                        decoration: InputDecoration(labelText: l10n.expenseSourceLabel),
+                        items: [
+                          DropdownMenuItem(value: _accountOption, child: Text(l10n.accountLabel)),
+                          for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
+                        ],
+                        onChanged: (v) => setState(() {
+                          _selection = v ?? _accountOption;
+                          _error = null;
+                        }),
+                      ),
+                    ),
+                    (
+                      width: 220.0,
+                      child: TextField(
+                        controller: _descriptionController,
+                        enabled: !blocked,
+                        decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel, hintText: l10n.expenseDescriptionHint),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.availableLabel(formatCurrency(availableBalance)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: availableBalance < 0 ? context.tokens.statusCritical : context.tokens.subtle,
+                    fontWeight: availableBalance < 0 ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+                if (blocked)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      l10n.frozenDebtBlockLong,
+                      style: TextStyle(fontSize: 12, color: context.tokens.statusCritical, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _submitting || blocked ? null : () => _submit(categories, availableBalance),
+                  child: Text(l10n.submitExpenseButton),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ResponsiveFormRow(
+                  fields: [
+                    (
+                      width: 160.0,
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _filterFrom ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            final range = rangeAfterPickingFrom(picked, _filterTo);
+                            setState(() {
+                              _filterFrom = range.from;
+                              _filterTo = range.to;
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: l10n.filterFromLabel),
+                          child: Text(_filterFrom == null ? '—' : formatDate(isoDateFrom(_filterFrom!))),
+                        ),
+                      ),
+                    ),
+                    (
+                      width: 160.0,
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _filterTo ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            final range = rangeAfterPickingTo(picked, _filterFrom);
+                            setState(() {
+                              _filterFrom = range.from;
+                              _filterTo = range.to;
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: l10n.filterToLabel),
+                          child: Text(_filterTo == null ? '—' : formatDate(isoDateFrom(_filterTo!))),
+                        ),
+                      ),
+                    ),
+                    if (filterActive)
+                      (
+                        width: 140.0,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(l10n.expensesListTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                expensesAsync.when(
+                  data: (expenses) {
+                    if (expenses.isEmpty) return EmptyState(l10n.expensesEmptyState);
+                    final filtered = expenses.where((e) => isDateWithinRange(e.date, _filterFrom, _filterTo)).toList();
+                    if (filtered.isEmpty) {
+                      return EmptyState(
+                        _filteredEmptyMessage(l10n, _filterFrom, _filterTo),
+                        action: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
+                      );
+                    }
+                    return Column(
+                      children: [
+                        for (var i = 0; i < filtered.length; i++)
+                          _ExpenseRow(
+                            expense: filtered[i],
+                            categoryName: categoryName,
+                            onTap: () => _editExpense(filtered[i], categories),
+                            onDelete: () => _delete(filtered[i].id),
+                            divider: i > 0,
+                          ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

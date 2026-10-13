@@ -17,6 +17,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/edit_transaction_sheet.dart';
 import '../../widgets/responsive_form_row.dart';
 import '../../widgets/saved_feedback.dart';
+import '../../widgets/catch_up_refresh.dart';
 
 class ReceitasPage extends ConsumerStatefulWidget {
   const ReceitasPage({super.key});
@@ -87,7 +88,12 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(firestoreServiceProvider)!.deleteIncome(id);
+    try {
+      await ref.read(firestoreServiceProvider)!.deleteIncome(id);
+      if (mounted) showSavedSnackBar(context, l10n.removedIncome);
+    } catch (e) {
+      if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
+    }
   }
 
   void _editIncome(Income income) {
@@ -107,177 +113,181 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
     final incomesAsync = ref.watch(incomesProvider);
     final filterActive = _filterFrom != null || _filterTo != null;
 
-    return ListView(
-      children: [
-        PageHeader(
-          title: l10n.receitasTitle,
-          subtitle: l10n.receitasSubtitle,
-          onOpenMenu: AppNavigation.of(context)?.openMenu,
-          menuLabel: l10n.navMenu,
-        ),
-        const SizedBox(height: 24),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _date,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) setState(() => _date = picked);
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.dateLabel),
-                        child: Text(formatDate(isoDateFrom(_date))),
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: TextField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [MoneyInputFormatter()],
-                      decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
-                    ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: DropdownButtonFormField<IncomeSource>(
-                      initialValue: _source,
-                      isExpanded: true,
-                      decoration: InputDecoration(labelText: l10n.incomeSourceFieldLabel),
-                      items: [
-                        for (final s in incomeSourceValues)
-                          DropdownMenuItem(value: s, child: Text(incomeSourceLabel(l10n, s))),
-                      ],
-                      onChanged: (v) => setState(() => _source = v ?? IncomeSource.estagio),
-                    ),
-                  ),
-                  (
-                    width: 220.0,
-                    child: TextField(
-                      controller: _descriptionController,
-                      decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel, hintText: l10n.incomeDescriptionHint),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _submitting ? null : _submit, child: Text(l10n.submitIncomeButton)),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-            ],
+    return CatchUpRefresh(
+      child: ListView(
+        // Always scrollable, so pull-to-refresh works even when the content fits.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          PageHeader(
+            title: l10n.receitasTitle,
+            subtitle: l10n.receitasSubtitle,
+            onOpenMenu: AppNavigation.of(context)?.openMenu,
+            menuLabel: l10n.navMenu,
           ),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _filterFrom ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          final range = rangeAfterPickingFrom(picked, _filterTo);
-                          setState(() {
-                            _filterFrom = range.from;
-                            _filterTo = range.to;
-                          });
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.filterFromLabel),
-                        child: Text(_filterFrom == null ? '—' : formatDate(isoDateFrom(_filterFrom!))),
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ResponsiveFormRow(
+                  fields: [
+                    (
+                      width: 160.0,
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _date,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) setState(() => _date = picked);
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: l10n.dateLabel),
+                          child: Text(formatDate(isoDateFrom(_date))),
+                        ),
                       ),
                     ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _filterTo ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          final range = rangeAfterPickingTo(picked, _filterFrom);
-                          setState(() {
-                            _filterFrom = range.from;
-                            _filterTo = range.to;
-                          });
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(labelText: l10n.filterToLabel),
-                        child: Text(_filterTo == null ? '—' : formatDate(isoDateFrom(_filterTo!))),
-                      ),
-                    ),
-                  ),
-                  if (filterActive)
                     (
                       width: 140.0,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
+                      child: TextField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [MoneyInputFormatter()],
+                        decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(l10n.incomesListTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              incomesAsync.when(
-                data: (incomes) {
-                  if (incomes.isEmpty) return EmptyState(l10n.incomesEmptyState);
-                  final filtered = incomes.where((i) => isDateWithinRange(i.date, _filterFrom, _filterTo)).toList();
-                  if (filtered.isEmpty) {
-                    return EmptyState(
-                      _filteredEmptyMessage(l10n, _filterFrom, _filterTo),
-                      action: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
-                    );
-                  }
-                  return Column(
-                    children: [
-                      for (var i = 0; i < filtered.length; i++)
-                        _IncomeRow(
-                          income: filtered[i],
-                          onTap: () => _editIncome(filtered[i]),
-                          onDelete: () => _delete(filtered[i].id),
-                          divider: i > 0,
-                        ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
-              ),
-            ],
+                    (
+                      width: 160.0,
+                      child: DropdownButtonFormField<IncomeSource>(
+                        initialValue: _source,
+                        isExpanded: true,
+                        decoration: InputDecoration(labelText: l10n.incomeSourceFieldLabel),
+                        items: [
+                          for (final s in incomeSourceValues)
+                            DropdownMenuItem(value: s, child: Text(incomeSourceLabel(l10n, s))),
+                        ],
+                        onChanged: (v) => setState(() => _source = v ?? IncomeSource.estagio),
+                      ),
+                    ),
+                    (
+                      width: 220.0,
+                      child: TextField(
+                        controller: _descriptionController,
+                        decoration: InputDecoration(labelText: l10n.descriptionOptionalLabel, hintText: l10n.incomeDescriptionHint),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton(onPressed: _submitting ? null : _submit, child: Text(l10n.submitIncomeButton)),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ResponsiveFormRow(
+                  fields: [
+                    (
+                      width: 160.0,
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _filterFrom ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            final range = rangeAfterPickingFrom(picked, _filterTo);
+                            setState(() {
+                              _filterFrom = range.from;
+                              _filterTo = range.to;
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: l10n.filterFromLabel),
+                          child: Text(_filterFrom == null ? '—' : formatDate(isoDateFrom(_filterFrom!))),
+                        ),
+                      ),
+                    ),
+                    (
+                      width: 160.0,
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _filterTo ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            final range = rangeAfterPickingTo(picked, _filterFrom);
+                            setState(() {
+                              _filterFrom = range.from;
+                              _filterTo = range.to;
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(labelText: l10n.filterToLabel),
+                          child: Text(_filterTo == null ? '—' : formatDate(isoDateFrom(_filterTo!))),
+                        ),
+                      ),
+                    ),
+                    if (filterActive)
+                      (
+                        width: 140.0,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(l10n.incomesListTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                incomesAsync.when(
+                  data: (incomes) {
+                    if (incomes.isEmpty) return EmptyState(l10n.incomesEmptyState);
+                    final filtered = incomes.where((i) => isDateWithinRange(i.date, _filterFrom, _filterTo)).toList();
+                    if (filtered.isEmpty) {
+                      return EmptyState(
+                        _filteredEmptyMessage(l10n, _filterFrom, _filterTo),
+                        action: TextButton(onPressed: _clearFilter, child: Text(l10n.clearFilterButton)),
+                      );
+                    }
+                    return Column(
+                      children: [
+                        for (var i = 0; i < filtered.length; i++)
+                          _IncomeRow(
+                            income: filtered[i],
+                            onTap: () => _editIncome(filtered[i]),
+                            onDelete: () => _delete(filtered[i].id),
+                            divider: i > 0,
+                          ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

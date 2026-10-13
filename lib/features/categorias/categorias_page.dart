@@ -120,6 +120,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     if (confirmed != true) return;
     try {
       await ref.read(firestoreServiceProvider)!.deleteCategory(id);
+      if (mounted) showSavedSnackBar(context, l10n.removedCategory);
     } catch (e) {
       // Defensive fallback: the delete icon is proactively disabled while a
       // caixinha is in debt (see `_hasUnsettledDebt` in build()), so this

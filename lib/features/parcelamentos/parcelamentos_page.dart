@@ -17,6 +17,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/charge_source_field.dart';
 import '../../widgets/responsive_form_row.dart';
 import '../../widgets/saved_feedback.dart';
+import '../../widgets/catch_up_refresh.dart';
 
 /// Card purchases split into monthly installments, on their own screen —
 /// same reasoning as `AssinaturasPage`.
@@ -74,6 +75,8 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
       _nameController.clear();
       _totalController.clear();
       if (mounted) showSavedSnackBar(context, l10n.savedInstallment);
+      // Same as for subscriptions: charge what is already due now.
+      ref.invalidate(recurringChargesCatchUpProvider);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));
@@ -101,9 +104,14 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
       ),
     );
     if (confirmed != true) return;
-    await ref
-        .read(firestoreServiceProvider)!
-        .deleteInstallmentPurchase(purchase.id);
+    try {
+      await ref
+          .read(firestoreServiceProvider)!
+          .deleteInstallmentPurchase(purchase.id);
+      if (mounted) showSavedSnackBar(context, l10n.removedInstallment);
+    } catch (e) {
+      if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
+    }
   }
 
   /// Moves the day the remaining installments fall due. Only the day: the
@@ -169,6 +177,7 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
         // storing it as one would leave a field that means nothing.
         (picked == 0 || picked == anchorDay) ? null : picked,
       );
+      if (mounted) showSavedSnackBar(context, l10n.dueDayChangedMessage);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));
@@ -197,158 +206,162 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
     final showPending = catchUpState.hasValue;
     final today = ref.watch(todayProvider);
 
-    return ListView(
-      children: [
-        PageHeader(
-          title: l10n.installmentPurchasesTitle,
-          subtitle: l10n.installmentPurchasesSubtitle,
-          onOpenMenu: AppNavigation.of(context)?.openMenu,
-          menuLabel: l10n.navMenu,
-        ),
-        const SizedBox(height: 24),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ResponsiveFormRow(
-                fields: [
-                  (
-                    width: 200.0,
-                    child: TextField(
-                      controller: _nameController,
-                      enabled: !_submitting,
-                      decoration: InputDecoration(
-                        labelText: l10n.installmentNameLabel,
-                        hintText: l10n.installmentNameHint,
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: _DateField(
-                      label: l10n.purchaseDateLabel,
-                      value: _purchaseDate,
-                      enabled: !_submitting,
-                      onChanged: (d) => setState(() => _purchaseDate = d),
-                    ),
-                  ),
-                  (
-                    width: 140.0,
-                    child: TextField(
-                      controller: _totalController,
-                      enabled: !_submitting,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [MoneyInputFormatter()],
-                      decoration: InputDecoration(
-                        labelText: l10n.amountLabel,
-                        hintText: l10n.amountHint,
-                      ),
-                    ),
-                  ),
-                  (
-                    width: 120.0,
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _installments,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: l10n.installmentsCountLabel,
-                      ),
-                      items: [
-                        for (var n = 2; n <= 36; n++)
-                          DropdownMenuItem(value: n, child: Text('${n}x')),
-                      ],
-                      onChanged: _submitting
-                          ? null
-                          : (v) => setState(
-                              () => _installments = v ?? _installments,
-                            ),
-                    ),
-                  ),
-                  (
-                    width: 160.0,
-                    child: _DateField(
-                      label: l10n.firstChargeDateLabel,
-                      value: _firstChargeDate,
-                      enabled: !_submitting,
-                      onChanged: (d) => setState(() => _firstChargeDate = d),
-                    ),
-                  ),
-                  (
-                    width: 180.0,
-                    child: ChargeSourceField(
-                      categories: categories,
-                      value: _source,
-                      onChanged: _submitting
-                          ? null
-                          : (v) => setState(() => _source = v),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _submitting ? null : _submit,
-                child: Text(l10n.submitInstallmentPurchaseButton),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-            ],
+    return CatchUpRefresh(
+      child: ListView(
+        // Always scrollable, so pull-to-refresh works even when the content fits.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          PageHeader(
+            title: l10n.installmentPurchasesTitle,
+            subtitle: l10n.installmentPurchasesSubtitle,
+            onOpenMenu: AppNavigation.of(context)?.openMenu,
+            menuLabel: l10n.navMenu,
           ),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.installmentPurchasesListTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              purchasesAsync.when(
-                data: (purchases) {
-                  if (purchases.isEmpty) {
-                    return EmptyState(l10n.installmentPurchasesEmptyState);
-                  }
-                  return Column(
-                    children: [
-                      for (var i = 0; i < purchases.length; i++)
-                        _InstallmentPurchaseRow(
-                          purchase: purchases[i],
-                          categories: categories,
-                          pendingCharges: showPending
-                              ? schedule
-                                    .pendingInstallmentIndexes(
-                                      purchases[i],
-                                      today,
-                                    )
-                                    .length
-                              : 0,
-                          onPay: () => _pay(purchases[i], categories),
-                          onDelete: () => _delete(purchases[i]),
-                          onChangeDueDay: () => _changeDueDay(purchases[i]),
-                          divider: i > 0,
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ResponsiveFormRow(
+                  fields: [
+                    (
+                      width: 200.0,
+                      child: TextField(
+                        controller: _nameController,
+                        enabled: !_submitting,
+                        decoration: InputDecoration(
+                          labelText: l10n.installmentNameLabel,
+                          hintText: l10n.installmentNameHint,
                         ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
-              ),
-            ],
+                      ),
+                    ),
+                    (
+                      width: 160.0,
+                      child: _DateField(
+                        label: l10n.purchaseDateLabel,
+                        value: _purchaseDate,
+                        enabled: !_submitting,
+                        onChanged: (d) => setState(() => _purchaseDate = d),
+                      ),
+                    ),
+                    (
+                      width: 140.0,
+                      child: TextField(
+                        controller: _totalController,
+                        enabled: !_submitting,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [MoneyInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: l10n.amountLabel,
+                          hintText: l10n.amountHint,
+                        ),
+                      ),
+                    ),
+                    (
+                      width: 120.0,
+                      child: DropdownButtonFormField<int>(
+                        initialValue: _installments,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: l10n.installmentsCountLabel,
+                        ),
+                        items: [
+                          for (var n = 2; n <= 36; n++)
+                            DropdownMenuItem(value: n, child: Text('${n}x')),
+                        ],
+                        onChanged: _submitting
+                            ? null
+                            : (v) => setState(
+                                () => _installments = v ?? _installments,
+                              ),
+                      ),
+                    ),
+                    (
+                      width: 160.0,
+                      child: _DateField(
+                        label: l10n.firstChargeDateLabel,
+                        value: _firstChargeDate,
+                        enabled: !_submitting,
+                        onChanged: (d) => setState(() => _firstChargeDate = d),
+                      ),
+                    ),
+                    (
+                      width: 180.0,
+                      child: ChargeSourceField(
+                        categories: categories,
+                        value: _source,
+                        onChanged: _submitting
+                            ? null
+                            : (v) => setState(() => _source = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(l10n.submitInstallmentPurchaseButton),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.installmentPurchasesListTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                purchasesAsync.when(
+                  data: (purchases) {
+                    if (purchases.isEmpty) {
+                      return EmptyState(l10n.installmentPurchasesEmptyState);
+                    }
+                    return Column(
+                      children: [
+                        for (var i = 0; i < purchases.length; i++)
+                          _InstallmentPurchaseRow(
+                            purchase: purchases[i],
+                            categories: categories,
+                            pendingCharges: showPending
+                                ? schedule
+                                      .pendingInstallmentIndexes(
+                                        purchases[i],
+                                        today,
+                                      )
+                                      .length
+                                : 0,
+                            onPay: () => _pay(purchases[i], categories),
+                            onDelete: () => _delete(purchases[i]),
+                            onChangeDueDay: () => _changeDueDay(purchases[i]),
+                            divider: i > 0,
+                          ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -745,7 +758,10 @@ class _PayInstallmentSheetState extends ConsumerState<_PayInstallmentSheet> {
                 ? l10n.installmentSettleDescription(widget.purchase.name)
                 : l10n.installmentPayAheadDescription(widget.purchase.name),
           );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        showSavedSnackBar(context, l10n.paymentRecordedMessage);
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
