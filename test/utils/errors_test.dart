@@ -8,6 +8,7 @@
 // (mirrors `categoriaLabel`-style helpers) rather than a `BuildContext`, so
 // it stays testable here without pumping a widget — `AppLocalizationsPt()`
 // is constructed directly, matching the app's PT-first default.
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dindin/l10n/app_localizations_pt.dart';
@@ -88,6 +89,13 @@ void main() {
       expect(
         friendlyErrorMessage(l10n, StateError('transfer amount must be positive')),
         'Informe um valor válido.',
+      );
+    });
+
+    test('keeps the code of an unrecognized Firebase error visible', () {
+      expect(
+        friendlyErrorMessage(l10n, FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied')),
+        'Não foi possível salvar (erro: permission-denied). Tente novamente.',
       );
     });
 

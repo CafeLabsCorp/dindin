@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
+
 import '../l10n/app_localizations.dart';
 
 /// Maps a raw error thrown by [FirestoreService] (today, always a `StateError`
@@ -32,6 +34,12 @@ String friendlyErrorMessage(AppLocalizations l10n, Object error) {
   }
   if (message.contains('cannot be negative') || message.contains('must be positive')) {
     return l10n.invalidAmountError;
+  }
+  // An unrecognized Firebase failure (rules denial, quota, network...) keeps
+  // its short code on screen: the generic text alone made one user's failed
+  // save impossible to diagnose from a screenshot.
+  if (error is FirebaseException && error.code.isNotEmpty) {
+    return l10n.errorGenericSaveCode(error.code);
   }
   return l10n.errorGenericSave;
 }
