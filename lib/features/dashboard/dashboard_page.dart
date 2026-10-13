@@ -18,6 +18,7 @@ import '../../widgets/caixinha_color_dot.dart';
 import '../../widgets/stat_tile.dart';
 import '../../widgets/saved_feedback.dart';
 import '../../widgets/catch_up_refresh.dart';
+import '../../widgets/data_loading_view.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -29,7 +30,21 @@ class DashboardPage extends ConsumerWidget {
     final categories = ref.watch(categoriesProvider).value;
 
     if (summary == null || categories == null) {
-      return const Center(child: CircularProgressIndicator());
+      // Four streams feed the summary; any one failing (or never arriving,
+      // offline) would otherwise leave this spinner up forever.
+      return DataLoadingView(
+        error:
+            ref.watch(categoriesProvider).error ??
+            ref.watch(allIncomesProvider).error ??
+            ref.watch(allAllocationsProvider).error ??
+            ref.watch(allExpensesProvider).error,
+        onRetry: () {
+          ref.invalidate(categoriesProvider);
+          ref.invalidate(allIncomesProvider);
+          ref.invalidate(allAllocationsProvider);
+          ref.invalidate(allExpensesProvider);
+        },
+      );
     }
 
     final dark = Theme.of(context).brightness == Brightness.dark;
