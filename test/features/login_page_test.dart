@@ -44,8 +44,32 @@ void main() {
   }
 
   testWidgets(
-    'Google sign-in canceled (picker closed, or silent re-auth failing) shows '
-    'nothing at all and re-enables the button',
+    'Google sign-in canceled by the user (picker closed) shows nothing at all '
+    'and re-enables the button',
+    (tester) async {
+      final authService = _MockAuthService();
+      when(() => authService.signInWithGoogle()).thenThrow(
+        const GoogleSignInException(
+          code: GoogleSignInExceptionCode.canceled,
+          description: '[16] Cancelled by user.',
+        ),
+      );
+
+      await pumpLoginPage(tester, authService);
+      await tester.tap(find.byType(OutlinedButton));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Não foi possível entrar'), findsNothing);
+      expect(find.textContaining('GoogleSignInException'), findsNothing);
+
+      final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(button.onPressed, isNotNull);
+    },
+  );
+
+  testWidgets(
+    '"Account reauth failed" (reported under the canceled code, e.g. after '
+    'switching accounts) is NOT silent: the user tapped, so they get a message',
     (tester) async {
       final authService = _MockAuthService();
       when(() => authService.signInWithGoogle()).thenThrow(
@@ -59,10 +83,11 @@ void main() {
       await tester.tap(find.byType(OutlinedButton));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Não foi possível entrar'), findsNothing);
-      expect(find.textContaining('GoogleSignInException'), findsNothing);
+      expect(
+        find.text('Não foi possível entrar com o Google agora. Tente novamente em alguns instantes.'),
+        findsOneWidget,
+      );
       expect(find.textContaining('Account reauth failed'), findsNothing);
-
       final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
       expect(button.onPressed, isNotNull);
     },

@@ -76,11 +76,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         stackTrace: stackTrace,
       );
       if (!mounted) return;
-      // `canceled` covers both the user closing the account picker and the
-      // automatic silent re-auth failing ("[16] Account reauth failed."),
-      // which can fire without the user touching anything. Neither is an
-      // error worth showing: the login form is still right there.
-      if (e.code != GoogleSignInExceptionCode.canceled) {
+      // Closing the account picker ("[16] Cancelled by user.") is not an
+      // error: the form is still right there. But the plugin reports other
+      // failures under the same `canceled` code too — notably "[16] Account
+      // reauth failed.", seen after signing out and picking another account.
+      // This app only ever starts a sign-in from the button, so that is
+      // something the user tapped and must hear about, not stay stuck on a
+      // screen where nothing happens.
+      final userDismissed = e.code == GoogleSignInExceptionCode.canceled &&
+          (e.description == null || !e.description!.toLowerCase().contains('reauth'));
+      if (!userDismissed) {
         setState(() => _error = AppLocalizations.of(context)!.googleSignInErrorMessage);
       }
     } catch (e, stackTrace) {
