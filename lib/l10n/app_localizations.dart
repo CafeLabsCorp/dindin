@@ -1669,6 +1669,66 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Atualizar'**
   String get updateAction;
+
+  /// No description provided for @removedExpense.
+  ///
+  /// In pt, this message translates to:
+  /// **'Gasto removido.'**
+  String get removedExpense;
+
+  /// No description provided for @removedIncome.
+  ///
+  /// In pt, this message translates to:
+  /// **'Receita removida.'**
+  String get removedIncome;
+
+  /// No description provided for @removedSubscription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinatura removida.'**
+  String get removedSubscription;
+
+  /// No description provided for @removedInstallment.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelamento removido.'**
+  String get removedInstallment;
+
+  /// No description provided for @removedCategory.
+  ///
+  /// In pt, this message translates to:
+  /// **'Caixinha removida.'**
+  String get removedCategory;
+
+  /// No description provided for @autoChargeOnMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrança automática ligada.'**
+  String get autoChargeOnMessage;
+
+  /// No description provided for @autoChargeOffMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrança automática desligada.'**
+  String get autoChargeOffMessage;
+
+  /// No description provided for @dueDayChangedMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Dia de cobrança alterado.'**
+  String get dueDayChangedMessage;
+
+  /// No description provided for @chargedNowMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrança lançada.'**
+  String get chargedNowMessage;
+
+  /// No description provided for @paymentRecordedMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pagamento registrado.'**
+  String get paymentRecordedMessage;
 }
 
 class _AppLocalizationsDelegate

@@ -296,5 +296,15 @@
   "emailVerifyPromptTitle": "Confirm your email",
   "emailVerifyPromptLater": "Not now",
   "updateAvailableMessage": "A new version of Dindin is available.",
-  "updateAction": "Update"
+  "updateAction": "Update",
+  "removedExpense": "Expense removed.",
+  "removedIncome": "Income removed.",
+  "removedSubscription": "Subscription removed.",
+  "removedInstallment": "Installment purchase removed.",
+  "removedCategory": "Envelope removed.",
+  "autoChargeOnMessage": "Automatic billing turned on.",
+  "autoChargeOffMessage": "Automatic billing turned off.",
+  "dueDayChangedMessage": "Due day changed.",
+  "chargedNowMessage": "Charge posted.",
+  "paymentRecordedMessage": "Payment recorded."
 }

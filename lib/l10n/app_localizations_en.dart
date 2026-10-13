@@ -950,4 +950,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateAction => 'Update';
+
+  @override
+  String get removedExpense => 'Expense removed.';
+
+  @override
+  String get removedIncome => 'Income removed.';
+
+  @override
+  String get removedSubscription => 'Subscription removed.';
+
+  @override
+  String get removedInstallment => 'Installment purchase removed.';
+
+  @override
+  String get removedCategory => 'Envelope removed.';
+
+  @override
+  String get autoChargeOnMessage => 'Automatic billing turned on.';
+
+  @override
+  String get autoChargeOffMessage => 'Automatic billing turned off.';
+
+  @override
+  String get dueDayChangedMessage => 'Due day changed.';
+
+  @override
+  String get chargedNowMessage => 'Charge posted.';
+
+  @override
+  String get paymentRecordedMessage => 'Payment recorded.';
 }

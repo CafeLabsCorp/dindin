@@ -948,4 +948,34 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get updateAction => 'Atualizar';
+
+  @override
+  String get removedExpense => 'Gasto removido.';
+
+  @override
+  String get removedIncome => 'Receita removida.';
+
+  @override
+  String get removedSubscription => 'Assinatura removida.';
+
+  @override
+  String get removedInstallment => 'Parcelamento removido.';
+
+  @override
+  String get removedCategory => 'Caixinha removida.';
+
+  @override
+  String get autoChargeOnMessage => 'Cobrança automática ligada.';
+
+  @override
+  String get autoChargeOffMessage => 'Cobrança automática desligada.';
+
+  @override
+  String get dueDayChangedMessage => 'Dia de cobrança alterado.';
+
+  @override
+  String get chargedNowMessage => 'Cobrança lançada.';
+
+  @override
+  String get paymentRecordedMessage => 'Pagamento registrado.';
 }
