@@ -159,7 +159,7 @@
   "@pendingChargesWarning": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "pendingChargesRowLabel": "{count, plural, =1{1 cobrança pendente} other{{count} cobranças pendentes}}",
+  "pendingChargesRowLabel": "{count, plural, =1{1 cobrança pendente (saldo insuficiente)} other{{count} cobranças pendentes (saldo insuficiente)}}",
   "@pendingChargesRowLabel": {
     "placeholders": { "count": { "type": "int" } }
   },

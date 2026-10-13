@@ -388,8 +388,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count pending charges',
-      one: '1 pending charge',
+      other: '$count pending charges (insufficient balance)',
+      one: '1 pending charge (insufficient balance)',
     );
     return '$_temp0';
   }

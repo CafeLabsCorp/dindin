@@ -151,7 +151,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('3 cobranças pendentes'), findsOneWidget);
+    expect(find.text('3 cobranças pendentes (saldo insuficiente)'), findsOneWidget);
   });
 
   testWidgets('adicionar assinatura sem nome mostra o erro de nome obrigatório', (tester) async {

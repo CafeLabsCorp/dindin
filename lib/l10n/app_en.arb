@@ -127,7 +127,7 @@
   "installmentDueDayReset": "Back to the original day",
 
   "pendingChargesWarning": "{count, plural, =1{1 charge wasn't posted because the account balance didn't cover it. It goes through on its own once there's enough.} other{{count} charges weren't posted because the account balance didn't cover them. They go through on their own once there's enough.}}",
-  "pendingChargesRowLabel": "{count, plural, =1{1 pending charge} other{{count} pending charges}}",
+  "pendingChargesRowLabel": "{count, plural, =1{1 pending charge (insufficient balance)} other{{count} pending charges (insufficient balance)}}",
   "catchUpFailedWarning": "Couldn't process automatic charges right now. The app tries again next time you open it.",
   "recurringChargesPosted": "{count, plural, =1{1 charge just posted · {amount}} other{{count} charges just posted · {amount}}}",
   "generatedExpenseTooltip": "Posted automatically by a subscription or installment purchase",

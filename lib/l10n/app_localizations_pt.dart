@@ -386,8 +386,8 @@ class AppLocalizationsPt extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count cobranças pendentes',
-      one: '1 cobrança pendente',
+      other: '$count cobranças pendentes (saldo insuficiente)',
+      one: '1 cobrança pendente (saldo insuficiente)',
     );
     return '$_temp0';
   }

@@ -40,6 +40,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
   String? _deleteMessage;
 
   bool _verificationBusy = false;
+  bool _signingOut = false;
   String? _verificationMessage;
 
   @override
@@ -78,6 +79,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
       // Best-effort — see doc comment above.
     }
     if (mounted) setState(() {});
+  }
+
+  Future<void> _signOut() async {
+    setState(() => _signingOut = true);
+    try {
+      await ref.read(authServiceProvider).signOut();
+    } finally {
+      // On success the router leaves this page; only a failed sign-out stays.
+      if (mounted) setState(() => _signingOut = false);
+    }
   }
 
   Future<void> _resendVerificationEmail() async {
@@ -276,8 +287,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
               Text(user?.email ?? user?.displayName ?? '—'),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: () => ref.read(authServiceProvider).signOut(),
-                child: Text(l10n.signOutButton),
+                // Signing out takes a moment (Google + Firebase); without a
+                // sign of progress the pause reads as a failure.
+                onPressed: _signingOut ? null : _signOut,
+                child: _signingOut
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text(l10n.signOutButton),
               ),
             ],
           ),

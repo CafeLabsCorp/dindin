@@ -21,6 +21,20 @@ List<String> _type(String keys) {
 
 void main() {
   group('MoneyInputFormatter', () {
+    test('para de aceitar dígitos quando o valor passaria do teto do backend (R\$ 1 bilhão)', () {
+      final formatter = MoneyInputFormatter();
+      const limit = TextEditingValue(text: '1.000.000.000,00');
+      // 1.000.000.000,00 é o máximo; mais um dígito é recusado e o campo fica como estava.
+      final result = formatter.formatEditUpdate(limit, const TextEditingValue(text: '1.000.000.000,001'));
+      expect(result.text, '1.000.000.000,00');
+      // Um valor colado enorme também é recusado, sem estourar o parse.
+      final pasted = formatter.formatEditUpdate(
+        const TextEditingValue(text: '1,00'),
+        const TextEditingValue(text: '646464646446464646464646'),
+      );
+      expect(pasted.text, '1,00');
+    });
+
     test('digit-pushes cents in from the right, no separator typed', () {
       expect(_type('123'), ['0,01', '0,12', '1,23']);
     });

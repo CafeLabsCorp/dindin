@@ -743,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @pendingChargesRowLabel.
   ///
   /// In pt, this message translates to:
-  /// **'{count, plural, =1{1 cobrança pendente} other{{count} cobranças pendentes}}'**
+  /// **'{count, plural, =1{1 cobrança pendente (saldo insuficiente)} other{{count} cobranças pendentes (saldo insuficiente)}}'**
   String pendingChargesRowLabel(int count);
 
   /// No description provided for @catchUpFailedWarning.

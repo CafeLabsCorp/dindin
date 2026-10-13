@@ -14,6 +14,10 @@ import 'package:intl/intl.dart';
 /// — money in this app is always Reais, so its punctuation doesn't change
 /// with the interface language.
 class MoneyInputFormatter extends TextInputFormatter {
+  /// Largest amount a field accepts, in cents: R$ 1.000.000.000,00 — the same
+  /// ceiling `firestore.rules` enforces on every money amount.
+  static const maxAmountCents = 100000000000;
+
   static final _nonDigits = RegExp(r'[^0-9]');
   static final _grouped = NumberFormat.currency(
     locale: 'pt_BR',
@@ -30,6 +34,10 @@ class MoneyInputFormatter extends TextInputFormatter {
     if (digits.isEmpty) {
       return const TextEditingValue(text: '');
     }
+    // Refuses a digit that would push the value past what the backend accepts
+    // (`firestore.rules` caps an amount at R$ 1.000.000.000), instead of
+    // letting the user type R$ 64 bilhões and then be told "permission-denied".
+    if (digits.length > 12 || int.parse(digits) > maxAmountCents) return oldValue;
     final formatted = _grouped.format(int.parse(digits) / 100).trim();
     return TextEditingValue(
       text: formatted,
