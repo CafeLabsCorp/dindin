@@ -1363,7 +1363,7 @@ class FirestoreService {
       if (schedule.isSettled(purchase)) continue;
       for (final index in schedule.pendingInstallmentIndexes(purchase, today)) {
         final dueIso = schedule.isoDate(
-          schedule.installmentDueDate(purchase, index),
+          schedule.installmentDueDate(purchase, index, today: today),
         );
         // See [catchUpSubscriptions]: the amount actually billed, read fresh
         // inside the transaction (an early payoff can shrink the final one).

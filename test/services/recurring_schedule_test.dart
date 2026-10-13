@@ -52,7 +52,9 @@ void main() {
         dueDay: 20,
         createdAt: '2026-01-01',
       );
-      expect(pendingDueDates(sub, DateTime(2026, 1, 20)), [DateTime(2026, 1, 20)]);
+      expect(pendingDueDates(sub, DateTime(2026, 1, 20)), [
+        DateTime(2026, 1, 20),
+      ]);
     });
 
     test('lists every missed month oldest first when never charged', () {
@@ -79,7 +81,9 @@ void main() {
         createdAt: '2025-11-01',
         lastChargedDate: '2025-12-10',
       );
-      expect(pendingDueDates(sub, DateTime(2026, 1, 15)), [DateTime(2026, 1, 10)]);
+      expect(pendingDueDates(sub, DateTime(2026, 1, 15)), [
+        DateTime(2026, 1, 10),
+      ]);
     });
 
     test('is empty once the current month is already charged', () {
@@ -104,7 +108,9 @@ void main() {
         dueDay: 5,
         createdAt: '2026-01-20',
       );
-      expect(pendingDueDates(sub, DateTime(2026, 2, 10)), [DateTime(2026, 2, 5)]);
+      expect(pendingDueDates(sub, DateTime(2026, 2, 10)), [
+        DateTime(2026, 2, 5),
+      ]);
     });
 
     test('clamps a dueDay-31 subscription per month', () {
@@ -141,7 +147,11 @@ void main() {
       for (final total in [100.0, 999.99, 1234.56, 0.03]) {
         for (final n in [2, 3, 7, 12, 36]) {
           final sum = installmentAmounts(total, n).reduce((a, b) => a + b);
-          expect((sum - total).abs() < 0.005, isTrue, reason: '$total in ${n}x summed to $sum');
+          expect(
+            (sum - total).abs() < 0.005,
+            isTrue,
+            reason: '$total in ${n}x summed to $sum',
+          );
         }
       }
     });
@@ -181,20 +191,36 @@ void main() {
     );
 
     test('lists every installment already due, oldest first', () {
-      expect(pendingInstallmentIndexes(purchase(), DateTime(2026, 3, 15)), [0, 1, 2]);
+      expect(pendingInstallmentIndexes(purchase(), DateTime(2026, 3, 15)), [
+        0,
+        1,
+        2,
+      ]);
     });
 
     test('stops at installments not yet due', () {
-      expect(pendingInstallmentIndexes(purchase(), DateTime(2026, 2, 15)), [0, 1]);
+      expect(pendingInstallmentIndexes(purchase(), DateTime(2026, 2, 15)), [
+        0,
+        1,
+      ]);
     });
 
     test('resumes from chargedInstallments', () {
-      expect(pendingInstallmentIndexes(purchase(charged: 2), DateTime(2026, 3, 15)), [2]);
+      expect(
+        pendingInstallmentIndexes(purchase(charged: 2), DateTime(2026, 3, 15)),
+        [2],
+      );
     });
 
-    test('is empty once fully charged — never runs past the last installment', () {
-      expect(pendingInstallmentIndexes(purchase(charged: 3), DateTime(2027, 1, 1)), isEmpty);
-    });
+    test(
+      'is empty once fully charged — never runs past the last installment',
+      () {
+        expect(
+          pendingInstallmentIndexes(purchase(charged: 3), DateTime(2027, 1, 1)),
+          isEmpty,
+        );
+      },
+    );
   });
 
   group('amortização (pagar adiantado encurta o prazo)', () {
@@ -222,12 +248,20 @@ void main() {
       expect(outstandingAmount(purchase(charged: 3)), 700);
     });
 
-    test('pagar 300 a mais com 3 parcelas pagas deixa 400 e encurta o prazo', () {
-      final p = purchase(charged: 3, amortized: 300);
-      expect(outstandingAmount(p), 400);
-      // Faltavam 7 parcelas; com 400 devendo, sobram 4 de R$ 100.
-      expect(pendingInstallmentIndexes(p, DateTime(2027, 1, 1)), [3, 4, 5, 6]);
-    });
+    test(
+      'pagar 300 a mais com 3 parcelas pagas deixa 400 e encurta o prazo',
+      () {
+        final p = purchase(charged: 3, amortized: 300);
+        expect(outstandingAmount(p), 400);
+        // Faltavam 7 parcelas; com 400 devendo, sobram 4 de R$ 100.
+        expect(pendingInstallmentIndexes(p, DateTime(2027, 1, 1)), [
+          3,
+          4,
+          5,
+          6,
+        ]);
+      },
+    );
 
     test('a parcela continua em 100 — quem encurta é o prazo, não o valor', () {
       final p = purchase(charged: 3, amortized: 300);
@@ -282,24 +316,28 @@ void main() {
   });
 
   group('installmentDueDate com dueDayOverride', () {
-    InstallmentPurchase purchase({int charged = 0, int? override}) => InstallmentPurchase(
-      id: 'p1',
-      name: 'Notebook',
-      totalAmount: 1200,
-      installments: 12,
-      purchaseDate: '2026-01-01',
-      firstChargeDate: '2026-01-10',
-      createdAt: '2026-01-01',
-      chargedInstallments: charged,
-      dueDayOverride: override,
-    );
+    InstallmentPurchase purchase({int charged = 0, int? override}) =>
+        InstallmentPurchase(
+          id: 'p1',
+          name: 'Notebook',
+          totalAmount: 1200,
+          installments: 12,
+          purchaseDate: '2026-01-01',
+          firstChargeDate: '2026-01-10',
+          createdAt: '2026-01-01',
+          chargedInstallments: charged,
+          dueDayOverride: override,
+        );
 
     test('sem override, nada muda', () {
       expect(installmentDueDate(purchase(), 2), DateTime(2026, 3, 10));
     });
 
     test('move o dia das parcelas ainda não cobradas', () {
-      expect(installmentDueDate(purchase(override: 20), 2), DateTime(2026, 3, 20));
+      expect(
+        installmentDueDate(purchase(override: 20), 2),
+        DateTime(2026, 3, 20),
+      );
     });
 
     test('NÃO move o que já foi cobrado — o histórico fica como foi', () {
@@ -317,14 +355,26 @@ void main() {
       );
     });
 
-    test('dia 31 encolhe pro fim do mês curto, como em qualquer vencimento', () {
-      expect(installmentDueDate(purchase(override: 31), 1), DateTime(2026, 2, 28));
-    });
+    test(
+      'dia 31 encolhe pro fim do mês curto, como em qualquer vencimento',
+      () {
+        expect(
+          installmentDueDate(purchase(override: 31), 1),
+          DateTime(2026, 2, 28),
+        );
+      },
+    );
 
     test('o vencimento novo é o que a cobrança pendente passa a usar', () {
       // dia 10 já passou em 15/01, dia 20 ainda não: a parcela sai da fila.
       expect(pendingInstallmentIndexes(purchase(), DateTime(2026, 1, 15)), [0]);
-      expect(pendingInstallmentIndexes(purchase(override: 20), DateTime(2026, 1, 15)), isEmpty);
+      expect(
+        pendingInstallmentIndexes(
+          purchase(override: 20),
+          DateTime(2026, 1, 15),
+        ),
+        isEmpty,
+      );
     });
   });
 
@@ -339,7 +389,12 @@ void main() {
       createdAt: '2026-01-01',
       chargedInstallments: 2,
     );
-    Expense expense(String id, String date, String? description, {String? sourceId = 'p1'}) => Expense(
+    Expense expense(
+      String id,
+      String date,
+      String? description, {
+      String? sourceId = 'p1',
+    }) => Expense(
       id: id,
       date: date,
       amount: 100,
@@ -386,6 +441,64 @@ void main() {
       ]);
       expect(dates.containsKey(0), isFalse);
       expect(dates[1], '2026-02-11');
+    });
+  });
+
+  group('trocar o dia pra trás não cobra a parcela do mês na hora', () {
+    // Janeiro e fevereiro já cobrados; a próxima (março) cairia dia 10.
+    InstallmentPurchase purchase({int? override}) => InstallmentPurchase(
+      id: 'p1',
+      name: 'Notebook',
+      totalAmount: 1200,
+      installments: 12,
+      purchaseDate: '2026-01-01',
+      firstChargeDate: '2026-01-10',
+      createdAt: '2026-01-01',
+      chargedInstallments: 2,
+      dueDayOverride: override,
+    );
+    final today = DateTime(2026, 3, 5);
+
+    test(
+      'dia novo já passado neste mês: esta parcela mantém a data original',
+      () {
+        final p = purchase(
+          override: 3,
+        ); // dia 3 já passou (hoje é 5), o 10 ainda não
+        expect(installmentDueDate(p, 2, today: today), DateTime(2026, 3, 10));
+        expect(
+          pendingInstallmentIndexes(p, today),
+          isEmpty,
+          reason: 'nada é cobrado na hora',
+        );
+      },
+    );
+
+    test('o dia novo vale a partir da parcela seguinte', () {
+      final p = purchase(override: 3);
+      expect(installmentDueDate(p, 3, today: today), DateTime(2026, 4, 3));
+    });
+
+    test('dia novo ainda no futuro: vale já nesta parcela', () {
+      final p = purchase(override: 20);
+      expect(installmentDueDate(p, 2, today: today), DateTime(2026, 3, 20));
+    });
+
+    test(
+      'a parcela original já venceu e não foi cobrada: continua devida (não some)',
+      () {
+        final p = purchase(override: 3);
+        final later = DateTime(2026, 3, 12); // o dia 10 já passou
+        expect(installmentDueDate(p, 2, today: later), DateTime(2026, 3, 3));
+        expect(pendingInstallmentIndexes(p, later), [2]);
+      },
+    );
+
+    test('sem "today" o comportamento é o de sempre', () {
+      expect(
+        installmentDueDate(purchase(override: 3), 2),
+        DateTime(2026, 3, 3),
+      );
     });
   });
 }

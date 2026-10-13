@@ -98,11 +98,25 @@ List<double> installmentAmounts(double totalAmount, int installments) {
 /// occurrences that have NOT been billed yet. An installment already charged
 /// keeps the date it was actually scheduled for, so moving the due day never
 /// rewrites history, and the month sequence is untouched either way.
-DateTime installmentDueDate(InstallmentPurchase purchase, int index) {
+///
+/// When [today] is given, one more rule applies to the NEXT installment to
+/// bill: moving the due day BACKWARD past today must not make this month's
+/// installment instantly due. Say today is the 20th, the installment falls on
+/// the 24th, and the user moves the day to the 5th — the 5th already passed,
+/// so taken literally the next app open would bill it at once. The new day
+/// only takes effect from the following month; this one keeps its original
+/// date. Moving the day forward (or any change that leaves the date in the
+/// future) applies immediately, as chosen.
+DateTime installmentDueDate(InstallmentPurchase purchase, int index, {DateTime? today}) {
   final first = _parseIsoDate(purchase.firstChargeDate);
   final override = purchase.dueDayOverride;
-  final day = (override != null && index >= purchase.chargedInstallments) ? override : first.day;
-  return dueDateFor(first.year, first.month + index, day);
+  final overridden = override != null && index >= purchase.chargedInstallments;
+  final due = dueDateFor(first.year, first.month + index, overridden ? override : first.day);
+  if (overridden && today != null && index == purchase.chargedInstallments) {
+    final original = dueDateFor(first.year, first.month + index, first.day);
+    if (original.isAfter(today) && !due.isAfter(today)) return original;
+  }
+  return due;
 }
 
 /// Which day each installment was actually charged on, keyed by 0-based
@@ -216,7 +230,7 @@ double committedThisMonth(
     var outstanding = outstandingAmount(p);
     for (var i = p.chargedInstallments; i < p.installments; i++) {
       if (outstanding <= _eps) break;
-      final due = installmentDueDate(p, i);
+      final due = installmentDueDate(p, i, today: today);
       if (due.isAfter(monthEnd)) break;
       final amount = installmentChargeAmount(p, i, outstanding);
       if (inThisMonth(due)) total += amount;
@@ -239,7 +253,7 @@ List<int> pendingInstallmentIndexes(InstallmentPurchase purchase, DateTime today
   final indexes = <int>[];
   for (var i = purchase.chargedInstallments; i < purchase.installments; i++) {
     if (outstanding <= _eps) break; // settled early — the rest never bills
-    if (installmentDueDate(purchase, i).isAfter(today)) break;
+    if (installmentDueDate(purchase, i, today: today).isAfter(today)) break;
     indexes.add(i);
     outstanding = agg.round2(
       outstanding - installmentChargeAmount(purchase, i, outstanding),

@@ -610,7 +610,7 @@ class _InstallmentDetailsList extends ConsumerWidget {
               index: i + 1,
               amount: amounts[i],
               paid: i < purchase.chargedInstallments,
-              dueDate: schedule.installmentDueDate(purchase, i),
+              dueDate: schedule.installmentDueDate(purchase, i, today: ref.watch(todayProvider)),
               paidDate: paidDates[i],
             ),
         ],
