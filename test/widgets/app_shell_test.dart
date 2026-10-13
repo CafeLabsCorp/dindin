@@ -15,12 +15,25 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/providers/providers.dart';
+import 'package:dindin/services/app_update_service.dart';
 import 'package:dindin/services/auth_service.dart';
 import 'package:dindin/theme/theme.dart';
 import 'package:dindin/widgets/app_shell.dart';
 import 'package:dindin/widgets/page_header.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
+
+class _FakeUpdateService implements AppUpdateService {
+  _FakeUpdateService({required this.available});
+  final bool available;
+  int started = 0;
+
+  @override
+  Future<bool> isUpdateAvailable() async => available;
+
+  @override
+  Future<void> startUpdate() async => started++;
+}
 
 class _MockUser extends Mock implements User {}
 
@@ -282,6 +295,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Confirme seu e-mail'), findsNothing);
+    });
+  });
+
+  group('aviso de atualização disponível', () {
+    testWidgets('com versão nova na Play: snackbar com "Atualizar", que inicia a atualização', (tester) async {
+      final service = _FakeUpdateService(available: true);
+      await pump(tester, extraOverrides: [appUpdateServiceProvider.overrideWithValue(service)]);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Tem uma versão nova do Dindin disponível.'), findsOneWidget);
+      await tester.tap(find.text('Atualizar'));
+      await tester.pump();
+      expect(service.started, 1);
+      expect(find.text('page:Dashboard'), findsOneWidget, reason: 'não bloqueia o app');
+    });
+
+    testWidgets('sem versão nova: nada aparece', (tester) async {
+      final service = _FakeUpdateService(available: false);
+      await pump(tester, extraOverrides: [appUpdateServiceProvider.overrideWithValue(service)]);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Tem uma versão nova do Dindin disponível.'), findsNothing);
     });
   });
 }

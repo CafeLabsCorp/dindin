@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
+import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../theme/theme.dart';
@@ -63,7 +64,31 @@ class _AppShellState extends ConsumerState<AppShell> {
     super.initState();
     // Once per app open, after the first frame so there is a navigator to
     // show the dialog on.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybePromptEmailVerification());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybePromptEmailVerification();
+      _maybeOfferUpdate();
+    });
+  }
+
+  /// Tells the user a newer version is on Google Play. Dismissible and never
+  /// blocking: a snackbar with an "Atualizar" action, shown once per app open,
+  /// and silent whenever Play has nothing to say (see [AppUpdateService]).
+  Future<void> _maybeOfferUpdate() async {
+    final AppUpdateService service;
+    try {
+      service = ref.read(appUpdateServiceProvider);
+    } catch (_) {
+      return;
+    }
+    if (!await service.isUpdateAvailable() || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(l10n.updateAvailableMessage),
+        duration: const Duration(seconds: 12),
+        action: SnackBarAction(label: l10n.updateAction, onPressed: service.startUpdate),
+      ),
+    );
   }
 
   /// Reminds a password-account user that their e-mail is still unconfirmed.

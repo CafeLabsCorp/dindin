@@ -294,5 +294,7 @@
   "authUserDisabledError": "This account has been disabled.",
   "authGenericError": "Couldn't complete that. Please try again.",
   "emailVerifyPromptTitle": "Confirm your email",
-  "emailVerifyPromptLater": "Not now"
+  "emailVerifyPromptLater": "Not now",
+  "updateAvailableMessage": "A new version of Dindin is available.",
+  "updateAction": "Update"
 }

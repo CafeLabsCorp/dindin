@@ -944,4 +944,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emailVerifyPromptLater => 'Not now';
+
+  @override
+  String get updateAvailableMessage => 'A new version of Dindin is available.';
+
+  @override
+  String get updateAction => 'Update';
 }

@@ -1657,6 +1657,18 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Agora não'**
   String get emailVerifyPromptLater;
+
+  /// No description provided for @updateAvailableMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Tem uma versão nova do Dindin disponível.'**
+  String get updateAvailableMessage;
+
+  /// No description provided for @updateAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Atualizar'**
+  String get updateAction;
 }
 
 class _AppLocalizationsDelegate

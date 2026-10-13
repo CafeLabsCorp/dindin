@@ -406,5 +406,7 @@
   "authUserDisabledError": "Essa conta foi desativada.",
   "authGenericError": "Não foi possível concluir. Tente novamente.",
   "emailVerifyPromptTitle": "Confirme seu e-mail",
-  "emailVerifyPromptLater": "Agora não"
+  "emailVerifyPromptLater": "Agora não",
+  "updateAvailableMessage": "Tem uma versão nova do Dindin disponível.",
+  "updateAction": "Atualizar"
 }

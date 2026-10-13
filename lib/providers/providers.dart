@@ -12,11 +12,14 @@ import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
 import '../services/aggregation_service.dart';
 import '../services/analytics_service.dart';
+import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/import_export_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+
+final appUpdateServiceProvider = Provider<AppUpdateService>((ref) => const AppUpdateService());
 
 final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(authServiceProvider).authStateChanges;

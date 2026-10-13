@@ -941,4 +941,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get emailVerifyPromptLater => 'Agora não';
+
+  @override
+  String get updateAvailableMessage =>
+      'Tem uma versão nova do Dindin disponível.';
+
+  @override
+  String get updateAction => 'Atualizar';
 }
