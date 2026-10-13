@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
 import '../services/firestore_service.dart';
+import '../theme/theme.dart';
 import '../utils/format.dart';
 
 /// Every top-level destination, in the SAME order as the branches in
@@ -28,13 +30,65 @@ List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLo
 /// App-wide nav: a single menu behind the logo on narrow (mobile) screens, a
 /// side rail on wide (web/desktop) screens. The 720px breakpoint is the same
 /// one the responsive forms use — see §4 of FLUTTER_MIGRATION.md.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   const AppShell({super.key, required this.navigationShell});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  StatefulNavigationShell get navigationShell => widget.navigationShell;
+
+  /// Destinations visited before the current one, most recent last. The
+  /// system back button walks this instead of leaving the app: every top-level
+  /// destination is a sibling branch, so without it back has nothing to pop
+  /// and closes the app from any screen.
+  final List<int> _history = [];
+  bool _goingBack = false;
+
+  /// Per destination: has its list scrolled far enough that the page title
+  /// is out of sight? Tracked per branch because the IndexedStack keeps every
+  /// visited page (and its scroll position) alive.
+  final Map<int, bool> _titleHidden = {};
+
+  static const _titleHiddenOffset = 56.0;
+
+  @override
+  void didUpdateWidget(AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final from = oldWidget.navigationShell.currentIndex;
+    final to = navigationShell.currentIndex;
+    if (from == to) return;
+    if (_goingBack) {
+      _goingBack = false;
+    } else {
+      _history.remove(to);
+      _history.add(from);
+    }
+  }
+
+  void _goBack() {
+    if (_history.isEmpty) return;
+    final target = _history.removeLast();
+    _goingBack = true;
+    navigationShell.goBranch(target);
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
+    final hidden = n.metrics.pixels > _titleHiddenOffset;
+    final index = navigationShell.currentIndex;
+    if ((_titleHidden[index] ?? false) != hidden) {
+      setState(() => _titleHidden[index] = hidden);
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Fires recurring-charge catch-up (subscriptions + installment purchases)
     // once per signed-in session — see recurringChargesCatchUpProvider.
     // Watched (not read) so it re-runs if the user signs out and back in as
@@ -112,13 +166,38 @@ class AppShell extends ConsumerWidget {
     // the same word twice, one line apart. Instead of dropping one of them,
     // the page title took the app bar's job: PageHeader grows a chevron and
     // opens this menu. One name on screen, and what you tap is what you read.
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: AppNavigation(
-            openMenu: () => _openMenu(context, destinations),
-            child: navigationShell,
+    void openMenu() => _openMenu(context, destinations);
+    final titleHidden = _titleHidden[navigationShell.currentIndex] ?? false;
+    return PopScope(
+      // On web the browser owns back; on Android, back leaves the app only
+      // once there is nowhere earlier in the app to go.
+      canPop: kIsWeb || _history.isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _onScroll,
+                  child: AppNavigation(openMenu: openMenu, child: navigationShell),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _StickyTitle(
+                  visible: titleHidden,
+                  label: destinations[navigationShell.currentIndex].label,
+                  menuLabel: l10n.navMenu,
+                  onOpenMenu: openMenu,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -214,4 +293,68 @@ class AppNavigation extends InheritedWidget {
   @override
   bool updateShouldNotify(AppNavigation oldWidget) =>
       (openMenu == null) != (oldWidget.openMenu == null);
+}
+
+/// Compact copy of the page title that slides in once the real one has
+/// scrolled away, so the menu is always one tap from wherever the list is.
+class _StickyTitle extends StatelessWidget {
+  final bool visible;
+  final String label;
+  final String menuLabel;
+  final VoidCallback onOpenMenu;
+
+  const _StickyTitle({
+    required this.visible,
+    required this.label,
+    required this.menuLabel,
+    required this.onOpenMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, -0.6), end: Offset.zero).animate(animation),
+          child: child,
+        ),
+      ),
+      // Not built at all while hidden, so the title never shows up twice in
+      // the tree (or for a screen reader) while the real one is on screen.
+      child: !visible
+          ? const SizedBox.shrink()
+          : Material(
+              key: const ValueKey('sticky-title'),
+              color: theme.scaffoldBackgroundColor,
+              elevation: 1,
+              child: InkWell(
+                onTap: onOpenMenu,
+                child: Semantics(
+                  button: true,
+                  label: menuLabel,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.expand_more, size: 24, color: context.tokens.subtle),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
 }

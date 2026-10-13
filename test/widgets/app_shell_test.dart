@@ -32,6 +32,8 @@ void main() {
               menuLabel: 'Menu',
             ),
             Text('page:$title'),
+            // Long enough to scroll, for the sticky-title test.
+            const SizedBox(height: 1500),
           ],
         ),
       ),
@@ -170,5 +172,42 @@ void main() {
       findsNothing,
       reason: 'com o rail visível, um menu no título seria redundante',
     );
+  });
+
+  Future<void> goTo(WidgetTester tester, String label) async {
+    await tester.tap(find.byTooltip('Menu').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, label));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('o botão voltar do sistema volta pra tela anterior, e só sai do app no começo', (tester) async {
+    await pump(tester);
+    await goTo(tester, 'Gastos');
+    await goTo(tester, 'Ajustes');
+    expect(find.text('page:Ajustes'), findsOneWidget);
+
+    // Back #1: Ajustes -> Gastos (a tela de onde veio, não o Dashboard).
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('page:Gastos'), findsOneWidget);
+
+    // Back #2: Gastos -> Dashboard.
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('page:Dashboard'), findsOneWidget);
+  });
+
+  testWidgets('rolando a lista, um título compacto aparece e abre o menu', (tester) async {
+    await pump(tester);
+    expect(find.byKey(const ValueKey('sticky-title')), findsNothing);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('sticky-title')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('sticky-title')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ListTile), findsNWidgets(7));
   });
 }
