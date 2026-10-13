@@ -156,4 +156,61 @@ void main() {
       expect(find.textContaining('Erro'), findsNothing);
     },
   );
+
+  testWidgets('a senha pode ser mostrada e ocultada pelo olho', (tester) async {
+    await pumpLoginPage(tester, _MockAuthService());
+
+    EditableText field() => tester.widget<EditableText>(
+      find.descendant(of: find.widgetWithText(TextFormField, 'Senha'), matching: find.byType(EditableText)),
+    );
+    expect(field().obscureText, isTrue);
+
+    await tester.tap(find.byTooltip('Mostrar senha'));
+    await tester.pump();
+    expect(field().obscureText, isFalse);
+
+    await tester.tap(find.byTooltip('Ocultar senha'));
+    await tester.pump();
+    expect(field().obscureText, isTrue);
+  });
+
+  testWidgets('o cadastro pede a senha duas vezes e só segue se baterem', (tester) async {
+    final authService = _MockAuthService();
+    await pumpLoginPage(tester, authService);
+
+    // Entrar não tem confirmação.
+    expect(find.text('Confirmar senha'), findsNothing);
+
+    await tester.tap(find.text('Criar uma conta'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirmar senha'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'E-mail'), 'a@b.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Senha'), 'abc123');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Confirmar senha'), 'abc124');
+    await tester.tap(find.widgetWithText(FilledButton, 'Criar conta'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('As senhas não conferem'), findsOneWidget);
+    verifyNever(() => authService.registerWithEmail(any(), any()));
+  });
+
+  testWidgets('erro do Firebase Auth aparece em português, não em inglês cru', (tester) async {
+    final authService = _MockAuthService();
+    when(() => authService.signInWithEmail(any(), any())).thenThrow(
+      FirebaseAuthException(
+        code: 'invalid-credential',
+        message: 'The supplied auth credential is incorrect, malformed or has expired.',
+      ),
+    );
+    await pumpLoginPage(tester, authService);
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'E-mail'), 'a@b.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Senha'), 'abc123');
+    await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('E-mail ou senha incorretos.'), findsOneWidget);
+    expect(find.textContaining('supplied auth credential'), findsNothing);
+  });
 }

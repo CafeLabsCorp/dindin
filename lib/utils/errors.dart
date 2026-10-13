@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 
 import '../l10n/app_localizations.dart';
@@ -50,3 +51,27 @@ String friendlyErrorMessage(AppLocalizations l10n, Object error) {
 /// instead of leaving the user stuck on a form for a row that no longer
 /// exists, without blocking the rest of the feature on it.
 bool isGoneError(Object error) => error.toString().contains('not found');
+
+/// Maps a Firebase Auth failure on the login/register form to a localized
+/// sentence. Auth used to pass `e.message` straight to the screen, so an
+/// otherwise Portuguese app showed things like "The supplied auth credential
+/// is incorrect, malformed or has expired."
+///
+/// Wrong e-mail and wrong password deliberately share one message
+/// (`invalid-credential` and its older aliases): telling them apart would let
+/// anyone probe which e-mails have an account.
+String friendlyAuthErrorMessage(AppLocalizations l10n, FirebaseAuthException error) {
+  return switch (error.code) {
+    'invalid-credential' ||
+    'invalid-login-credentials' ||
+    'wrong-password' ||
+    'user-not-found' => l10n.authInvalidCredentialError,
+    'email-already-in-use' => l10n.authEmailInUseError,
+    'invalid-email' => l10n.authInvalidEmailError,
+    'weak-password' => l10n.authWeakPasswordError,
+    'too-many-requests' => l10n.authTooManyRequestsError,
+    'network-request-failed' => l10n.authNetworkError,
+    'user-disabled' => l10n.authUserDisabledError,
+    _ => l10n.authGenericError,
+  };
+}

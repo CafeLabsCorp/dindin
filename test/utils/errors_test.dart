@@ -8,6 +8,7 @@
 // (mirrors `categoriaLabel`-style helpers) rather than a `BuildContext`, so
 // it stays testable here without pumping a widget — `AppLocalizationsPt()`
 // is constructed directly, matching the app's PT-first default.
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +16,7 @@ import 'package:dindin/l10n/app_localizations_pt.dart';
 import 'package:dindin/utils/errors.dart';
 
 void main() {
+  authErrorTests();
   final l10n = AppLocalizationsPt();
 
   group('friendlyErrorMessage', () {
@@ -129,6 +131,36 @@ void main() {
     test('false for an unrelated error', () {
       expect(isGoneError(StateError('amount exceeds available balance')), isFalse);
       expect(isGoneError(StateError('settle the debt first')), isFalse);
+    });
+  });
+}
+
+void authErrorTests() {
+  group('friendlyAuthErrorMessage', () {
+    final l10n = AppLocalizationsPt();
+    String msg(String code) => friendlyAuthErrorMessage(l10n, FirebaseAuthException(code: code));
+
+    test('credencial errada (e aliases antigos) cai numa mensagem só, sem revelar se o e-mail existe', () {
+      for (final code in ['invalid-credential', 'invalid-login-credentials', 'wrong-password', 'user-not-found']) {
+        expect(msg(code), 'E-mail ou senha incorretos.', reason: code);
+      }
+    });
+
+    test('os demais códigos conhecidos viram frases em português', () {
+      expect(msg('email-already-in-use'), contains('Já existe uma conta'));
+      expect(msg('invalid-email'), contains('não parece válido'));
+      expect(msg('weak-password'), contains('Senha fraca'));
+      expect(msg('too-many-requests'), contains('Muitas tentativas'));
+      expect(msg('network-request-failed'), contains('Sem conexão'));
+      expect(msg('user-disabled'), contains('desativada'));
+    });
+
+    test('código desconhecido nunca vaza inglês cru', () {
+      final text = friendlyAuthErrorMessage(
+        l10n,
+        FirebaseAuthException(code: 'something-new', message: 'The supplied auth credential is incorrect'),
+      );
+      expect(text, 'Não foi possível concluir. Tente novamente.');
     });
   });
 }

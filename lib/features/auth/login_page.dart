@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../providers/providers.dart';
+import '../../utils/errors.dart';
 import '../../widgets/app_card.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -22,6 +23,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _showPassword = false;
   bool _isRegister = false;
   bool _loading = false;
   // Which button started the request, so only that one shows the spinner.
@@ -32,6 +35,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -48,7 +52,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           : await auth.signInWithEmail(_emailController.text.trim(), _passwordController.text);
       _logAccountCreatedIfNew(credential);
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? e.code);
+      if (!mounted) return;
+      setState(() => _error = friendlyAuthErrorMessage(AppLocalizations.of(context)!, e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -156,10 +161,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(labelText: l10n.passwordLabel),
+                          obscureText: !_showPassword,
+                          decoration: InputDecoration(
+                            labelText: l10n.passwordLabel,
+                            suffixIcon: IconButton(
+                              tooltip: _showPassword ? l10n.hidePasswordTooltip : l10n.showPasswordTooltip,
+                              icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                              onPressed: () => setState(() => _showPassword = !_showPassword),
+                            ),
+                          ),
                           validator: (v) => (v == null || v.length < 6) ? l10n.passwordMinLengthError : null,
                         ),
+                        if (_isRegister) ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _confirmController,
+                            obscureText: !_showPassword,
+                            decoration: InputDecoration(labelText: l10n.passwordConfirmLabel),
+                            validator: (v) => v != _passwordController.text ? l10n.passwordMismatchError : null,
+                          ),
+                        ],
                         if (_error != null) ...[
                           const SizedBox(height: 12),
                           Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
@@ -173,7 +194,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                         const SizedBox(height: 8),
                         TextButton(
-                          onPressed: _loading ? null : () => setState(() => _isRegister = !_isRegister),
+                          onPressed: _loading
+                              ? null
+                              : () => setState(() {
+                                  _isRegister = !_isRegister;
+                                  _confirmController.clear();
+                                  _error = null;
+                                }),
                           child: Text(_isRegister ? l10n.haveAccountToggle : l10n.createAccountToggle),
                         ),
                         const Divider(height: 32),
