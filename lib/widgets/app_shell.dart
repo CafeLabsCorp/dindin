@@ -346,7 +346,8 @@ class _StickyTitle extends StatelessWidget {
                           child: Text(
                             label,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            // Same serif as the page title it stands in for, a touch smaller.
+                            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, fontSize: 19),
                           ),
                         ),
                         const SizedBox(width: 4),
