@@ -67,278 +67,316 @@ class DashboardPage extends ConsumerWidget {
         .toList();
     final canTransfer = categories.length >= 2 && eligibleOrigins.isNotEmpty;
 
-    return ListView(
-      children: [
-        PageHeader(
-          title: l10n.dashboardTitle,
-          subtitle: l10n.dashboardSubtitle,
-          onOpenMenu: AppNavigation.of(context)?.openMenu,
-          menuLabel: l10n.navMenu,
-        ),
-        const SizedBox(height: 24),
-        StatTile(
-          label: l10n.totalBalanceLabel,
-          value: formatCurrency(summary.total),
-        ),
-        const SizedBox(height: 16),
-        AppCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.accountLabel,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: context.tokens.muted,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatCurrency(summary.accountBalance),
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      l10n.accountBalanceDescription,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.tokens.subtle,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.tonal(
-                onPressed: categories.isEmpty || summary.accountBalance <= 0
-                    ? null
-                    : () => _showAllocateDialog(
-                        context,
-                        ref,
-                        categories,
-                        summary.accountBalance,
-                      ),
-                child: Text(l10n.allocateButton),
-              ),
-            ],
+    // Pull down to run the recurring-charge catch-up again. It otherwise only
+    // runs once per app open, so a subscription or installment that fell due
+    // while the app stayed open would not show up until a restart. The shell
+    // listens to that provider, so the "N charges posted" snackbar still
+    // appears if anything was charged.
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(recurringChargesCatchUpProvider);
+        try {
+          await ref.read(recurringChargesCatchUpProvider.future);
+        } catch (_) {
+          // Already logged by the provider; the indicator just stops.
+        }
+      },
+      child: ListView(
+        // Always scrollable, so the gesture works even when the content fits.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          PageHeader(
+            title: l10n.dashboardTitle,
+            subtitle: l10n.dashboardSubtitle,
+            onOpenMenu: AppNavigation.of(context)?.openMenu,
+            menuLabel: l10n.navMenu,
           ),
-        ),
-        const SizedBox(height: 16),
-        Builder(
-          builder: (context) {
-            // The 3 month tiles sit BESIDE the caixinhas card as a narrow
-            // left sidebar on a wide/web layout (bug fix: they used to stack
-            // above it as a full-width row, unrelated visually to the list
-            // right below); on a narrow/mobile layout there's no room for a
-            // sidebar, so they stay stacked above it, full width, like
-            // before.
-            final tiles = [
-              StatTile(
-                label: l10n.receivedThisMonthLabel,
-                value: formatCurrency(summary.currentMonth.totalIncome),
-              ),
-              StatTile(
-                label: l10n.spentThisMonthLabel,
-                value: formatCurrency(summary.currentMonth.totalExpense),
-              ),
-              StatTile(
-                label: l10n.monthBalanceLabel,
-                value: formatCurrency(summary.currentMonth.net),
-                color: netColor,
-              ),
-            ];
-            final caixinhasCard = AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(height: 24),
+          StatTile(
+            label: l10n.totalBalanceLabel,
+            value: formatCurrency(summary.total),
+          ),
+          const SizedBox(height: 16),
+          AppCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.caixinhasTitle,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        l10n.accountLabel,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: context.tokens.muted,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
-                      FilledButton(
-                        onPressed: canTransfer
-                            ? () => _showTransferDialog(
-                                context,
-                                ref,
-                                categories,
-                                eligibleOrigins,
-                                summary.balancesByCategory,
-                              )
-                            : null,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.tertiaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onTertiaryContainer,
+                      const SizedBox(height: 4),
+                      Text(
+                        formatCurrency(summary.accountBalance),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.accountBalanceDescription,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.tokens.subtle,
                         ),
-                        child: Text(l10n.transferButton),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  if (caixinhas.isEmpty)
-                    EmptyState(l10n.caixinhasEmptyState)
-                  else
-                    for (var i = 0; i < caixinhas.length; i++)
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          border: i > 0
-                              ? Border(
-                                  top: BorderSide(color: context.tokens.border),
+                ),
+                FilledButton.tonal(
+                  onPressed: categories.isEmpty || summary.accountBalance <= 0
+                      ? null
+                      : () => _showAllocateDialog(
+                          context,
+                          ref,
+                          categories,
+                          summary.accountBalance,
+                        ),
+                  child: Text(l10n.allocateButton),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Builder(
+            builder: (context) {
+              // The 3 month tiles sit BESIDE the caixinhas card as a narrow
+              // left sidebar on a wide/web layout (bug fix: they used to stack
+              // above it as a full-width row, unrelated visually to the list
+              // right below); on a narrow/mobile layout there's no room for a
+              // sidebar, so they stay stacked above it, full width, like
+              // before.
+              final tiles = [
+                StatTile(
+                  label: l10n.receivedThisMonthLabel,
+                  value: formatCurrency(summary.currentMonth.totalIncome),
+                ),
+                StatTile(
+                  label: l10n.spentThisMonthLabel,
+                  value: formatCurrency(summary.currentMonth.totalExpense),
+                ),
+                StatTile(
+                  label: l10n.monthBalanceLabel,
+                  value: formatCurrency(summary.currentMonth.net),
+                  color: netColor,
+                ),
+              ];
+              final caixinhasCard = AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          l10n.caixinhasTitle,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        FilledButton(
+                          onPressed: canTransfer
+                              ? () => _showTransferDialog(
+                                  context,
+                                  ref,
+                                  categories,
+                                  eligibleOrigins,
+                                  summary.balancesByCategory,
                                 )
                               : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
+                          ),
+                          child: Text(l10n.transferButton),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Wrap(
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    spacing: 6,
-                                    children: [
-                                      CaixinhaColorDot(
-                                        color: caixinhaPaletteColor(
-                                          caixinhas[i].colorIndex,
-                                          dark: dark,
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (caixinhas.isEmpty)
+                      EmptyState(l10n.caixinhasEmptyState)
+                    else
+                      for (var i = 0; i < caixinhas.length; i++)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            border: i > 0
+                                ? Border(
+                                    top: BorderSide(
+                                      color: context.tokens.border,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Wrap(
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      spacing: 6,
+                                      children: [
+                                        CaixinhaColorDot(
+                                          color: caixinhaPaletteColor(
+                                            caixinhas[i].colorIndex,
+                                            dark: dark,
+                                          ),
+                                          label: caixinhas[i].name,
+                                          labelStyle: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 14,
+                                          ),
                                         ),
-                                        label: caixinhas[i].name,
-                                        labelStyle: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 14,
+                                        Text(
+                                          l10n.sinceDatePrefix(
+                                            formatDate(caixinhas[i].createdAt),
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: context.tokens.subtle,
+                                          ),
                                         ),
-                                      ),
-                                      Text(
-                                        l10n.sinceDatePrefix(
-                                          formatDate(caixinhas[i].createdAt),
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: context.tokens.subtle,
-                                        ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  formatCurrency(caixinhas[i].value),
-                                  style: TextStyle(
-                                    color: caixinhas[i].value < 0
-                                        ? context.tokens.statusCritical
-                                        : context.tokens.muted,
-                                    fontWeight: caixinhas[i].value < 0
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (caixinhas[i].kind == CategoryKind.save &&
-                                caixinhas[i].goalAmount != null) ...[
-                              const SizedBox(height: 8),
-                              CaixinhaGoalBar(
-                                saved: caixinhas[i].hasMonthlyGoal
-                                    ? caixinhas[i].savedThisMonth
-                                    : caixinhas[i].value,
-                                goal: caixinhas[i].goalAmount!,
-                                monthly: caixinhas[i].hasMonthlyGoal,
-                              ),
-                              // The monthly bar's "saved" figure is NOT the
-                              // caixinha's running total — that total is what
-                              // this feature promises to keep showing (it never
-                              // resets). The number at the top-right of this row
-                              // already IS that total, but it's quiet gray text
-                              // next to a now-bold, colored monthly bar; a
-                              // one-line explicit caption removes any doubt about
-                              // which number is which.
-                              if (caixinhas[i].hasMonthlyGoal) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  l10n.caixinhaMonthlyGoalTotalCaption(
+                                  Text(
                                     formatCurrency(caixinhas[i].value),
+                                    style: TextStyle(
+                                      color: caixinhas[i].value < 0
+                                          ? context.tokens.statusCritical
+                                          : context.tokens.muted,
+                                      fontWeight: caixinhas[i].value < 0
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
                                   ),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.tokens.subtle,
-                                  ),
-                                ),
-                              ],
-                            ] else if (caixinhas[i].kind ==
-                                CategoryKind.save) ...[
-                              const SizedBox(height: 4),
-                              CaixinhaSavedThisMonth(
-                                savedThisMonth: caixinhas[i].savedThisMonth,
+                                ],
                               ),
-                            ] else ...[
-                              // Spend caixinha: budget bar (month vs. limit) and
-                              // debt indicator (all-time balance) are independent
-                              // facts and can both show at once — see the
-                              // Categorias list for the same pairing.
-                              if (caixinhas[i].monthlyBudget != null) ...[
+                              if (caixinhas[i].kind == CategoryKind.save &&
+                                  caixinhas[i].goalAmount != null) ...[
                                 const SizedBox(height: 8),
-                                CaixinhaBudgetBar(
-                                  spent: caixinhas[i].spentThisMonth,
-                                  limit: caixinhas[i].monthlyBudget!,
+                                CaixinhaGoalBar(
+                                  saved: caixinhas[i].hasMonthlyGoal
+                                      ? caixinhas[i].savedThisMonth
+                                      : caixinhas[i].value,
+                                  goal: caixinhas[i].goalAmount!,
+                                  monthly: caixinhas[i].hasMonthlyGoal,
                                 ),
-                              ],
-                              if (caixinhas[i].value < 0) ...[
+                                // The monthly bar's "saved" figure is NOT the
+                                // caixinha's running total — that total is what
+                                // this feature promises to keep showing (it never
+                                // resets). The number at the top-right of this row
+                                // already IS that total, but it's quiet gray text
+                                // next to a now-bold, colored monthly bar; a
+                                // one-line explicit caption removes any doubt about
+                                // which number is which.
+                                if (caixinhas[i].hasMonthlyGoal) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    l10n.caixinhaMonthlyGoalTotalCaption(
+                                      formatCurrency(caixinhas[i].value),
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: context.tokens.subtle,
+                                    ),
+                                  ),
+                                ],
+                              ] else if (caixinhas[i].kind ==
+                                  CategoryKind.save) ...[
                                 const SizedBox(height: 4),
-                                CaixinhaDebtIndicator(
-                                  balance: caixinhas[i].value,
+                                CaixinhaSavedThisMonth(
+                                  savedThisMonth: caixinhas[i].savedThisMonth,
                                 ),
+                              ] else ...[
+                                // Spend caixinha: budget bar (month vs. limit) and
+                                // debt indicator (all-time balance) are independent
+                                // facts and can both show at once — see the
+                                // Categorias list for the same pairing.
+                                if (caixinhas[i].monthlyBudget != null) ...[
+                                  const SizedBox(height: 8),
+                                  CaixinhaBudgetBar(
+                                    spent: caixinhas[i].spentThisMonth,
+                                    limit: caixinhas[i].monthlyBudget!,
+                                  ),
+                                ],
+                                if (caixinhas[i].value < 0) ...[
+                                  const SizedBox(height: 4),
+                                  CaixinhaDebtIndicator(
+                                    balance: caixinhas[i].value,
+                                  ),
+                                ],
                               ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                ],
-              ),
-            );
+                  ],
+                ),
+              );
 
-            // Wide/web: a narrow sidebar of stacked tiles beside the
-            // caixinhas card. Narrow/mobile: no room for a sidebar, so the
-            // tiles go back to stacking above the card, same as before.
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 760) {
-                  final tilesWide = constraints.maxWidth >= 560;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (tilesWide)
-                        Row(
-                          children: [
-                            for (final t in tiles)
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
+              // Wide/web: a narrow sidebar of stacked tiles beside the
+              // caixinhas card. Narrow/mobile: no room for a sidebar, so the
+              // tiles go back to stacking above the card, same as before.
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 760) {
+                    final tilesWide = constraints.maxWidth >= 560;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (tilesWide)
+                          Row(
+                            children: [
+                              for (final t in tiles)
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    child: t,
                                   ),
-                                  child: t,
                                 ),
-                              ),
-                          ],
-                        )
-                      else
-                        Column(
+                            ],
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final t in tiles) ...[
+                                t,
+                                const SizedBox(height: 12),
+                              ],
+                            ],
+                          ),
+                        const SizedBox(height: 24),
+                        caixinhasCard,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 220,
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             for (final t in tiles) ...[
@@ -347,57 +385,39 @@ class DashboardPage extends ConsumerWidget {
                             ],
                           ],
                         ),
-                      const SizedBox(height: 24),
-                      caixinhasCard,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(child: caixinhasCard),
                     ],
                   );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 220,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final t in tiles) ...[
-                            t,
-                            const SizedBox(height: 12),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(child: caixinhasCard),
-                  ],
-                );
-              },
-            );
-          },
-        ),
-        const SizedBox(height: 24),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.historyTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              if (summary.history.isEmpty)
-                EmptyState(l10n.historyEmptyState)
-              else
-                SizedBox(
-                  height: 280,
-                  child: _HistoryChart(history: summary.history),
-                ),
-            ],
+                },
+              );
+            },
           ),
-        ),
-      ],
+          const SizedBox(height: 24),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.historyTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 16),
+                if (summary.history.isEmpty)
+                  EmptyState(l10n.historyEmptyState)
+                else
+                  SizedBox(
+                    height: 280,
+                    child: _HistoryChart(history: summary.history),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
