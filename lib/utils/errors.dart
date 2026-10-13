@@ -36,7 +36,10 @@ String friendlyErrorMessage(AppLocalizations l10n, Object error) {
   if (message.contains('cannot be negative') || message.contains('must be positive')) {
     return l10n.invalidAmountError;
   }
-  // An unrecognized Firebase failure (rules denial, quota, network...) keeps
+  if (isNetworkError(error)) {
+    return l10n.errorNetwork;
+  }
+  // An unrecognized Firebase failure (rules denial, quota...) keeps
   // its short code on screen: the generic text alone made one user's failed
   // save impossible to diagnose from a screenshot.
   if (error is FirebaseException && error.code.isNotEmpty) {
@@ -75,3 +78,22 @@ String friendlyAuthErrorMessage(AppLocalizations l10n, FirebaseAuthException err
     _ => l10n.authGenericError,
   };
 }
+
+/// Whether [error] is a connectivity problem (offline, unreachable server,
+/// timeout) rather than something about the data. Writes here are Firestore
+/// transactions, which need the network, so this is what a save attempted
+/// offline fails with.
+bool isNetworkError(Object error) {
+  final code = switch (error) {
+    // FirebaseAuthException is a FirebaseException too.
+    FirebaseException(:final code) => code,
+    _ => null,
+  };
+  return code == 'unavailable' || code == 'network-request-failed' || code == 'deadline-exceeded';
+}
+
+/// Message for a list/screen that failed to LOAD (as opposed to a save): the
+/// connectivity sentence when that is the cause, otherwise a plain "couldn't
+/// load" — never the raw exception text.
+String friendlyLoadErrorMessage(AppLocalizations l10n, Object error) =>
+    isNetworkError(error) ? l10n.errorNetwork : l10n.loadErrorMessage;

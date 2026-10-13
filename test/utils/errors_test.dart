@@ -94,6 +94,18 @@ void main() {
       );
     });
 
+    test('connectivity failures (offline, unreachable, timeout) say so in plain words', () {
+      for (final code in ['unavailable', 'deadline-exceeded', 'network-request-failed']) {
+        expect(
+          friendlyErrorMessage(l10n, FirebaseException(plugin: 'cloud_firestore', code: code)),
+          'Sem conexão com a internet. Verifique e tente de novo.',
+          reason: code,
+        );
+      }
+      expect(isNetworkError(FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied')), isFalse);
+      expect(isNetworkError(StateError('x')), isFalse);
+    });
+
     test('keeps the code of an unrecognized Firebase error visible', () {
       expect(
         friendlyErrorMessage(l10n, FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied')),
