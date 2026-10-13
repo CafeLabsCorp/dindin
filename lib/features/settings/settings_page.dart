@@ -10,6 +10,7 @@ import '../../widgets/app_shell.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
+import '../../utils/errors.dart';
 import '../../widgets/app_card.dart';
 
 /// dindin-landing's legal pages — no locale prefix needed, its middleware
@@ -94,6 +95,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
       setState(() {
         _verificationMessage = e.code == 'too-many-requests'
             ? l10n.verificationEmailRateLimitedMessage
+            : isNetworkError(e)
+            ? l10n.errorNetwork
             : l10n.verificationEmailErrorMessage(e.message ?? e.code);
       });
     } catch (e) {
@@ -116,7 +119,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
       setState(() => _message = l10n.exportSuccessMessage);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _message = l10n.exportErrorMessage(e.toString()));
+      setState(() => _message = isNetworkError(e) ? l10n.errorNetwork : l10n.exportErrorMessage(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -153,7 +156,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
       setState(() => _message = l10n.importSuccessMessage);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _message = l10n.importErrorMessage(e.toString()));
+      // A malformed backup keeps its detail (useful to see what is wrong with
+      // the file); a connectivity failure just says so.
+      setState(() => _message = isNetworkError(e) ? l10n.errorNetwork : l10n.importErrorMessage(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
