@@ -329,8 +329,10 @@ class _StickyTitle extends StatelessWidget {
           ? const SizedBox.shrink()
           : Material(
               key: const ValueKey('sticky-title'),
+              // No elevation: its shadow also draws ABOVE the bar, as a faint
+              // line against the status bar. A hairline underneath instead.
               color: theme.scaffoldBackgroundColor,
-              elevation: 1,
+              shape: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.5))),
               child: InkWell(
                 onTap: onOpenMenu,
                 child: Semantics(
