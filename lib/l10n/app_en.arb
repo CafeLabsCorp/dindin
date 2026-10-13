@@ -268,5 +268,17 @@
 
   "incomeSourceEstagio": "Internship",
   "incomeSourceFreela": "Freelance",
-  "incomeSourceOutro": "Other"
+  "incomeSourceOutro": "Other",
+
+  "signingInWithGoogle": "Signing in…",
+  "savedExpense": "Expense saved.",
+  "savedIncome": "Income saved.",
+  "savedEdit": "Changes saved.",
+  "savedSubscription": "Subscription created.",
+  "savedInstallment": "Installment purchase created.",
+  "savedCategory": "Envelope saved.",
+  "savedAllocation": "Amount allocated.",
+  "savedTransfer": "Transfer done.",
+  "errorGenericSaveCode": "Couldn't save (error: {code}). Please try again.",
+  "@errorGenericSaveCode": {"placeholders": {"code": {"type": "String"}}}
 }

@@ -863,4 +863,36 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get incomeSourceOutro => 'Outro';
+
+  @override
+  String get signingInWithGoogle => 'Entrando…';
+
+  @override
+  String get savedExpense => 'Gasto lançado.';
+
+  @override
+  String get savedIncome => 'Receita registrada.';
+
+  @override
+  String get savedEdit => 'Alterações salvas.';
+
+  @override
+  String get savedSubscription => 'Assinatura criada.';
+
+  @override
+  String get savedInstallment => 'Parcelamento criado.';
+
+  @override
+  String get savedCategory => 'Caixinha salva.';
+
+  @override
+  String get savedAllocation => 'Valor alocado.';
+
+  @override
+  String get savedTransfer => 'Transferência feita.';
+
+  @override
+  String errorGenericSaveCode(String code) {
+    return 'Não foi possível salvar (erro: $code). Tente novamente.';
+  }
 }

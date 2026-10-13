@@ -380,5 +380,17 @@
 
   "incomeSourceEstagio": "Estágio",
   "incomeSourceFreela": "Freela",
-  "incomeSourceOutro": "Outro"
+  "incomeSourceOutro": "Outro",
+
+  "signingInWithGoogle": "Entrando…",
+  "savedExpense": "Gasto lançado.",
+  "savedIncome": "Receita registrada.",
+  "savedEdit": "Alterações salvas.",
+  "savedSubscription": "Assinatura criada.",
+  "savedInstallment": "Parcelamento criado.",
+  "savedCategory": "Caixinha salva.",
+  "savedAllocation": "Valor alocado.",
+  "savedTransfer": "Transferência feita.",
+  "errorGenericSaveCode": "Não foi possível salvar (erro: {code}). Tente novamente.",
+  "@errorGenericSaveCode": {"placeholders": {"code": {"type": "String"}}}
 }

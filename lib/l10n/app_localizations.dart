@@ -1513,6 +1513,66 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Outro'**
   String get incomeSourceOutro;
+
+  /// No description provided for @signingInWithGoogle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Entrando…'**
+  String get signingInWithGoogle;
+
+  /// No description provided for @savedExpense.
+  ///
+  /// In pt, this message translates to:
+  /// **'Gasto lançado.'**
+  String get savedExpense;
+
+  /// No description provided for @savedIncome.
+  ///
+  /// In pt, this message translates to:
+  /// **'Receita registrada.'**
+  String get savedIncome;
+
+  /// No description provided for @savedEdit.
+  ///
+  /// In pt, this message translates to:
+  /// **'Alterações salvas.'**
+  String get savedEdit;
+
+  /// No description provided for @savedSubscription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Assinatura criada.'**
+  String get savedSubscription;
+
+  /// No description provided for @savedInstallment.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelamento criado.'**
+  String get savedInstallment;
+
+  /// No description provided for @savedCategory.
+  ///
+  /// In pt, this message translates to:
+  /// **'Caixinha salva.'**
+  String get savedCategory;
+
+  /// No description provided for @savedAllocation.
+  ///
+  /// In pt, this message translates to:
+  /// **'Valor alocado.'**
+  String get savedAllocation;
+
+  /// No description provided for @savedTransfer.
+  ///
+  /// In pt, this message translates to:
+  /// **'Transferência feita.'**
+  String get savedTransfer;
+
+  /// No description provided for @errorGenericSaveCode.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível salvar (erro: {code}). Tente novamente.'**
+  String errorGenericSaveCode(String code);
 }
 
 class _AppLocalizationsDelegate
