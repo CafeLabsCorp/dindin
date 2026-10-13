@@ -343,18 +343,18 @@ class DashboardPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (tilesWide)
-                          Row(
-                            children: [
-                              for (final t in tiles)
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                    ),
-                                    child: t,
-                                  ),
-                                ),
-                            ],
+                          // Same width as the cards around it (no outer
+                          // inset), equal heights, 12px between tiles.
+                          IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                for (var i = 0; i < tiles.length; i++) ...[
+                                  if (i > 0) const SizedBox(width: 12),
+                                  Expanded(child: tiles[i]),
+                                ],
+                              ],
+                            ),
                           )
                         else
                           Column(

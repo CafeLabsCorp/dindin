@@ -24,11 +24,17 @@ class StatTile extends StatelessWidget {
             ).textTheme.labelMedium?.copyWith(color: context.tokens.muted, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: color ?? Theme.of(context).colorScheme.onSurface,
+          // Shrinks a long amount instead of wrapping it ("R$ 4.000,0" / "0")
+          // when the tile is narrow, e.g. three across on a small tablet.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: color ?? Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
         ],
