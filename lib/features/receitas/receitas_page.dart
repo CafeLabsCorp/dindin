@@ -198,7 +198,13 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (picked != null) setState(() => _filterFrom = picked);
+                        if (picked != null) {
+                          final range = rangeAfterPickingFrom(picked, _filterTo);
+                          setState(() {
+                            _filterFrom = range.from;
+                            _filterTo = range.to;
+                          });
+                        }
                       },
                       child: InputDecorator(
                         decoration: InputDecoration(labelText: l10n.filterFromLabel),
@@ -216,7 +222,13 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (picked != null) setState(() => _filterTo = picked);
+                        if (picked != null) {
+                          final range = rangeAfterPickingTo(picked, _filterFrom);
+                          setState(() {
+                            _filterFrom = range.from;
+                            _filterTo = range.to;
+                          });
+                        }
                       },
                       child: InputDecorator(
                         decoration: InputDecoration(labelText: l10n.filterToLabel),

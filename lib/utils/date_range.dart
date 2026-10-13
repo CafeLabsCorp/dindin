@@ -13,3 +13,15 @@ bool isDateWithinRange(String isoDate, DateTime? from, DateTime? to) {
   if (to != null && isoDate.compareTo(isoDateFrom(to)) > 0) return false;
   return true;
 }
+
+/// The filter range after the user picks a new "De" (from) date. If it lands
+/// after the current "Até", "Até" moves to the same day — an inverted range
+/// (from after to) matches nothing and used to leave an empty list with no
+/// explanation.
+({DateTime? from, DateTime? to}) rangeAfterPickingFrom(DateTime picked, DateTime? to) =>
+    (from: picked, to: (to != null && picked.isAfter(to)) ? picked : to);
+
+/// Mirror of [rangeAfterPickingFrom] for a newly picked "Até" (to) date: if it
+/// lands before the current "De", "De" moves to the same day.
+({DateTime? from, DateTime? to}) rangeAfterPickingTo(DateTime picked, DateTime? from) =>
+    (from: (from != null && picked.isBefore(from)) ? picked : from, to: picked);

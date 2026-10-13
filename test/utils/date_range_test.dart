@@ -30,4 +30,40 @@ void main() {
       expect(isDateWithinRange('2026-06-01', from, to), isFalse);
     });
   });
+
+  group(
+    'rangeAfterPickingFrom / rangeAfterPickingTo (intervalo nunca fica invertido)',
+    () {
+      final may5 = DateTime(2026, 5, 5);
+      final may24 = DateTime(2026, 5, 24);
+
+      test('"De" depois do "Até" arrasta o "Até" pro mesmo dia', () {
+        final r = rangeAfterPickingFrom(may24, may5);
+        expect(r.from, may24);
+        expect(r.to, may24);
+      });
+
+      test('"De" antes do "Até" não mexe no "Até"', () {
+        final r = rangeAfterPickingFrom(may5, may24);
+        expect(r.from, may5);
+        expect(r.to, may24);
+      });
+
+      test('"Até" antes do "De" arrasta o "De" pro mesmo dia', () {
+        final r = rangeAfterPickingTo(may5, may24);
+        expect(r.from, may5);
+        expect(r.to, may5);
+      });
+
+      test('sem o outro lado definido, só guarda o escolhido', () {
+        expect(rangeAfterPickingFrom(may5, null).to, isNull);
+        expect(rangeAfterPickingTo(may5, null).from, isNull);
+      });
+
+      test('mesmo dia nos dois lados é intervalo válido', () {
+        final r = rangeAfterPickingFrom(may5, may5);
+        expect((r.from, r.to), (may5, may5));
+      });
+    },
+  );
 }
