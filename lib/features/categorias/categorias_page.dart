@@ -14,6 +14,7 @@ import '../../widgets/adaptive_form_sheet.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/caixinha_budget_bar.dart';
 import '../../widgets/caixinha_color_dot.dart';
+import '../../widgets/saved_feedback.dart';
 
 class CategoriasPage extends ConsumerStatefulWidget {
   const CategoriasPage({super.key});
@@ -88,6 +89,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
         _recurring = true;
         _allowNegative = false;
       });
+      if (mounted) showSavedSnackBar(context, l10n.savedCategory);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));
@@ -553,7 +555,10 @@ class _EditCategoryFormState extends State<_EditCategoryForm> {
         clearGoalAmount: goal == null,
         allowNegative: _kind == CategoryKind.spend ? _allowNegative : false,
       );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        showSavedSnackBar(context, l10n.savedCategory);
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));

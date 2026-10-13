@@ -16,6 +16,7 @@ import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/charge_source_field.dart';
 import '../../widgets/responsive_form_row.dart';
+import '../../widgets/saved_feedback.dart';
 
 /// Card purchases split into monthly installments, on their own screen —
 /// same reasoning as `AssinaturasPage`.
@@ -72,6 +73,7 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
       );
       _nameController.clear();
       _totalController.clear();
+      if (mounted) showSavedSnackBar(context, l10n.savedInstallment);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));

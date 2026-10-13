@@ -16,6 +16,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/caixinha_budget_bar.dart';
 import '../../widgets/caixinha_color_dot.dart';
 import '../../widgets/stat_tile.dart';
+import '../../widgets/saved_feedback.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -463,7 +464,10 @@ class _AllocateDialogState extends State<_AllocateDialog> {
             amount: value,
             date: DateTime.now().toIso8601String().substring(0, 10),
           );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        showSavedSnackBar(context, l10n.savedAllocation);
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));
@@ -612,7 +616,10 @@ class _TransferDialogState extends State<_TransferDialog> {
             amount: value,
             date: DateTime.now().toIso8601String().substring(0, 10),
           );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        showSavedSnackBar(context, l10n.savedTransfer);
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));

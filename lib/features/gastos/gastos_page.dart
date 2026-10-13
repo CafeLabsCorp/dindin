@@ -19,6 +19,7 @@ import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/edit_transaction_sheet.dart';
 import '../../widgets/responsive_form_row.dart';
+import '../../widgets/saved_feedback.dart';
 
 /// Sentinel for the "Conta" dropdown entry — an expense charged directly
 /// against the account balance instead of a caixinha.
@@ -100,6 +101,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
       }
       _amountController.clear();
       _descriptionController.clear();
+      if (mounted) showSavedSnackBar(context, l10n.savedExpense);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyErrorMessage(l10n, e));

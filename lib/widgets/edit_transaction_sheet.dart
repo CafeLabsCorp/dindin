@@ -16,6 +16,7 @@ import '../utils/income_source_labels.dart';
 import '../utils/money_input_formatter.dart';
 import 'adaptive_form_sheet.dart';
 import 'responsive_form_row.dart';
+import 'saved_feedback.dart';
 
 /// The 3 kinds of ledger entry `docs/DESIGN.md` §5.1 wants edit support for.
 /// A sealed hierarchy (rather than 3 separate widgets/functions) is what lets
@@ -152,7 +153,10 @@ class _EditTransactionFormState extends State<_EditTransactionForm> {
             date: isoDateFrom(_date),
           );
       }
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        showSavedSnackBar(context, l10n.savedEdit);
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       final friendly = friendlyErrorMessage(l10n, e);
