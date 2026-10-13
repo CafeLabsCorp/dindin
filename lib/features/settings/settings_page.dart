@@ -289,6 +289,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
               // language endonyms, kept as literal labels (not routed through
               // AppLocalizations) same as Domo's precedent for this control.
               SegmentedButton<Locale?>(
+                // The check icon steals width and wraps "Português" onto two
+                // lines on narrow screens; the filled segment already marks it.
+                showSelectedIcon: false,
                 segments: [
                   ButtonSegment(value: null, label: Text(l10n.languageSystemOption)),
                   const ButtonSegment(value: Locale('pt'), label: Text('Português')),
