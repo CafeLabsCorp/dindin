@@ -87,10 +87,35 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
+    // Everything the undo needs, captured now: by the time it is tapped this
+    // page may be gone, and its `ref`/`context` with it.
+    final removed = ref.read(incomesProvider).value?.where((i) => i.id == id).firstOrNull;
+    final firestore = ref.read(firestoreServiceProvider)!;
+    final messenger = ScaffoldMessenger.maybeOf(context);
     try {
-      await ref.read(firestoreServiceProvider)!.deleteIncome(id);
-      if (mounted) showSavedSnackBar(context, l10n.removedIncome);
+      await firestore.deleteIncome(id);
+      if (!mounted) return;
+      showSavedSnackBar(
+        context,
+        l10n.removedIncome,
+        actionLabel: removed == null ? null : l10n.undoAction,
+        onAction: removed == null
+            ? null
+            : () async {
+                try {
+                  await firestore.createIncome(
+                    date: removed.date,
+                    amount: removed.amount,
+                    source: removed.source,
+                    description: removed.description,
+                  );
+                  messenger?.showSnackBar(SnackBar(content: Text(l10n.restoredMessage)));
+                } catch (e) {
+                  messenger?.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(l10n, e))));
+                }
+              },
+      );
     } catch (e) {
       if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
     }

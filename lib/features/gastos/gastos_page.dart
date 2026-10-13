@@ -123,10 +123,35 @@ class _GastosPageState extends ConsumerState<GastosPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
+    // Everything the undo needs, captured now: by the time it is tapped this
+    // page may be gone, and its `ref`/`context` with it.
+    final removed = ref.read(expensesProvider).value?.where((e) => e.id == id).firstOrNull;
+    final firestore = ref.read(firestoreServiceProvider)!;
+    final messenger = ScaffoldMessenger.maybeOf(context);
     try {
-      await ref.read(firestoreServiceProvider)!.deleteExpense(id);
-      if (mounted) showSavedSnackBar(context, l10n.removedExpense);
+      await firestore.deleteExpense(id);
+      if (!mounted) return;
+      showSavedSnackBar(
+        context,
+        l10n.removedExpense,
+        actionLabel: removed == null ? null : l10n.undoAction,
+        onAction: removed == null
+            ? null
+            : () async {
+                try {
+                  await firestore.createExpense(
+                    date: removed.date,
+                    amount: removed.amount,
+                    categoryId: removed.categoryId,
+                    description: removed.description,
+                  );
+                  messenger?.showSnackBar(SnackBar(content: Text(l10n.restoredMessage)));
+                } catch (e) {
+                  messenger?.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(l10n, e))));
+                }
+              },
+      );
     } catch (e) {
       if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
     }
