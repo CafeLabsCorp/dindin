@@ -295,7 +295,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
                   const ButtonSegment(value: Locale('en'), label: Text('English')),
                 ],
                 selected: {ref.watch(localeProvider)},
-                onSelectionChanged: (set) => ref.read(localeProvider.notifier).state = set.first,
+                onSelectionChanged: (set) => setLocalePreference(ref, set.first),
               ),
             ],
           ),

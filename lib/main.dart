@@ -9,13 +9,20 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
+import 'providers/locale_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await _activateAppCheck();
   await initializeDateFormatting('pt_BR');
-  runApp(const ProviderScope(child: DindinApp()));
+  final savedLocale = await loadSavedLocale();
+  runApp(
+    ProviderScope(
+      overrides: [localeProvider.overrideWith((ref) => savedLocale)],
+      child: const DindinApp(),
+    ),
+  );
 }
 
 /// Firebase App Check — bot/abuse attestation. `firestore.rules`' own
