@@ -392,5 +392,17 @@
   "savedAllocation": "Valor alocado.",
   "savedTransfer": "Transferência feita.",
   "errorGenericSaveCode": "Não foi possível salvar (erro: {code}). Tente novamente.",
-  "@errorGenericSaveCode": {"placeholders": {"code": {"type": "String"}}}
+  "@errorGenericSaveCode": {"placeholders": {"code": {"type": "String"}}},
+  "passwordConfirmLabel": "Confirmar senha",
+  "passwordMismatchError": "As senhas não conferem",
+  "showPasswordTooltip": "Mostrar senha",
+  "hidePasswordTooltip": "Ocultar senha",
+  "authInvalidCredentialError": "E-mail ou senha incorretos.",
+  "authEmailInUseError": "Já existe uma conta com esse e-mail. Tente entrar.",
+  "authInvalidEmailError": "Esse e-mail não parece válido.",
+  "authWeakPasswordError": "Senha fraca demais. Use ao menos 6 caracteres.",
+  "authTooManyRequestsError": "Muitas tentativas. Aguarde um pouco e tente de novo.",
+  "authNetworkError": "Sem conexão com a internet. Verifique e tente de novo.",
+  "authUserDisabledError": "Essa conta foi desativada.",
+  "authGenericError": "Não foi possível concluir. Tente novamente."
 }

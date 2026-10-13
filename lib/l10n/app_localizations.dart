@@ -1573,6 +1573,78 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Não foi possível salvar (erro: {code}). Tente novamente.'**
   String errorGenericSaveCode(String code);
+
+  /// No description provided for @passwordConfirmLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Confirmar senha'**
+  String get passwordConfirmLabel;
+
+  /// No description provided for @passwordMismatchError.
+  ///
+  /// In pt, this message translates to:
+  /// **'As senhas não conferem'**
+  String get passwordMismatchError;
+
+  /// No description provided for @showPasswordTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mostrar senha'**
+  String get showPasswordTooltip;
+
+  /// No description provided for @hidePasswordTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ocultar senha'**
+  String get hidePasswordTooltip;
+
+  /// No description provided for @authInvalidCredentialError.
+  ///
+  /// In pt, this message translates to:
+  /// **'E-mail ou senha incorretos.'**
+  String get authInvalidCredentialError;
+
+  /// No description provided for @authEmailInUseError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Já existe uma conta com esse e-mail. Tente entrar.'**
+  String get authEmailInUseError;
+
+  /// No description provided for @authInvalidEmailError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Esse e-mail não parece válido.'**
+  String get authInvalidEmailError;
+
+  /// No description provided for @authWeakPasswordError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Senha fraca demais. Use ao menos 6 caracteres.'**
+  String get authWeakPasswordError;
+
+  /// No description provided for @authTooManyRequestsError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Muitas tentativas. Aguarde um pouco e tente de novo.'**
+  String get authTooManyRequestsError;
+
+  /// No description provided for @authNetworkError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sem conexão com a internet. Verifique e tente de novo.'**
+  String get authNetworkError;
+
+  /// No description provided for @authUserDisabledError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Essa conta foi desativada.'**
+  String get authUserDisabledError;
+
+  /// No description provided for @authGenericError.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível concluir. Tente novamente.'**
+  String get authGenericError;
 }
 
 class _AppLocalizationsDelegate

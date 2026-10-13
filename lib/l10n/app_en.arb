@@ -280,5 +280,17 @@
   "savedAllocation": "Amount allocated.",
   "savedTransfer": "Transfer done.",
   "errorGenericSaveCode": "Couldn't save (error: {code}). Please try again.",
-  "@errorGenericSaveCode": {"placeholders": {"code": {"type": "String"}}}
+  "@errorGenericSaveCode": {"placeholders": {"code": {"type": "String"}}},
+  "passwordConfirmLabel": "Confirm password",
+  "passwordMismatchError": "Passwords don't match",
+  "showPasswordTooltip": "Show password",
+  "hidePasswordTooltip": "Hide password",
+  "authInvalidCredentialError": "Incorrect e-mail or password.",
+  "authEmailInUseError": "An account with this e-mail already exists. Try signing in.",
+  "authInvalidEmailError": "That e-mail doesn't look valid.",
+  "authWeakPasswordError": "Password too weak. Use at least 6 characters.",
+  "authTooManyRequestsError": "Too many attempts. Wait a moment and try again.",
+  "authNetworkError": "No internet connection. Check it and try again.",
+  "authUserDisabledError": "This account has been disabled.",
+  "authGenericError": "Couldn't complete that. Please try again."
 }

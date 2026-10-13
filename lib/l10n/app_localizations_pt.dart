@@ -895,4 +895,44 @@ class AppLocalizationsPt extends AppLocalizations {
   String errorGenericSaveCode(String code) {
     return 'Não foi possível salvar (erro: $code). Tente novamente.';
   }
+
+  @override
+  String get passwordConfirmLabel => 'Confirmar senha';
+
+  @override
+  String get passwordMismatchError => 'As senhas não conferem';
+
+  @override
+  String get showPasswordTooltip => 'Mostrar senha';
+
+  @override
+  String get hidePasswordTooltip => 'Ocultar senha';
+
+  @override
+  String get authInvalidCredentialError => 'E-mail ou senha incorretos.';
+
+  @override
+  String get authEmailInUseError =>
+      'Já existe uma conta com esse e-mail. Tente entrar.';
+
+  @override
+  String get authInvalidEmailError => 'Esse e-mail não parece válido.';
+
+  @override
+  String get authWeakPasswordError =>
+      'Senha fraca demais. Use ao menos 6 caracteres.';
+
+  @override
+  String get authTooManyRequestsError =>
+      'Muitas tentativas. Aguarde um pouco e tente de novo.';
+
+  @override
+  String get authNetworkError =>
+      'Sem conexão com a internet. Verifique e tente de novo.';
+
+  @override
+  String get authUserDisabledError => 'Essa conta foi desativada.';
+
+  @override
+  String get authGenericError => 'Não foi possível concluir. Tente novamente.';
 }
