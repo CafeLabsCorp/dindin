@@ -24,6 +24,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _passwordController = TextEditingController();
   bool _isRegister = false;
   bool _loading = false;
+  // Which button started the request, so only that one shows the spinner.
+  bool _loadingGoogle = false;
   String? _error;
 
   @override
@@ -55,6 +57,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _submitGoogle() async {
     setState(() {
       _loading = true;
+      _loadingGoogle = true;
       _error = null;
     });
     try {
@@ -72,11 +75,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         error: e,
         stackTrace: stackTrace,
       );
+      if (!mounted) return;
+      // `canceled` covers both the user closing the account picker and the
+      // automatic silent re-auth failing ("[16] Account reauth failed."),
+      // which can fire without the user touching anything. Neither is an
+      // error worth showing: the login form is still right there.
+      if (e.code != GoogleSignInExceptionCode.canceled) {
+        setState(() => _error = AppLocalizations.of(context)!.googleSignInErrorMessage);
+      }
+    } catch (e, stackTrace) {
+      developer.log('Google sign-in failed', name: 'dindin.auth', error: e, stackTrace: stackTrace);
+      if (!mounted) return;
       setState(() => _error = AppLocalizations.of(context)!.googleSignInErrorMessage);
-    } catch (e) {
-      setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadingGoogle = false;
+        });
+      }
     }
   }
 
@@ -145,7 +162,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _loading ? null : _submitEmail,
-                          child: Text(_isRegister ? l10n.authCreateAccountTitle : l10n.authSignInTitle),
+                          child: _loading && !_loadingGoogle
+                              ? const _ButtonSpinner()
+                              : Text(_isRegister ? l10n.authCreateAccountTitle : l10n.authSignInTitle),
                         ),
                         const SizedBox(height: 8),
                         TextButton(
@@ -155,8 +174,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const Divider(height: 32),
                         OutlinedButton.icon(
                           onPressed: _loading ? null : _submitGoogle,
-                          icon: const FaIcon(FontAwesomeIcons.google, size: 18),
-                          label: Text(l10n.signInWithGoogle),
+                          icon: _loadingGoogle
+                              ? const _ButtonSpinner()
+                              : const FaIcon(FontAwesomeIcons.google, size: 18),
+                          label: Text(_loadingGoogle ? l10n.signingInWithGoogle : l10n.signInWithGoogle),
                         ),
                       ],
                     ),
@@ -169,4 +190,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       ),
     );
   }
+}
+
+/// Small progress ring sized to sit inside a button, in place of its label/icon.
+class _ButtonSpinner extends StatelessWidget {
+  const _ButtonSpinner();
+
+  @override
+  Widget build(BuildContext context) =>
+      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2));
 }

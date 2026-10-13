@@ -7,6 +7,8 @@
 // scary exception dump — the user always gets a short, actionable message,
 // and the form stays usable to retry (loading state clears, button
 // re-enables).
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,8 +44,8 @@ void main() {
   }
 
   testWidgets(
-    'Google sign-in failing with GoogleSignInException shows a friendly '
-    'message (never the raw exception text) and re-enables the button',
+    'Google sign-in canceled (picker closed, or silent re-auth failing) shows '
+    'nothing at all and re-enables the button',
     (tester) async {
       final authService = _MockAuthService();
       when(() => authService.signInWithGoogle()).thenThrow(
@@ -57,18 +59,60 @@ void main() {
       await tester.tap(find.byType(OutlinedButton));
       await tester.pumpAndSettle();
 
+      expect(find.textContaining('Não foi possível entrar'), findsNothing);
+      expect(find.textContaining('GoogleSignInException'), findsNothing);
+      expect(find.textContaining('Account reauth failed'), findsNothing);
+
+      final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(button.onPressed, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'Google sign-in failing for any other reason shows a friendly message '
+    '(never the raw exception text) and re-enables the button',
+    (tester) async {
+      final authService = _MockAuthService();
+      when(() => authService.signInWithGoogle()).thenThrow(
+        const GoogleSignInException(
+          code: GoogleSignInExceptionCode.clientConfigurationError,
+          description: 'bad config',
+        ),
+      );
+
+      await pumpLoginPage(tester, authService);
+      await tester.tap(find.byType(OutlinedButton));
+      await tester.pumpAndSettle();
+
       expect(
         find.text('Não foi possível entrar com o Google agora. Tente novamente em alguns instantes.'),
         findsOneWidget,
       );
       expect(find.textContaining('GoogleSignInException'), findsNothing);
-      expect(find.textContaining('Account reauth failed'), findsNothing);
 
-      // The button must still be tappable afterward (loading state cleared).
       final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
       expect(button.onPressed, isNotNull);
     },
   );
+
+  testWidgets('while Google sign-in is running the button shows a spinner', (tester) async {
+    final authService = _MockAuthService();
+    final completer = Completer<UserCredential>();
+    when(() => authService.signInWithGoogle()).thenAnswer((_) => completer.future);
+
+    await pumpLoginPage(tester, authService);
+    await tester.tap(find.byType(OutlinedButton));
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Entrando…'), findsOneWidget);
+
+    completer.completeError(
+      const GoogleSignInException(code: GoogleSignInExceptionCode.canceled),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
 
   testWidgets(
     'a successful Google sign-in for a returning user does not log account_created',
