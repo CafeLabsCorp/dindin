@@ -17,6 +17,7 @@ import '../../widgets/caixinha_budget_bar.dart';
 import '../../widgets/caixinha_color_dot.dart';
 import '../../widgets/stat_tile.dart';
 import '../../widgets/saved_feedback.dart';
+import '../../widgets/catch_up_refresh.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -67,20 +68,7 @@ class DashboardPage extends ConsumerWidget {
         .toList();
     final canTransfer = categories.length >= 2 && eligibleOrigins.isNotEmpty;
 
-    // Pull down to run the recurring-charge catch-up again. It otherwise only
-    // runs once per app open, so a subscription or installment that fell due
-    // while the app stayed open would not show up until a restart. The shell
-    // listens to that provider, so the "N charges posted" snackbar still
-    // appears if anything was charged.
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(recurringChargesCatchUpProvider);
-        try {
-          await ref.read(recurringChargesCatchUpProvider.future);
-        } catch (_) {
-          // Already logged by the provider; the indicator just stops.
-        }
-      },
+    return CatchUpRefresh(
       child: ListView(
         // Always scrollable, so the gesture works even when the content fits.
         physics: const AlwaysScrollableScrollPhysics(),
