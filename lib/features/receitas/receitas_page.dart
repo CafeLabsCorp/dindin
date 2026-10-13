@@ -281,7 +281,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text(l10n.genericErrorPrefix(e.toString())),
+                  error: (e, _) => Text(friendlyLoadErrorMessage(l10n, e)),
                 ),
               ],
             ),
