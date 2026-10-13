@@ -938,4 +938,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authGenericError => 'Couldn\'t complete that. Please try again.';
+
+  @override
+  String get emailVerifyPromptTitle => 'Confirm your email';
+
+  @override
+  String get emailVerifyPromptLater => 'Not now';
 }

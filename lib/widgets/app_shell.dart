@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException, User;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
+import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../theme/theme.dart';
 import '../utils/format.dart';
@@ -55,6 +57,67 @@ class _AppShellState extends ConsumerState<AppShell> {
   final Map<int, bool> _titleHidden = {};
 
   static const _titleHiddenOffset = 56.0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Once per app open, after the first frame so there is a navigator to
+    // show the dialog on.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybePromptEmailVerification());
+  }
+
+  /// Reminds a password-account user that their e-mail is still unconfirmed.
+  /// Non-blocking by design (security audit 2026-09-22: nothing gates on
+  /// `emailVerified`): a dismissible dialog, shown once per app open, until
+  /// they confirm. Ajustes -> Privacidade keeps the passive warning.
+  Future<void> _maybePromptEmailVerification() async {
+    // Best-effort, like the rest of this reminder: if auth can't be reached
+    // there is simply nothing to remind about.
+    User? user;
+    try {
+      user = ref.read(authServiceProvider).currentUser;
+    } catch (_) {
+      return;
+    }
+    if (user == null || !AuthService.needsEmailVerification(user)) return;
+    // `emailVerified` is a snapshot from sign-in; someone who confirmed in
+    // their mail app since then must not be nagged. Best-effort.
+    try {
+      await ref.read(authServiceProvider).reloadCurrentUser();
+    } catch (_) {}
+    if (!mounted || !AuthService.needsEmailVerification(ref.read(authServiceProvider).currentUser)) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final resend = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.emailVerifyPromptTitle),
+        content: Text(l10n.emailNotVerifiedMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.emailVerifyPromptLater)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.resendVerificationEmailButton)),
+        ],
+      ),
+    );
+    if (resend != true || !mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await ref.read(authServiceProvider).sendEmailVerification();
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.verificationEmailSentMessage)));
+    } on FirebaseAuthException catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            e.code == 'too-many-requests'
+                ? l10n.verificationEmailRateLimitedMessage
+                : l10n.verificationEmailErrorMessage(e.message ?? e.code),
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.verificationEmailErrorMessage(e.toString()))));
+    }
+  }
 
   @override
   void didUpdateWidget(AppShell oldWidget) {

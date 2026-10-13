@@ -935,4 +935,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get authGenericError => 'Não foi possível concluir. Tente novamente.';
+
+  @override
+  String get emailVerifyPromptTitle => 'Confirme seu e-mail';
+
+  @override
+  String get emailVerifyPromptLater => 'Agora não';
 }

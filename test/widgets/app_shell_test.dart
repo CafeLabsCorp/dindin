@@ -5,16 +5,26 @@
 // tests exercise that whole chain — AppShell -> AppNavigation -> PageHeader —
 // rather than stubbing the header out, because the wiring between them is
 // exactly what broke while this shape was being found.
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/providers/providers.dart';
+import 'package:dindin/services/auth_service.dart';
 import 'package:dindin/theme/theme.dart';
 import 'package:dindin/widgets/app_shell.dart';
 import 'package:dindin/widgets/page_header.dart';
+
+class _MockAuthService extends Mock implements AuthService {}
+
+class _MockUser extends Mock implements User {}
+
+class _MockUserInfo extends Mock implements UserInfo {}
 
 void main() {
   /// Stand-in for a real screen: a PageHeader (the menu trigger) plus a body
@@ -40,7 +50,11 @@ void main() {
     ],
   );
 
-  Future<void> pump(WidgetTester tester, {Size size = const Size(400, 800)}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    Size size = const Size(400, 800),
+    List<Override> extraOverrides = const [],
+  }) async {
     // physicalSize + devicePixelRatio 1.0 (rather than setSurfaceSize, which
     // is physical pixels) so `size` IS the logical size the layout sees —
     // these tests turn on the 720px narrow/wide breakpoint.
@@ -73,6 +87,7 @@ void main() {
           // through the auth chain; without this the test would need a real
           // Firebase app just to draw navigation.
           firestoreServiceProvider.overrideWithValue(null),
+          ...extraOverrides,
         ],
         child: MaterialApp.router(
           routerConfig: router,
@@ -209,5 +224,64 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('sticky-title')));
     await tester.pumpAndSettle();
     expect(find.byType(ListTile), findsNWidgets(7));
+  });
+
+  group('lembrete de e-mail não verificado ao abrir o app', () {
+    ({_MockAuthService auth, List<Override> overrides}) setup({required bool verified}) {
+      final info = _MockUserInfo();
+      when(() => info.providerId).thenReturn('password');
+      final user = _MockUser();
+      when(() => user.emailVerified).thenReturn(verified);
+      when(() => user.providerData).thenReturn([info]);
+      final auth = _MockAuthService();
+      when(() => auth.currentUser).thenReturn(user);
+      when(() => auth.reloadCurrentUser()).thenAnswer((_) async {});
+      when(() => auth.sendEmailVerification()).thenAnswer((_) async {});
+      return (
+        auth: auth,
+        overrides: [
+          authServiceProvider.overrideWithValue(auth),
+        ],
+      );
+    }
+
+    testWidgets('e-mail não confirmado: aparece o aviso, dispensável, sem bloquear', (tester) async {
+      final t = setup(verified: false);
+      await pump(tester, extraOverrides: t.overrides);
+      // O lembrete é assíncrono (espera o usuário, recarrega, abre o diálogo).
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Confirme seu e-mail'), findsOneWidget);
+      await tester.tap(find.text('Agora não'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirme seu e-mail'), findsNothing);
+      expect(find.text('page:Dashboard'), findsOneWidget, reason: 'o app segue usável');
+      verifyNever(() => t.auth.sendEmailVerification());
+    });
+
+    testWidgets('"Reenviar" manda o e-mail e confirma com um snackbar', (tester) async {
+      final t = setup(verified: false);
+      await pump(tester, extraOverrides: t.overrides);
+      // O lembrete é assíncrono (espera o usuário, recarrega, abre o diálogo).
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Reenviar e-mail de verificação'));
+      await tester.pumpAndSettle();
+
+      verify(() => t.auth.sendEmailVerification()).called(1);
+      expect(find.textContaining('E-mail de verificação enviado'), findsOneWidget);
+    });
+
+    testWidgets('e-mail já confirmado: nada aparece', (tester) async {
+      final t = setup(verified: true);
+      await pump(tester, extraOverrides: t.overrides);
+      // O lembrete é assíncrono (espera o usuário, recarrega, abre o diálogo).
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Confirme seu e-mail'), findsNothing);
+    });
   });
 }

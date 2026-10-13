@@ -404,5 +404,7 @@
   "authTooManyRequestsError": "Muitas tentativas. Aguarde um pouco e tente de novo.",
   "authNetworkError": "Sem conexão com a internet. Verifique e tente de novo.",
   "authUserDisabledError": "Essa conta foi desativada.",
-  "authGenericError": "Não foi possível concluir. Tente novamente."
+  "authGenericError": "Não foi possível concluir. Tente novamente.",
+  "emailVerifyPromptTitle": "Confirme seu e-mail",
+  "emailVerifyPromptLater": "Agora não"
 }

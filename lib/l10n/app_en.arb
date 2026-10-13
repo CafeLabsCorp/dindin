@@ -292,5 +292,7 @@
   "authTooManyRequestsError": "Too many attempts. Wait a moment and try again.",
   "authNetworkError": "No internet connection. Check it and try again.",
   "authUserDisabledError": "This account has been disabled.",
-  "authGenericError": "Couldn't complete that. Please try again."
+  "authGenericError": "Couldn't complete that. Please try again.",
+  "emailVerifyPromptTitle": "Confirm your email",
+  "emailVerifyPromptLater": "Not now"
 }

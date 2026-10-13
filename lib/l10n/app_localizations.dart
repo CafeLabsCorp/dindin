@@ -1645,6 +1645,18 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Não foi possível concluir. Tente novamente.'**
   String get authGenericError;
+
+  /// No description provided for @emailVerifyPromptTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Confirme seu e-mail'**
+  String get emailVerifyPromptTitle;
+
+  /// No description provided for @emailVerifyPromptLater.
+  ///
+  /// In pt, this message translates to:
+  /// **'Agora não'**
+  String get emailVerifyPromptLater;
 }
 
 class _AppLocalizationsDelegate
