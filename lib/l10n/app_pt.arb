@@ -418,5 +418,11 @@
   "autoChargeOffMessage": "Cobrança automática desligada.",
   "dueDayChangedMessage": "Dia de cobrança alterado.",
   "chargedNowMessage": "Cobrança lançada.",
-  "paymentRecordedMessage": "Pagamento registrado."
+  "paymentRecordedMessage": "Pagamento registrado.",
+  "errorNetwork": "Sem conexão com a internet. Verifique e tente de novo.",
+  "loadErrorMessage": "Não foi possível carregar seus dados.",
+  "loadingSlowMessage": "Está demorando mais que o normal. Verifique sua conexão.",
+  "retryButton": "Tentar de novo",
+  "undoAction": "Desfazer",
+  "restoredMessage": "Restaurado."
 }

@@ -1729,6 +1729,42 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Pagamento registrado.'**
   String get paymentRecordedMessage;
+
+  /// No description provided for @errorNetwork.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sem conexão com a internet. Verifique e tente de novo.'**
+  String get errorNetwork;
+
+  /// No description provided for @loadErrorMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Não foi possível carregar seus dados.'**
+  String get loadErrorMessage;
+
+  /// No description provided for @loadingSlowMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Está demorando mais que o normal. Verifique sua conexão.'**
+  String get loadingSlowMessage;
+
+  /// No description provided for @retryButton.
+  ///
+  /// In pt, this message translates to:
+  /// **'Tentar de novo'**
+  String get retryButton;
+
+  /// No description provided for @undoAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Desfazer'**
+  String get undoAction;
+
+  /// No description provided for @restoredMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Restaurado.'**
+  String get restoredMessage;
 }
 
 class _AppLocalizationsDelegate

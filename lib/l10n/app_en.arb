@@ -306,5 +306,11 @@
   "autoChargeOffMessage": "Automatic billing turned off.",
   "dueDayChangedMessage": "Due day changed.",
   "chargedNowMessage": "Charge posted.",
-  "paymentRecordedMessage": "Payment recorded."
+  "paymentRecordedMessage": "Payment recorded.",
+  "errorNetwork": "No internet connection. Check it and try again.",
+  "loadErrorMessage": "Couldn't load your data.",
+  "loadingSlowMessage": "This is taking longer than usual. Check your connection.",
+  "retryButton": "Try again",
+  "undoAction": "Undo",
+  "restoredMessage": "Restored."
 }

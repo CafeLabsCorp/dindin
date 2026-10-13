@@ -978,4 +978,24 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get paymentRecordedMessage => 'Pagamento registrado.';
+
+  @override
+  String get errorNetwork =>
+      'Sem conexão com a internet. Verifique e tente de novo.';
+
+  @override
+  String get loadErrorMessage => 'Não foi possível carregar seus dados.';
+
+  @override
+  String get loadingSlowMessage =>
+      'Está demorando mais que o normal. Verifique sua conexão.';
+
+  @override
+  String get retryButton => 'Tentar de novo';
+
+  @override
+  String get undoAction => 'Desfazer';
+
+  @override
+  String get restoredMessage => 'Restaurado.';
 }

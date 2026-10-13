@@ -980,4 +980,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paymentRecordedMessage => 'Payment recorded.';
+
+  @override
+  String get errorNetwork => 'No internet connection. Check it and try again.';
+
+  @override
+  String get loadErrorMessage => 'Couldn\'t load your data.';
+
+  @override
+  String get loadingSlowMessage =>
+      'This is taking longer than usual. Check your connection.';
+
+  @override
+  String get retryButton => 'Try again';
+
+  @override
+  String get undoAction => 'Undo';
+
+  @override
+  String get restoredMessage => 'Restored.';
 }
