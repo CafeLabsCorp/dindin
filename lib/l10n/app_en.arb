@@ -108,6 +108,8 @@
   "invalidInstallmentsError": "Enter between 2 and 36 installments.",
   "submitInstallmentPurchaseButton": "Add installment purchase",
   "installmentPurchasesListTitle": "Registered installment purchases",
+  "settledInstallmentPurchasesTitle": "Paid-off installment purchases ({count})",
+  "@settledInstallmentPurchasesTitle": {"placeholders": {"count": {"type": "int"}}},
   "installmentPurchasesEmptyState": "No installment purchases registered yet.",
   "installmentSummaryLabel": "{count}x of {amount}",
   "installmentProgressLabel": "{paid} of {total} installments paid",

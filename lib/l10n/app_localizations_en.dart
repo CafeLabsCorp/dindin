@@ -335,6 +335,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Registered installment purchases';
 
   @override
+  String settledInstallmentPurchasesTitle(int count) {
+    return 'Paid-off installment purchases ($count)';
+  }
+
+  @override
   String get installmentPurchasesEmptyState =>
       'No installment purchases registered yet.';
 

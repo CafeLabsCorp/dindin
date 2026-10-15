@@ -333,6 +333,11 @@ class AppLocalizationsPt extends AppLocalizations {
   String get installmentPurchasesListTitle => 'Parcelamentos cadastrados';
 
   @override
+  String settledInstallmentPurchasesTitle(int count) {
+    return 'Parcelamentos quitados ($count)';
+  }
+
+  @override
   String get installmentPurchasesEmptyState =>
       'Nenhum parcelamento cadastrado ainda.';
 

@@ -131,6 +131,8 @@
   "invalidInstallmentsError": "Informe entre 2 e 36 parcelas.",
   "submitInstallmentPurchaseButton": "Adicionar parcelamento",
   "installmentPurchasesListTitle": "Parcelamentos cadastrados",
+  "settledInstallmentPurchasesTitle": "Parcelamentos quitados ({count})",
+  "@settledInstallmentPurchasesTitle": {"placeholders": {"count": {"type": "int"}}},
   "installmentPurchasesEmptyState": "Nenhum parcelamento cadastrado ainda.",
   "installmentSummaryLabel": "{count}x de {amount}",
   "@installmentSummaryLabel": {

@@ -332,25 +332,17 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                     if (purchases.isEmpty) {
                       return EmptyState(l10n.installmentPurchasesEmptyState);
                     }
+                    final active = [
+                      for (final p in purchases)
+                        if (!schedule.isSettled(p)) p,
+                    ];
+                    if (active.isEmpty) {
+                      return EmptyState(l10n.installmentPurchasesEmptyState);
+                    }
                     return Column(
                       children: [
-                        for (var i = 0; i < purchases.length; i++)
-                          _InstallmentPurchaseRow(
-                            purchase: purchases[i],
-                            categories: categories,
-                            pendingCharges: showPending
-                                ? schedule
-                                      .pendingInstallmentIndexes(
-                                        purchases[i],
-                                        today,
-                                      )
-                                      .length
-                                : 0,
-                            onPay: () => _pay(purchases[i], categories),
-                            onDelete: () => _delete(purchases[i]),
-                            onChangeDueDay: () => _changeDueDay(purchases[i]),
-                            divider: i > 0,
-                          ),
+                        for (var i = 0; i < active.length; i++)
+                          _buildRow(active, i, categories, showPending, today),
                       ],
                     );
                   },
@@ -360,9 +352,75 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
               ],
             ),
           ),
+          ..._settledSection(
+            purchasesAsync.value ?? const <InstallmentPurchase>[],
+            categories,
+            showPending,
+            today,
+          ),
         ],
       ),
     );
+  }
+
+  _InstallmentPurchaseRow _buildRow(
+    List<InstallmentPurchase> list,
+    int i,
+    List<Category> categories,
+    bool showPending,
+    DateTime today,
+  ) {
+    final purchase = list[i];
+    return _InstallmentPurchaseRow(
+      purchase: purchase,
+      categories: categories,
+      pendingCharges: showPending
+          ? schedule.pendingInstallmentIndexes(purchase, today).length
+          : 0,
+      onPay: () => _pay(purchase, categories),
+      onDelete: () => _delete(purchase),
+      onChangeDueDay: () => _changeDueDay(purchase),
+      divider: i > 0,
+    );
+  }
+
+  /// Fully paid purchases (by running their course or settled early) move out
+  /// of the main list into a collapsed section of their own, so they stop
+  /// crowding the ones still being charged.
+  List<Widget> _settledSection(
+    List<InstallmentPurchase> purchases,
+    List<Category> categories,
+    bool showPending,
+    DateTime today,
+  ) {
+    final settled = [
+      for (final p in purchases)
+        if (schedule.isSettled(p)) p,
+    ];
+    if (settled.isEmpty) return const [];
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      const SizedBox(height: 16),
+      AppCard(
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            title: Text(
+              l10n.settledInstallmentPurchasesTitle(settled.length),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            children: [
+              for (var i = 0; i < settled.length; i++)
+                _buildRow(settled, i, categories, showPending, today),
+            ],
+          ),
+        ),
+      ),
+    ];
   }
 }
 

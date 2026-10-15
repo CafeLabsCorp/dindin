@@ -680,6 +680,12 @@ abstract class AppLocalizations {
   /// **'Parcelamentos cadastrados'**
   String get installmentPurchasesListTitle;
 
+  /// No description provided for @settledInstallmentPurchasesTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Parcelamentos quitados ({count})'**
+  String settledInstallmentPurchasesTitle(int count);
+
   /// No description provided for @installmentPurchasesEmptyState.
   ///
   /// In pt, this message translates to:

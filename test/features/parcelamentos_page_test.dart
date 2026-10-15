@@ -133,8 +133,41 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Settled purchases live in their own collapsed section.
+    expect(find.text('Quitado'), findsNothing);
+    await tester.tap(find.text('Parcelamentos quitados (1)'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Quitado'), findsOneWidget);
     expect(find.byTooltip('Pagar adiantado ou quitar'), findsNothing);
+  });
+
+  testWidgets('quitados saem da lista principal e vão pra seção própria', (tester) async {
+    await pump(
+      tester,
+      purchases: const [
+        emAndamento,
+        InstallmentPurchase(
+          id: 'p2',
+          name: 'Geladeira',
+          totalAmount: 500,
+          installments: 5,
+          purchaseDate: '2026-01-01',
+          firstChargeDate: '2026-01-10',
+          createdAt: '2026-01-01',
+          chargedInstallments: 5,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('· Notebook Dell ·'), findsOneWidget);
+    expect(find.textContaining('· Geladeira ·'), findsNothing);
+    expect(find.text('Parcelamentos quitados (1)'), findsOneWidget);
+
+    await tester.tap(find.text('Parcelamentos quitados (1)'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('· Geladeira ·'), findsOneWidget);
   });
 
   testWidgets('a folha de pagamento oferece quitar pelo saldo devedor exato', (tester) async {
