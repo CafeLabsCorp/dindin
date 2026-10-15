@@ -974,6 +974,7 @@ class FirestoreService {
     required double amount,
     required int dueDay,
     String? categoryId,
+    bool chargeThisMonth = false,
   }) async {
     if (amount <= 0) throw StateError('subscription amount must be positive');
     if (dueDay < 1 || dueDay > 31) {
@@ -985,7 +986,12 @@ class FirestoreService {
       name: name,
       amount: amount,
       dueDay: dueDay,
-      createdAt: DateTime.now().toIso8601String(),
+      // [chargeThisMonth] anchors creation on the 1st of the current month so
+      // a due day that already passed this month still counts as pending and
+      // catch-up bills it (otherwise a subscription never backdates).
+      createdAt: chargeThisMonth
+          ? DateTime(_now().year, _now().month).toIso8601String()
+          : DateTime.now().toIso8601String(),
       categoryId: categoryId,
     );
     await doc.set(subscription.toMap());

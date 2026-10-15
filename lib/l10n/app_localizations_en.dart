@@ -288,6 +288,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'This subscription\'s caixinha no longer exists — edit the subscription.';
 
   @override
+  String pastDueDayTitle(int day) {
+    return 'Day $day already passed this month';
+  }
+
+  @override
+  String get pastDueDayBody =>
+      'Charge this month\'s payment now, or start only next month?';
+
+  @override
+  String get pastDueDayChargeNow => 'Charge now';
+
+  @override
+  String get pastDueDayNextMonth => 'Next month';
+
+  @override
   String get installmentPurchasesTitle => 'Installment purchases';
 
   @override

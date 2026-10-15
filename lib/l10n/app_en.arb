@@ -92,6 +92,11 @@
   "chargeNowNothingDue": "Nothing pending to charge.",
   "chargeNowSuperseded": "This charge was already posted.",
   "chargeNowMissingCaixinha": "This subscription's caixinha no longer exists — edit the subscription.",
+  "pastDueDayTitle": "Day {day} already passed this month",
+  "@pastDueDayTitle": {"placeholders": {"day": {"type": "int"}}},
+  "pastDueDayBody": "Charge this month's payment now, or start only next month?",
+  "pastDueDayChargeNow": "Charge now",
+  "pastDueDayNextMonth": "Next month",
 
   "installmentPurchasesTitle": "Installment purchases",
   "installmentPurchasesSubtitle": "A card purchase split into installments, billed automatically over the following months starting from the first charge.",

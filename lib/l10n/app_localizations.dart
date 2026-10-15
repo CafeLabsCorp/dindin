@@ -596,6 +596,30 @@ abstract class AppLocalizations {
   /// **'A caixinha dessa assinatura não existe mais — edite a assinatura.'**
   String get chargeNowMissingCaixinha;
 
+  /// No description provided for @pastDueDayTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'O dia {day} já passou neste mês'**
+  String pastDueDayTitle(int day);
+
+  /// No description provided for @pastDueDayBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Quer cobrar a parcela deste mês agora ou começar só no mês que vem?'**
+  String get pastDueDayBody;
+
+  /// No description provided for @pastDueDayChargeNow.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cobrar agora'**
+  String get pastDueDayChargeNow;
+
+  /// No description provided for @pastDueDayNextMonth.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mês que vem'**
+  String get pastDueDayNextMonth;
+
   /// No description provided for @installmentPurchasesTitle.
   ///
   /// In pt, this message translates to:

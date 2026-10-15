@@ -65,6 +65,32 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
     }
     final firestore = ref.read(firestoreServiceProvider);
     if (firestore == null) return;
+    // This month's due day already went by: ask whether to bill this month
+    // now or start from next month (dismissing the dialog cancels the save).
+    final today = ref.read(todayProvider);
+    final dueThisMonth = schedule.dueDateFor(today.year, today.month, _dueDay);
+    var chargeThisMonth = false;
+    if (dueThisMonth.isBefore(DateTime(today.year, today.month, today.day))) {
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.pastDueDayTitle(_dueDay)),
+          content: Text(l10n.pastDueDayBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.pastDueDayNextMonth),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.pastDueDayChargeNow),
+            ),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      chargeThisMonth = choice;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -75,6 +101,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
         amount: value,
         dueDay: _dueDay,
         categoryId: ChargeSourceField.toCategoryId(_source),
+        chargeThisMonth: chargeThisMonth,
       );
       _nameController.clear();
       _amountController.clear();

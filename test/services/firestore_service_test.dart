@@ -238,6 +238,27 @@ void main() {
       expect(stored, isNotNull);
     });
 
+    test('createSubscription with chargeThisMonth makes a past due day bill this month', () async {
+      svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 10, 15));
+      await svc.createIncome(date: '2026-10-01', amount: 100, source: IncomeSource.freela);
+      await svc.createSubscription(name: 'Netflix', amount: 40, dueDay: 10, chargeThisMonth: true);
+
+      final report = await svc.catchUpSubscriptions();
+
+      expect(report.count, 1);
+      expect(report.total, 40);
+    });
+
+    test('createSubscription without chargeThisMonth does not bill a past due day', () async {
+      svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 10, 15));
+      await svc.createIncome(date: '2026-10-01', amount: 100, source: IncomeSource.freela);
+      await svc.createSubscription(name: 'Netflix', amount: 40, dueDay: 10);
+
+      final report = await svc.catchUpSubscriptions();
+
+      expect(report.isEmpty, isTrue);
+    });
+
     test('createSubscription rejects a non-positive amount', () {
       expect(
         () => svc.createSubscription(name: 'Netflix', amount: 0, dueDay: 5),

@@ -287,6 +287,21 @@ class AppLocalizationsPt extends AppLocalizations {
       'A caixinha dessa assinatura não existe mais — edite a assinatura.';
 
   @override
+  String pastDueDayTitle(int day) {
+    return 'O dia $day já passou neste mês';
+  }
+
+  @override
+  String get pastDueDayBody =>
+      'Quer cobrar a parcela deste mês agora ou começar só no mês que vem?';
+
+  @override
+  String get pastDueDayChargeNow => 'Cobrar agora';
+
+  @override
+  String get pastDueDayNextMonth => 'Mês que vem';
+
+  @override
   String get installmentPurchasesTitle => 'Compras parceladas';
 
   @override
