@@ -562,11 +562,13 @@ class _InstallmentPurchaseRowState extends State<_InstallmentPurchaseRow> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                l10n.installmentDueDayLabel('$dueDay'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.tokens.subtle,
+                              Flexible(
+                                child: Text(
+                                  l10n.installmentDueDayLabel('$dueDay'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.tokens.subtle,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 4),

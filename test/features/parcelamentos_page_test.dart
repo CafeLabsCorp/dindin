@@ -47,9 +47,18 @@ void main() {
     List<Expense> expenses = const [],
     DateTime? today,
     bool catchUpFailed = false,
+    // Logical phone/tablet width and system font scale, for the layout sweep.
+    double? width,
+    double textScale = 1.0,
   }) async {
-    await tester.binding.setSurfaceSize(const Size(800, 2000));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    if (width != null) {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = Size(width, 2000);
+      addTearDown(tester.view.reset);
+    } else {
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+    }
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -67,6 +76,10 @@ void main() {
           locale: const Locale('pt'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
           home: const Scaffold(body: ParcelamentosPage()),
         ),
       ),
@@ -303,4 +316,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('vence todo dia'), findsNothing);
   });
+
+  for (final width in [320.0, 360.0, 412.0, 600.0, 900.0]) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets('layout da linha de parcelamento em ${width.toInt()}px, fonte x$scale', (tester) async {
+        await pump(
+          tester,
+          width: width,
+          textScale: scale,
+          purchases: const [emAndamento],
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        final info = tester.getSize(find.textContaining('· Notebook Dell ·').first);
+        if (width <= 412) expect(info.width, greaterThan(width * 0.5));
+      });
+    }
+  }
 }
