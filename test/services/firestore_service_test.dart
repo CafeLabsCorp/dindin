@@ -730,7 +730,49 @@ void main() {
         final report = await svc.chargeSubscriptionNow('s1');
 
         expect(report.isEmpty, isTrue);
+        expect(report.stopReason, isNull, reason: 'nothing due is not a failure');
         expect(await accountBalance(), 100);
+      });
+
+      test('reports insufficient balance as the stop reason only when that is why', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 10, source: IncomeSource.freela);
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            autoChargeEnabled: false,
+          ),
+        );
+
+        final report = await svc.chargeSubscriptionNow('s1');
+
+        expect(report.isEmpty, isTrue);
+        expect(report.stopReason, ChargeStopReason.insufficientBalance);
+      });
+
+      test('reports a removed caixinha as its own stop reason, not a balance problem', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        await seed(
+          const Subscription(
+            id: 's1',
+            name: 'Netflix',
+            amount: 40,
+            dueDay: 5,
+            createdAt: '2026-01-01',
+            categoryId: 'gone',
+            autoChargeEnabled: false,
+          ),
+        );
+
+        final report = await svc.chargeSubscriptionNow('s1');
+
+        expect(report.isEmpty, isTrue);
+        expect(report.stopReason, ChargeStopReason.missingCategory);
       });
     });
   });

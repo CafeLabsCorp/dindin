@@ -277,6 +277,16 @@ class AppLocalizationsPt extends AppLocalizations {
       'Cobrança não lançada — saldo insuficiente.';
 
   @override
+  String get chargeNowNothingDue => 'Nada pendente pra cobrar.';
+
+  @override
+  String get chargeNowSuperseded => 'Essa cobrança já foi lançada.';
+
+  @override
+  String get chargeNowMissingCaixinha =>
+      'A caixinha dessa assinatura não existe mais — edite a assinatura.';
+
+  @override
   String get installmentPurchasesTitle => 'Compras parceladas';
 
   @override

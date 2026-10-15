@@ -89,6 +89,9 @@
   "autoChargeSwitchTooltip": "Automatic billing",
   "chargeNowTooltip": "Charge now",
   "chargeNowInsufficientBalance": "Charge not posted — insufficient balance.",
+  "chargeNowNothingDue": "Nothing pending to charge.",
+  "chargeNowSuperseded": "This charge was already posted.",
+  "chargeNowMissingCaixinha": "This subscription's caixinha no longer exists — edit the subscription.",
 
   "installmentPurchasesTitle": "Installment purchases",
   "installmentPurchasesSubtitle": "A card purchase split into installments, billed automatically over the following months starting from the first charge.",

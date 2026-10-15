@@ -278,6 +278,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Charge not posted — insufficient balance.';
 
   @override
+  String get chargeNowNothingDue => 'Nothing pending to charge.';
+
+  @override
+  String get chargeNowSuperseded => 'This charge was already posted.';
+
+  @override
+  String get chargeNowMissingCaixinha =>
+      'This subscription\'s caixinha no longer exists — edit the subscription.';
+
+  @override
   String get installmentPurchasesTitle => 'Installment purchases';
 
   @override

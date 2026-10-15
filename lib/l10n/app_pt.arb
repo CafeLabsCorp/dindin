@@ -112,6 +112,9 @@
   "autoChargeSwitchTooltip": "Cobrança automática",
   "chargeNowTooltip": "Cobrar agora",
   "chargeNowInsufficientBalance": "Cobrança não lançada — saldo insuficiente.",
+  "chargeNowNothingDue": "Nada pendente pra cobrar.",
+  "chargeNowSuperseded": "Essa cobrança já foi lançada.",
+  "chargeNowMissingCaixinha": "A caixinha dessa assinatura não existe mais — edite a assinatura.",
 
   "installmentPurchasesTitle": "Compras parceladas",
   "installmentPurchasesSubtitle": "Uma compra parcelada no cartão, dividida automaticamente pelos meses seguintes a partir da primeira cobrança.",

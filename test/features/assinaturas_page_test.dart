@@ -209,7 +209,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Cobrar agora'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Cobrar agora'), findsOneWidget);
   });
 
   testWidgets('botão de cobrar agora fica desabilitado sem cobrança pendente', (tester) async {
@@ -229,8 +229,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final button = tester.widget<IconButton>(
-      find.ancestor(of: find.byTooltip('Cobrar agora'), matching: find.byType(IconButton)),
+    final button = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'Cobrar agora'),
     );
     expect(button.onPressed, isNull);
   });

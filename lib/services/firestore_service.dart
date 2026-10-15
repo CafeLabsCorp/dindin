@@ -1093,23 +1093,31 @@ class FirestoreService {
   /// date that can't be covered stops the run there and stays pending.
   Future<RecurringChargeReport> chargeSubscriptionNow(String id) async {
     final result = await _chargePendingDueDates(_subscriptions.doc(id), _now());
-    return RecurringChargeReport(count: result.count, total: result.total);
+    return RecurringChargeReport(
+      count: result.count,
+      total: result.total,
+      stopReason: result.stopReason,
+    );
   }
 
   /// Shared by [catchUpSubscriptions] (which filters by
   /// [Subscription.autoChargeEnabled] before calling this) and
   /// [chargeSubscriptionNow] (which doesn't) — everything below this line is
   /// indifferent to why a given subscription is being charged.
-  Future<({int count, double total})> _chargePendingDueDates(
+  Future<({int count, double total, ChargeStopReason? stopReason})>
+  _chargePendingDueDates(
     DocumentReference<Map<String, dynamic>> ref,
     DateTime today,
   ) async {
     final snap = await ref.get();
     final data = snap.data();
-    if (data == null) return (count: 0, total: 0.0);
+    if (data == null) {
+      return (count: 0, total: 0.0, stopReason: ChargeStopReason.superseded);
+    }
     final subscription = Subscription.fromMap(ref.id, data);
     var charged = 0;
     var chargedTotal = 0.0;
+    ChargeStopReason? stopReason;
     for (final due in schedule.pendingDueDates(subscription, today)) {
       final dueIso = schedule.isoDate(due);
       // Written by the transaction body with the amount it actually billed
@@ -1190,11 +1198,23 @@ class FirestoreService {
       // Insufficient balance / missing caixinha -> retry next run, and stay
       // visible as pending meanwhile.
       // Superseded -> another runner owns this subscription's catch-up.
-      if (outcome != _ChargeOutcome.charged) break;
+      if (outcome != _ChargeOutcome.charged) {
+        stopReason = switch (outcome) {
+          _ChargeOutcome.insufficientBalance =>
+            ChargeStopReason.insufficientBalance,
+          _ChargeOutcome.missingCategory => ChargeStopReason.missingCategory,
+          _ => ChargeStopReason.superseded,
+        };
+        break;
+      }
       charged++;
       chargedTotal += billed;
     }
-    return (count: charged, total: agg.round2(chargedTotal));
+    return (
+      count: charged,
+      total: agg.round2(chargedTotal),
+      stopReason: stopReason,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -1742,7 +1762,17 @@ class RecurringChargeReport {
   /// Their total — what actually left the account and the caixinhas.
   final double total;
 
-  const RecurringChargeReport({this.count = 0, this.total = 0});
+  /// Why a single-doc run ([FirestoreService.chargeSubscriptionNow]) stopped
+  /// before billing everything, so the UI can say the real reason instead of
+  /// blaming the balance for every empty result. Null when nothing stopped it
+  /// (including when there was simply nothing due).
+  final ChargeStopReason? stopReason;
+
+  const RecurringChargeReport({
+    this.count = 0,
+    this.total = 0,
+    this.stopReason,
+  });
 
   bool get isEmpty => count == 0;
 
@@ -1753,6 +1783,18 @@ class RecurringChargeReport {
         count: count + other.count,
         total: agg.round2(total + other.total),
       );
+}
+
+/// Why a charge run stopped on an occurrence it could not bill.
+enum ChargeStopReason {
+  /// The funding balance (account or caixinha) couldn't cover it.
+  insufficientBalance,
+
+  /// The caixinha it should come out of no longer exists.
+  missingCategory,
+
+  /// Another device/tab already billed it, or the doc was deleted mid-run.
+  superseded,
 }
 
 /// How one occurrence's charge attempt ended, inside

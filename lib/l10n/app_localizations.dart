@@ -578,6 +578,24 @@ abstract class AppLocalizations {
   /// **'Cobrança não lançada — saldo insuficiente.'**
   String get chargeNowInsufficientBalance;
 
+  /// No description provided for @chargeNowNothingDue.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nada pendente pra cobrar.'**
+  String get chargeNowNothingDue;
+
+  /// No description provided for @chargeNowSuperseded.
+  ///
+  /// In pt, this message translates to:
+  /// **'Essa cobrança já foi lançada.'**
+  String get chargeNowSuperseded;
+
+  /// No description provided for @chargeNowMissingCaixinha.
+  ///
+  /// In pt, this message translates to:
+  /// **'A caixinha dessa assinatura não existe mais — edite a assinatura.'**
+  String get chargeNowMissingCaixinha;
+
   /// No description provided for @installmentPurchasesTitle.
   ///
   /// In pt, this message translates to:

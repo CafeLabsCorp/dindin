@@ -7,6 +7,7 @@ import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../models/subscription.dart';
 import '../../providers/providers.dart';
+import '../../services/firestore_service.dart' show ChargeStopReason;
 import '../../services/recurring_schedule.dart' as schedule;
 import '../../theme/theme.dart';
 import '../../utils/errors.dart';
@@ -149,8 +150,14 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
       if (!mounted) return;
       if (report.isEmpty) {
         final l10n = AppLocalizations.of(context)!;
+        final message = switch (report.stopReason) {
+          ChargeStopReason.insufficientBalance => l10n.chargeNowInsufficientBalance,
+          ChargeStopReason.missingCategory => l10n.chargeNowMissingCaixinha,
+          ChargeStopReason.superseded => l10n.chargeNowSuperseded,
+          null => l10n.chargeNowNothingDue,
+        };
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.chargeNowInsufficientBalance)),
+          SnackBar(content: Text(message)),
         );
       } else {
         showSavedSnackBar(context, AppLocalizations.of(context)!.chargedNowMessage);
@@ -421,21 +428,22 @@ class _SubscriptionRow extends StatelessWidget {
             ),
           ),
           if (!subscription.autoChargeEnabled)
-            IconButton(
-              // Charging is only meaningful once something is actually due,
-              // and never for a caixinha that no longer exists — same guard
-              // catch-up itself would hit.
+            // Charging is only meaningful once something is actually due,
+            // and never for a caixinha that no longer exists — same guard
+            // catch-up itself would hit. A labelled button, not a bare icon:
+            // the lightning bolt alone didn't read as "charge".
+            TextButton.icon(
               onPressed: (charging || pendingCharges == 0 || missingCaixinha)
                   ? null
                   : onChargeNow,
               icon: charging
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.bolt_outlined),
-              tooltip: l10n.chargeNowTooltip,
+                  : const Icon(Icons.payments_outlined, size: 18),
+              label: Text(l10n.chargeNowTooltip),
             ),
           IconButton(
             onPressed: onEdit,
