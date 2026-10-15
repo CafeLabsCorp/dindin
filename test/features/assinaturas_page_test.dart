@@ -41,9 +41,18 @@ void main() {
     // date — can't drift as real time passes.
     DateTime? today,
     bool catchUpFailed = false,
+    // Logical phone/tablet width and system font scale, for the layout sweep.
+    double? width,
+    double textScale = 1.0,
   }) async {
-    await tester.binding.setSurfaceSize(const Size(800, 2000));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    if (width != null) {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = Size(width, 2000);
+      addTearDown(tester.view.reset);
+    } else {
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+    }
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -60,6 +69,10 @@ void main() {
           locale: const Locale('pt'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
           home: const Scaffold(body: AssinaturasPage()),
         ),
       ),
@@ -253,4 +266,40 @@ void main() {
     // Mudar o dia não mexe em mês já cobrado — a folha diz isso.
     expect(find.textContaining('vale a partir do próximo mês'), findsOneWidget);
   });
+
+  // Layout sweep: the row once squeezed the amount/name into a sliver when its
+  // actions sat beside it. No overflow at any phone/tablet width or font
+  // scale, and the info line keeps most of the card's width.
+  for (final width in [320.0, 360.0, 412.0, 600.0, 900.0]) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets('layout da linha de assinatura em ${width.toInt()}px, fonte x$scale', (tester) async {
+        await pump(
+          tester,
+          width: width,
+          textScale: scale,
+          subscriptions: const [
+            Subscription(
+              id: 's1',
+              name: 'Netflix Premium',
+              amount: 258.88,
+              dueDay: 9,
+              createdAt: '2026-01-01',
+              autoChargeEnabled: false,
+            ),
+          ],
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        final info = tester.getSize(find.textContaining('Netflix Premium').first);
+        if (width <= 412) {
+          expect(
+            info.width,
+            greaterThan(width * 0.5),
+            reason: 'nome e valor não podem ficar espremidos numa coluna estreita',
+          );
+        }
+      });
+    }
+  }
 }

@@ -156,7 +156,10 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
     try {
       await firestore.setSubscriptionAutoCharge(subscription.id, enabled);
       if (mounted) {
-        showSavedSnackBar(context, enabled ? l10n.autoChargeOnMessage : l10n.autoChargeOffMessage);
+        showSavedSnackBar(
+          context,
+          enabled ? l10n.autoChargeOnMessage : l10n.autoChargeOffMessage,
+        );
       }
     } catch (e) {
       if (mounted) showSavedSnackBar(context, friendlyErrorMessage(l10n, e));
@@ -178,16 +181,20 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
       if (report.isEmpty) {
         final l10n = AppLocalizations.of(context)!;
         final message = switch (report.stopReason) {
-          ChargeStopReason.insufficientBalance => l10n.chargeNowInsufficientBalance,
+          ChargeStopReason.insufficientBalance =>
+            l10n.chargeNowInsufficientBalance,
           ChargeStopReason.missingCategory => l10n.chargeNowMissingCaixinha,
           ChargeStopReason.superseded => l10n.chargeNowSuperseded,
           null => l10n.chargeNowNothingDue,
         };
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       } else {
-        showSavedSnackBar(context, AppLocalizations.of(context)!.chargedNowMessage);
+        showSavedSnackBar(
+          context,
+          AppLocalizations.of(context)!.chargedNowMessage,
+        );
       }
     } finally {
       if (mounted) setState(() => _chargingIds.remove(subscription.id));
@@ -335,7 +342,9 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                                       .pendingDueDates(subscriptions[i], today)
                                       .length
                                 : 0,
-                            charging: _chargingIds.contains(subscriptions[i].id),
+                            charging: _chargingIds.contains(
+                              subscriptions[i].id,
+                            ),
                             onEdit: () => _edit(subscriptions[i], categories),
                             onDelete: () => _delete(subscriptions[i]),
                             onToggleAutoCharge: (enabled) =>
@@ -346,7 +355,8 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                       ],
                     );
                   },
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Text(friendlyLoadErrorMessage(l10n, e)),
                 ),
               ],
@@ -406,82 +416,90 @@ class _SubscriptionRow extends StatelessWidget {
             ? Border(top: BorderSide(color: context.tokens.border))
             : null,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      // Info on top at full width, actions on their own line below: with the
+      // labelled "Cobrar agora" button beside the text, a phone-width row left
+      // the name and amount a sliver of a column.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: formatCurrency(subscription.amount),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: formatCurrency(subscription.amount),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: [FontFeature.tabularFigures()],
                       ),
-                      TextSpan(
-                        text: ' · ${subscription.name}',
-                        style: TextStyle(color: context.tokens.subtle),
-                      ),
-                    ],
-                  ),
+                    ),
+                    TextSpan(
+                      text: ' · ${subscription.name}',
+                      style: TextStyle(color: context.tokens.subtle),
+                    ),
+                  ],
                 ),
+              ),
+              Text(
+                '${l10n.subscriptionChargedOnLabel('${subscription.dueDay}')} · $sourceName',
+                style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+              ),
+              if (missingCaixinha)
                 Text(
-                  '${l10n.subscriptionChargedOnLabel('${subscription.dueDay}')} · $sourceName',
-                  style: TextStyle(fontSize: 12, color: context.tokens.subtle),
+                  l10n.chargeSourceMissingWarning,
+                  style: TextStyle(fontSize: 12, color: error),
+                )
+              else if (pendingCharges > 0)
+                Text(
+                  l10n.pendingChargesRowLabel(pendingCharges),
+                  style: TextStyle(fontSize: 12, color: error),
                 ),
-                if (missingCaixinha)
-                  Text(
-                    l10n.chargeSourceMissingWarning,
-                    style: TextStyle(fontSize: 12, color: error),
-                  )
-                else if (pendingCharges > 0)
-                  Text(
-                    l10n.pendingChargesRowLabel(pendingCharges),
-                    style: TextStyle(fontSize: 12, color: error),
-                  ),
-              ],
-            ),
+            ],
           ),
-          Tooltip(
-            message: l10n.autoChargeSwitchTooltip,
-            child: Switch(
-              value: subscription.autoChargeEnabled,
-              onChanged: charging ? null : onToggleAutoCharge,
-            ),
-          ),
-          if (!subscription.autoChargeEnabled)
-            // Charging is only meaningful once something is actually due,
-            // and never for a caixinha that no longer exists — same guard
-            // catch-up itself would hit. A labelled button, not a bare icon:
-            // the lightning bolt alone didn't read as "charge".
-            TextButton.icon(
-              onPressed: (charging || pendingCharges == 0 || missingCaixinha)
-                  ? null
-                  : onChargeNow,
-              icon: charging
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.payments_outlined, size: 18),
-              label: Text(l10n.chargeNowTooltip),
-            ),
-          IconButton(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: l10n.editSubscriptionTooltip,
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: l10n.removeSubscriptionTooltip,
-            color: error,
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Tooltip(
+                message: l10n.autoChargeSwitchTooltip,
+                child: Switch(
+                  value: subscription.autoChargeEnabled,
+                  onChanged: charging ? null : onToggleAutoCharge,
+                ),
+              ),
+              if (!subscription.autoChargeEnabled)
+                // Charging is only meaningful once something is actually due,
+                // and never for a caixinha that no longer exists — same guard
+                // catch-up itself would hit. A labelled button, not a bare icon:
+                // the lightning bolt alone didn't read as "charge".
+                TextButton.icon(
+                  onPressed:
+                      (charging || pendingCharges == 0 || missingCaixinha)
+                      ? null
+                      : onChargeNow,
+                  icon: charging
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.payments_outlined, size: 18),
+                  label: Text(l10n.chargeNowTooltip),
+                ),
+              IconButton(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: l10n.editSubscriptionTooltip,
+              ),
+              IconButton(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
+                tooltip: l10n.removeSubscriptionTooltip,
+                color: error,
+              ),
+            ],
           ),
         ],
       ),
