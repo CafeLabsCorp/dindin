@@ -328,13 +328,13 @@ Not applied to the single hero `StatTile` values (nothing to align against).
   3.52:1, `statusCritical` on it is 4.07:1, `statusGood` on
   `primaryContainer` is 4.08:1 — all below the 4.5:1 required at that size).
 
-**Existing logo** (`assets/logo.svg`): a piggy-bank/coin illustration in
-`#1BAF7A` (green) + `#1A6B4E` (dark green) + `#FFC800` (gold) + `#A4830C`
-(dark gold). This sits fine next to the new palette — it's already in the
-same green/gold hue family as `primary`/`Âmbar`, just a brighter/more
-saturated green than the new `primary` (`#2E6F4D`). Nudging the logo's green
-to match `primary` exactly is a cosmetic, non-blocking follow-up — they
-currently read as "related but not identical" rather than "the same color."
+**Logo** (`assets/logo.svg`): a money bag carrying the Dindin coin (the
+logotype's D, in Fraunces SemiBold) instead of a dollar sign since
+2026-10-27, in one palette for both backgrounds (set with Felipe on
+2026-10-07): `#3E8A62` (green), `#24563C` (green shadow), `#E8B04A` (gold)
+and `#A8660A` (gold shadow). It deliberately doesn't use the app's `primary`
+(`#2E6F4D`), which read too dark for a large symbol. Full catalogue and brand
+manual in `cafelabs-vault/marca/dindin/`.
 
 ---
 

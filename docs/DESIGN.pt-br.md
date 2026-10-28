@@ -347,11 +347,12 @@ alinhem verticalmente numa coluna. Não aplicado aos valores hero únicos do
   `primaryContainer` é 4.08:1 — todos abaixo do 4.5:1 exigido nesse
   tamanho).
 
-**Logo** (`assets/logo.svg`): saco de dinheiro com uma paleta única nos dois fundos
+**Logo** (`assets/logo.svg`): saco de dinheiro com a moeda do Dindin (o D do logotipo, em
+Fraunces SemiBold) no lugar do cifrão desde 2026-10-27, com uma paleta única nos dois fundos
 (definida com o Felipe em 2026-10-07): `#3E8A62` (verde), `#24563C` (sombra do verde),
 `#E8B04A` (dourado) e `#A8660A` (sombra do dourado). Não usa o `primary` do app
 (`#2E6F4D`) de propósito: esse verde ficava escuro demais pra um símbolo grande.
-Catálogo completo em `cafelabs-vault/marca/dindin/`.
+Catálogo completo e manual de marca em `cafelabs-vault/marca/dindin/`.
 
 ---
 
