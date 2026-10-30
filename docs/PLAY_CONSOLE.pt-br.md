@@ -59,6 +59,8 @@ dados") que deve ficar `true`.
 
 ### Ficha da loja (página "Detalhes do app" padrão, pt-BR)
 
+Imagens da ficha (ícone, gráfico de destaque e capturas) em [play-store-assets/](play-store-assets/README.md), fora do git.
+
 Preenchida em 2026-09-24. Texto como foi publicado (só pt-BR):
 
 **Nome:** `Dindin: finanças por caixinhas`

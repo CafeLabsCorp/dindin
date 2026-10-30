@@ -68,3 +68,7 @@ yarn-error.log*
 .pnpm-debug.log*
 .env*
 .vercel
+
+# Play Store listing graphics (icon, feature graphic, screenshots): binaries,
+# kept on disk + Drive (gdrive:dindin), not in git. See docs/play-store-assets/README.md.
+docs/play-store-assets/**/*.png

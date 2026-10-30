@@ -53,7 +53,7 @@ this ("users can request data deletion") that should be `true`.
 
 ### Store listing (main listing, pt-BR)
 
-Filled in on 2026-09-24. Listing text as published (pt-BR only):
+Filled in on 2026-09-24. Listing graphics (icon, feature graphic, screenshots) are in [play-store-assets/](play-store-assets/README.md), not versioned. Listing text as published (pt-BR only):
 
 **Nome:** `Dindin: finanças por caixinhas`
 
