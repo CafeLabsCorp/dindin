@@ -25,7 +25,7 @@ class _MockAuthService extends Mock implements AuthService {}
 
 class _FakeUpdateService implements AppUpdateService {
   _FakeUpdateService({required this.available});
-  final bool available;
+  bool available;
   int started = 0;
 
   @override
@@ -317,6 +317,49 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.text('Tem uma versão nova do Dindin disponível.'), findsNothing);
+    });
+
+    testWidgets('indicador fixo: item "Atualizar" no menu enquanto houver versão nova', (tester) async {
+      final service = _FakeUpdateService(available: true);
+      await pump(tester, extraOverrides: [appUpdateServiceProvider.overrideWithValue(service)]);
+      await tester.pump(const Duration(milliseconds: 50));
+      // Some o snackbar; o indicador continua.
+      await tester.pump(const Duration(seconds: 13));
+
+      expect(find.byType(Badge), findsWidgets);
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('update-indicator')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('update-indicator')));
+      await tester.pumpAndSettle();
+      expect(service.started, 1);
+    });
+
+    testWidgets('sem versão nova: sem item "Atualizar" no menu', (tester) async {
+      final service = _FakeUpdateService(available: false);
+      await pump(tester, extraOverrides: [appUpdateServiceProvider.overrideWithValue(service)]);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('update-indicator')), findsNothing);
+    });
+
+    testWidgets('volta do segundo plano: rechecha e o indicador acompanha', (tester) async {
+      final service = _FakeUpdateService(available: false);
+      await pump(tester, extraOverrides: [appUpdateServiceProvider.overrideWithValue(service)]);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byTooltip('Menu'), findsOneWidget);
+
+      service.available = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('update-indicator')), findsOneWidget);
     });
   });
 }

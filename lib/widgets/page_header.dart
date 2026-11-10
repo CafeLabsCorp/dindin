@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'app_shell.dart' show AppNavigation;
 
 /// The title + subtitle every screen opens with — and, on narrow screens, the
 /// app's navigation.
@@ -64,7 +65,11 @@ class PageHeader extends StatelessWidget {
                         child: Text(title, style: titleStyle, overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.expand_more, size: 26, color: context.tokens.subtle),
+                      Badge(
+                        isLabelVisible: AppNavigation.of(context)?.updateAvailable ?? false,
+                        smallSize: 8,
+                        child: Icon(Icons.expand_more, size: 26, color: context.tokens.subtle),
+                      ),
                     ],
                   ),
                 ),

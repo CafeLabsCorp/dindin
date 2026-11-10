@@ -42,7 +42,7 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
   StatefulNavigationShell get navigationShell => widget.navigationShell;
 
   /// Destinations visited before the current one, most recent last. The
@@ -59,9 +59,15 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   static const _titleHiddenOffset = 56.0;
 
+  /// Whether Play has a newer build. Drives the fixed indicator (a dot on the
+  /// menu trigger + an "Atualizar" entry in the menu), which stays for as long
+  /// as it's true — unlike the snackbar, which shows once per app open.
+  bool _updateAvailable = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Once per app open, after the first frame so there is a navigator to
     // show the dialog on.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,17 +76,40 @@ class _AppShellState extends ConsumerState<AppShell> {
     });
   }
 
-  /// Tells the user a newer version is on Google Play. Dismissible and never
-  /// blocking: a snackbar with an "Atualizar" action, shown once per app open,
-  /// and silent whenever Play has nothing to say (see [AppUpdateService]).
-  Future<void> _maybeOfferUpdate() async {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Back from the background: the user may have updated (or Play may have
+  /// published) in the meantime, so the indicator is re-checked — silently.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshUpdateAvailable();
+  }
+
+  /// Asks Play and updates the fixed indicator. Returns the service when an
+  /// update is available (so the caller can offer it), null otherwise.
+  Future<AppUpdateService?> _refreshUpdateAvailable() async {
     final AppUpdateService service;
     try {
       service = ref.read(appUpdateServiceProvider);
     } catch (_) {
-      return;
+      return null;
     }
-    if (!await service.isUpdateAvailable() || !mounted) return;
+    final available = await service.isUpdateAvailable();
+    if (!mounted) return null;
+    if (available != _updateAvailable) setState(() => _updateAvailable = available);
+    return available ? service : null;
+  }
+
+  /// Tells the user a newer version is on Google Play. Dismissible and never
+  /// blocking: a snackbar with an "Atualizar" action, shown once per app open,
+  /// and silent whenever Play has nothing to say (see [AppUpdateService]).
+  Future<void> _maybeOfferUpdate() async {
+    final service = await _refreshUpdateAvailable();
+    if (service == null || !mounted) return;
     final l10n = AppLocalizations.of(context)!;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
@@ -233,6 +262,25 @@ class _AppShellState extends ConsumerState<AppShell> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: SvgPicture.asset('assets/logo.svg', height: 32),
               ),
+              trailing: _updateAvailable
+                  ? Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Tooltip(
+                            message: l10n.updateAvailableMessage,
+                            child: TextButton.icon(
+                              key: const ValueKey('update-indicator'),
+                              onPressed: _startUpdate,
+                              icon: Badge(smallSize: 8, child: const Icon(Icons.system_update_alt)),
+                              label: Text(l10n.updateAction),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
               destinations: [
                 for (final d in destinations)
                   NavigationRailDestination(icon: Icon(d.icon), selectedIcon: Icon(d.selectedIcon), label: Text(d.label)),
@@ -271,7 +319,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 padding: const EdgeInsets.all(16),
                 child: NotificationListener<ScrollNotification>(
                   onNotification: _onScroll,
-                  child: AppNavigation(openMenu: openMenu, child: navigationShell),
+                  child: AppNavigation(
+                    openMenu: openMenu,
+                    updateAvailable: _updateAvailable,
+                    child: navigationShell,
+                  ),
                 ),
               ),
               Positioned(
@@ -283,6 +335,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   label: destinations[navigationShell.currentIndex].label,
                   menuLabel: l10n.navMenu,
                   onOpenMenu: openMenu,
+                  updateAvailable: _updateAvailable,
                 ),
               ),
             ],
@@ -290,6 +343,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
       ),
     );
+  }
+
+  /// Starts the Play update from the fixed indicator. The check is repeated
+  /// afterwards so the indicator goes away once the app is up to date.
+  Future<void> _startUpdate() async {
+    await ref.read(appUpdateServiceProvider).startUpdate();
+    if (mounted) await _refreshUpdateAvailable();
   }
 
   /// Every destination, as a list that drops down from the top over a dimmed
@@ -327,6 +387,17 @@ class _AppShellState extends ConsumerState<AppShell> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_updateAvailable)
+                    ListTile(
+                      key: const ValueKey('update-indicator'),
+                      leading: Badge(smallSize: 8, child: const Icon(Icons.system_update_alt)),
+                      title: Text(AppLocalizations.of(dialogContext)!.updateAction),
+                      subtitle: Text(AppLocalizations.of(dialogContext)!.updateAvailableMessage),
+                      onTap: () {
+                        Navigator.pop(dialogContext);
+                        _startUpdate();
+                      },
+                    ),
                   for (var i = 0; i < destinations.length; i++)
                     ListTile(
                       leading: Icon(
@@ -370,7 +441,15 @@ class _AppShellState extends ConsumerState<AppShell> {
 class AppNavigation extends InheritedWidget {
   final VoidCallback? openMenu;
 
-  const AppNavigation({super.key, required this.openMenu, required super.child});
+  /// Whether Play has a newer build; headers show a dot on the menu trigger.
+  final bool updateAvailable;
+
+  const AppNavigation({
+    super.key,
+    required this.openMenu,
+    this.updateAvailable = false,
+    required super.child,
+  });
 
   static AppNavigation? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppNavigation>();
@@ -380,7 +459,7 @@ class AppNavigation extends InheritedWidget {
   // frame for no reason.
   @override
   bool updateShouldNotify(AppNavigation oldWidget) =>
-      (openMenu == null) != (oldWidget.openMenu == null);
+      (openMenu == null) != (oldWidget.openMenu == null) || updateAvailable != oldWidget.updateAvailable;
 }
 
 /// Compact copy of the page title that slides in once the real one has
@@ -390,12 +469,14 @@ class _StickyTitle extends StatelessWidget {
   final String label;
   final String menuLabel;
   final VoidCallback onOpenMenu;
+  final bool updateAvailable;
 
   const _StickyTitle({
     required this.visible,
     required this.label,
     required this.menuLabel,
     required this.onOpenMenu,
+    this.updateAvailable = false,
   });
 
   @override
@@ -439,7 +520,11 @@ class _StickyTitle extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Icon(Icons.expand_more, size: 24, color: context.tokens.subtle),
+                        Badge(
+                          isLabelVisible: updateAvailable,
+                          smallSize: 8,
+                          child: Icon(Icons.expand_more, size: 24, color: context.tokens.subtle),
+                        ),
                       ],
                     ),
                   ),
