@@ -139,6 +139,10 @@ class AuthService {
   Future<void> deleteAccount() async {
     final user = _auth.currentUser;
     if (user == null) return;
+    // Delete first, forget the cached Google session after: if `delete()`
+    // throws (e.g. `requires-recent-login`) the user stays signed in as they
+    // were and can retry without having been logged out of Google.
+    await user.delete();
     if (!kIsWeb) {
       // Best-effort: forgets the cached Google session so a future sign-in
       // attempt on this device doesn't silently reuse credentials for an
@@ -149,6 +153,19 @@ class AuthService {
         // Not fatal to account deletion either way.
       }
     }
-    await user.delete();
+  }
+
+  /// Whether the current sign-in is recent enough for `user.delete()`.
+  /// Firebase refuses sensitive operations with `requires-recent-login` when
+  /// the ID token's `auth_time` is older than about five minutes; reading that
+  /// same claim lets the caller refuse BEFORE wiping the Firestore data (the
+  /// wipe runs first, see [deleteAccount]), so a stale session can't leave a
+  /// live, empty account behind. Uses a margin under the server window.
+  Future<bool> hasRecentLogin({Duration within = const Duration(minutes: 4)}) async {
+    final user = _auth.currentUser;
+    if (user == null) return true;
+    final authTime = (await user.getIdTokenResult()).authTime;
+    if (authTime == null) return false;
+    return DateTime.now().difference(authTime) <= within;
   }
 }

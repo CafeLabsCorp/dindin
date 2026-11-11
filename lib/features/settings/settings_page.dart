@@ -235,6 +235,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
       _deleteMessage = null;
     });
     try {
+      // Refuse BEFORE touching any data when the sign-in is too old for
+      // `user.delete()`: wiping Firestore first and failing at the Auth step
+      // used to leave a live, empty account behind.
+      if (!await ref.read(authServiceProvider).hasRecentLogin()) {
+        if (!mounted) return;
+        setState(() => _deleteMessage = l10n.deleteAccountReauthRequiredMessage);
+        return;
+      }
       // Order matters (see AuthService.deleteAccount's doc comment): the
       // Firestore subtree is wiped FIRST, the Auth identity LAST — the
       // reverse order would strand `users/{uid}` unreachable forever (uids

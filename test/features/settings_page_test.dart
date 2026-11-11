@@ -9,9 +9,12 @@ import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/providers/locale_provider.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/services/auth_service.dart';
+import 'package:dindin/services/firestore_service.dart';
 import 'package:dindin/theme/theme.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
+
+class _MockFirestoreService extends Mock implements FirestoreService {}
 
 class _MockUser extends Mock implements User {}
 
@@ -34,6 +37,7 @@ void main() {
     required Locale startLocale,
     User? user,
     AuthService? authService,
+    FirestoreService? firestoreService,
   }) async {
     final auth = authService ?? _MockAuthService();
     if (authService == null) {
@@ -49,6 +53,7 @@ void main() {
           // Firebase/auth setup.
           authStateProvider.overrideWith((ref) => Stream.value(user)),
           authServiceProvider.overrideWith((ref) => auth),
+          if (firestoreService != null) firestoreServiceProvider.overrideWith((ref) => firestoreService),
           localeProvider.overrideWith((ref) => startLocale),
         ],
         // Reads localeProvider the same way DindinApp's real
@@ -301,6 +306,59 @@ void main() {
       // Nenhuma exception sobe e derruba o teste (tester.pumpAndSettle já
       // faria isso falhar) — a tela mostra a mensagem amigável de rate limit.
       expect(find.textContaining('Muitas tentativas'), findsOneWidget);
+    });
+  });
+
+  group('Excluir conta: não apaga nada com login antigo', () {
+    Future<void> openDeleteAndConfirm(WidgetTester tester) async {
+      await scrollUntilVisible(tester, find.text('Excluir conta'));
+      await tester.tap(find.text('Excluir conta'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Excluir definitivamente'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('login antigo: mostra o aviso e NÃO apaga os dados nem a conta', (tester) async {
+      final authService = _MockAuthService();
+      when(() => authService.reloadCurrentUser()).thenAnswer((_) async {});
+      when(() => authService.hasRecentLogin()).thenAnswer((_) async => false);
+      final firestore = _MockFirestoreService();
+
+      await pumpPage(
+        tester,
+        startLocale: const Locale('pt'),
+        user: passwordUser(emailVerified: true),
+        authService: authService,
+        firestoreService: firestore,
+      );
+      await openDeleteAndConfirm(tester);
+
+      verifyNever(() => firestore.deleteAllUserData());
+      verifyNever(() => authService.deleteAccount());
+      expect(find.textContaining('login recente'), findsOneWidget);
+    });
+
+    testWidgets('login recente: apaga os dados e depois a conta, nessa ordem', (tester) async {
+      final authService = _MockAuthService();
+      when(() => authService.reloadCurrentUser()).thenAnswer((_) async {});
+      when(() => authService.hasRecentLogin()).thenAnswer((_) async => true);
+      when(() => authService.deleteAccount()).thenAnswer((_) async {});
+      final firestore = _MockFirestoreService();
+      when(() => firestore.deleteAllUserData()).thenAnswer((_) async {});
+
+      await pumpPage(
+        tester,
+        startLocale: const Locale('pt'),
+        user: passwordUser(emailVerified: true),
+        authService: authService,
+        firestoreService: firestore,
+      );
+      await openDeleteAndConfirm(tester);
+
+      verifyInOrder([
+        () => firestore.deleteAllUserData(),
+        () => authService.deleteAccount(),
+      ]);
     });
   });
 }
