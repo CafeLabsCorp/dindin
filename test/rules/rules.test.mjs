@@ -2180,3 +2180,124 @@ describe('accountDeletionLog (create-only, anonymous audit trail)', () => {
     await assertFails(deleteDoc(doc(alice, path)));
   });
 });
+
+// -----------------------------------------------------------------------
+// B2. Edits must compute the new balance exactly like the rules do.
+// The rules require `getAfter(bal) == balBefore + delta` with exact
+// IEEE-754 equality, where `delta` is a single subtraction (new - old or
+// old - new). The client used to chain the operations the other way around
+// (`(acct - old) + new`), which differs in the last bit for ~1/3 of
+// "dirty" money values, so an edit was randomly refused with
+// permission-denied. FirestoreService now adds the delta in one step
+// (`acct + (new - old)`), the same expression the rules evaluate.
+// -----------------------------------------------------------------------
+
+describe('edits: balance arithmetic parity with the rules (floating point)', () => {
+  async function seedBalances({ account, cat, catBalance }) {
+    await seed(async (sdb) => {
+      await setDoc(accountDoc(sdb, 'alice'), { balance: account });
+      if (cat) {
+        await setDoc(catDoc(sdb, 'alice', cat), {
+          name: 'Lazer',
+          recurring: false,
+          createdAt: '2026-01-01',
+          kind: 'spend',
+        });
+        await setDoc(balDoc(sdb, 'alice', cat), { balance: catBalance });
+      }
+    });
+  }
+
+  // Values chosen so the two orderings differ in the last bit (checked below).
+  const inc = { a: 687.14, o: 274.67, n: 970.96 };
+  const alloc = { a: 730.76, o: 132.02, n: 846.77, c: 819.53 };
+  const expCat = { o: 837.43, n: 610.28, c: 26.45 };
+  const expAcct = { a: 787.39, o: 832.28, n: 802.27 };
+
+  test('the chosen values really do differ between the two orderings', () => {
+    assert.notEqual(inc.a - inc.o + inc.n, inc.a + (inc.n - inc.o));
+    assert.notEqual(alloc.a - alloc.n + alloc.o, alloc.a + (alloc.o - alloc.n));
+    assert.notEqual(expCat.c + expCat.o - expCat.n, expCat.c + (expCat.o - expCat.n));
+    assert.notEqual(expAcct.a + expAcct.o - expAcct.n, expAcct.a + (expAcct.o - expAcct.n));
+  });
+
+  // ---- income ----
+  async function editIncome(newAccount) {
+    await seedBalances({ account: inc.a });
+    await seed((sdb) =>
+      setDoc(incomeDoc(sdb, 'alice', 'i1'), { date: '2026-01-01', amount: inc.o, source: 'freela' }),
+    );
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(incomeDoc(db, 'alice', 'i1'), { date: '2026-01-01', amount: inc.n, source: 'freela' });
+    batch.set(accountDoc(db, 'alice'), { balance: newAccount });
+    return batch.commit();
+  }
+  test('income edit: the old chained arithmetic (acct - old + new) is refused for dirty values', async () => {
+    await assertFails(editIncome(inc.a - inc.o + inc.n));
+  });
+  test('income edit: acct + (new - old) is accepted', async () => {
+    await assertSucceeds(editIncome(inc.a + (inc.n - inc.o)));
+  });
+
+  // ---- allocation ----
+  async function editAllocation(newAccount, newCat) {
+    await seedBalances({ account: alloc.a, cat: 'c1', catBalance: alloc.c });
+    await seed((sdb) =>
+      setDoc(allocDoc(sdb, 'alice', 'a1'), { categoryId: 'c1', amount: alloc.o, date: '2026-01-02' }),
+    );
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(allocDoc(db, 'alice', 'a1'), { categoryId: 'c1', amount: alloc.n, date: '2026-01-02' });
+    batch.set(accountDoc(db, 'alice'), { balance: newAccount });
+    batch.set(balDoc(db, 'alice', 'c1'), { balance: newCat });
+    return batch.commit();
+  }
+  test('allocation edit: the old chained arithmetic is refused for dirty values', async () => {
+    await assertFails(editAllocation(alloc.a - alloc.n + alloc.o, alloc.c + alloc.n - alloc.o));
+  });
+  test('allocation edit: acct + (old - new) and cat + (new - old) are accepted', async () => {
+    await assertSucceeds(
+      editAllocation(alloc.a + (alloc.o - alloc.n), alloc.c + (alloc.n - alloc.o)),
+    );
+  });
+
+  // ---- expense on a caixinha ----
+  async function editCatExpense(newCat) {
+    await seedBalances({ account: 1000, cat: 'c1', catBalance: expCat.c });
+    await seed((sdb) =>
+      setDoc(expenseDoc(sdb, 'alice', 'e1'), { date: '2026-01-03', amount: expCat.o, categoryId: 'c1' }),
+    );
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(expenseDoc(db, 'alice', 'e1'), { date: '2026-01-03', amount: expCat.n, categoryId: 'c1' });
+    batch.set(accountDoc(db, 'alice'), { balance: 1000 }); // accountDeltaOk(uid, 0)
+    batch.set(balDoc(db, 'alice', 'c1'), { balance: newCat });
+    return batch.commit();
+  }
+  test('caixinha expense edit: the old chained arithmetic (cat + old - new) is refused for dirty values', async () => {
+    await assertFails(editCatExpense(expCat.c + expCat.o - expCat.n));
+  });
+  test('caixinha expense edit: cat + (old - new) is accepted', async () => {
+    await assertSucceeds(editCatExpense(expCat.c + (expCat.o - expCat.n)));
+  });
+
+  // ---- expense on the account ----
+  async function editAccountExpense(newAccount) {
+    await seedBalances({ account: expAcct.a });
+    await seed((sdb) =>
+      setDoc(expenseDoc(sdb, 'alice', 'e1'), { date: '2026-01-03', amount: expAcct.o }),
+    );
+    const db = aliceDb();
+    const batch = writeBatch(db);
+    batch.set(expenseDoc(db, 'alice', 'e1'), { date: '2026-01-03', amount: expAcct.n });
+    batch.set(accountDoc(db, 'alice'), { balance: newAccount });
+    return batch.commit();
+  }
+  test('account expense edit: the old chained arithmetic (acct + old - new) is refused for dirty values', async () => {
+    await assertFails(editAccountExpense(expAcct.a + expAcct.o - expAcct.n));
+  });
+  test('account expense edit: acct + (old - new) is accepted', async () => {
+    await assertSucceeds(editAccountExpense(expAcct.a + (expAcct.o - expAcct.n)));
+  });
+});

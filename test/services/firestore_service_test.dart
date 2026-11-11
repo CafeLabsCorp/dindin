@@ -1477,6 +1477,61 @@ void main() {
     });
   });
 
+  group('edits add the delta in ONE step, like the rules (floating point parity)', () {
+    // firestore.rules compares `getAfter(bal) == balBefore + (new - old)` with
+    // exact IEEE-754 equality. Chaining `acct - old + new` differs in the last
+    // bit for some money values (see test/rules/rules.test.mjs, B2), so the
+    // client must store exactly `acct + (new - old)`.
+    Future<void> setAccount(double v) =>
+        fake.doc('users/u1/meta/account').set({'balance': v});
+    Future<void> setCatBalance(String id, double v) =>
+        fake.doc('users/u1/balances/$id').set({'balance': v});
+
+    test('updateIncome stores acct + (new - old)', () async {
+      final income = await svc.createIncome(date: '2026-01-01', amount: 274.67, source: IncomeSource.freela);
+      await setAccount(687.14);
+
+      await svc.updateIncome(income.id, date: '2026-01-01', amount: 970.96, source: IncomeSource.freela);
+
+      expect(await accountBalance(), 687.14 + (970.96 - 274.67));
+    });
+
+    test('updateAllocation stores acct + (old - new) and cat + (new - old)', () async {
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false);
+      await svc.createIncome(date: '2026-01-01', amount: 5000, source: IncomeSource.freela);
+      final alloc = await svc.createAllocation(categoryId: cat.id, amount: 132.02, date: '2026-01-02');
+      await setAccount(730.76);
+      await setCatBalance(cat.id, 819.53);
+
+      await svc.updateAllocation(alloc.id, categoryId: cat.id, amount: 846.77, date: '2026-01-02');
+
+      expect(await accountBalance(), 730.76 + (132.02 - 846.77));
+      expect(await categoryBalance(cat.id), 819.53 + (846.77 - 132.02));
+    });
+
+    test('updateExpense on a caixinha stores cat + (old - new)', () async {
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false);
+      await svc.createIncome(date: '2026-01-01', amount: 5000, source: IncomeSource.freela);
+      await svc.createAllocation(categoryId: cat.id, amount: 2000, date: '2026-01-02');
+      final exp = await svc.createExpense(date: '2026-01-03', amount: 837.43, categoryId: cat.id);
+      await setCatBalance(cat.id, 26.45);
+
+      await svc.updateExpense(exp.id, date: '2026-01-03', amount: 610.28, categoryId: cat.id);
+
+      expect(await categoryBalance(cat.id), 26.45 + (837.43 - 610.28));
+    });
+
+    test('updateExpense on the account stores acct + (old - new)', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 5000, source: IncomeSource.freela);
+      final exp = await svc.createExpense(date: '2026-01-03', amount: 832.28);
+      await setAccount(787.39);
+
+      await svc.updateExpense(exp.id, date: '2026-01-03', amount: 802.27);
+
+      expect(await accountBalance(), 787.39 + (832.28 - 802.27));
+    });
+  });
+
   group('deleteCategory cascade', () {
     test('deletes the category, its balance doc, and its ledger rows, restoring plain-allocation money to the account', () async {
       await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);

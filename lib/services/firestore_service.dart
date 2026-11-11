@@ -536,7 +536,10 @@ class FirestoreService {
       if (!snap.exists) throw StateError('income not found');
       final old = (snap.data()!['amount'] as num).toDouble();
       final acct = await _readBalance(tx, _account);
-      final newAcct = acct - old + amount;
+      // One addition of the delta, exactly like `firestore.rules`
+      // (`balBefore + (new - old)`): chaining `acct - old + amount` differs
+      // in the last bit for some money values and the rules compare with ==.
+      final newAcct = acct + (amount - old);
       if (newAcct < -_eps) {
         throw StateError('lowering income would overdraw the account');
       }
@@ -637,11 +640,11 @@ class FirestoreService {
       final old = (data['amount'] as num).toDouble();
       final acct = await _readBalance(tx, _account);
       final catBal = await _readBalance(tx, _balance(categoryId));
-      final newAcct = acct - amount + old; // account += (old - new)
+      final newAcct = acct + (old - amount); // same expression as the rules
       if (newAcct < -_eps) {
         throw StateError('amount exceeds account balance');
       }
-      final newCat = catBal + amount - old;
+      final newCat = catBal + (amount - old);
       if (!_catDeltaOk(category, catBal, newCat)) {
         throw StateError(
           'reducing this allocation would overdraw the caixinha',
@@ -874,7 +877,7 @@ class FirestoreService {
       final old = (data['amount'] as num).toDouble();
       if (categoryId == null) {
         final acct = await _readBalance(tx, _account);
-        final newAcct = acct + old - amount;
+        final newAcct = acct + (old - amount);
         if (newAcct < -_eps) {
           throw StateError('amount exceeds available balance');
         }
@@ -885,7 +888,7 @@ class FirestoreService {
         if (!catSnap.exists) throw StateError('category not found');
         final category = Category.fromMap(categoryId, catSnap.data()!);
         final catBal = await _readBalance(tx, _balance(categoryId));
-        final newCat = catBal + old - amount;
+        final newCat = catBal + (old - amount);
         if (!_catDeltaOk(category, catBal, newCat)) {
           throw StateError('amount exceeds available balance');
         }
