@@ -123,9 +123,13 @@ List<MonthSummary> monthlyHistory(AppDb db) {
   return allMonths(db).map((m) => monthSummary(db, m)).toList();
 }
 
-String currentMonthKey() {
-  final now = DateTime.now().toUtc();
-  return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}';
+/// The current month as `YYYY-MM`, in the device's LOCAL time — the same clock
+/// the ledger dates use (`todayIso()`/`isoDateFrom(DateTime.now())`). Using UTC
+/// here made the Dashboard flip to the next (empty) month at 21h local on the
+/// last day of the month in Brazil (UTC-3). [now] is injectable for tests.
+String currentMonthKey({DateTime? now}) {
+  final n = now ?? DateTime.now();
+  return '${n.year.toString().padLeft(4, '0')}-${n.month.toString().padLeft(2, '0')}';
 }
 
 class Summary {

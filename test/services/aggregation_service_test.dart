@@ -114,6 +114,12 @@ void main() {
     expect(history[1].totalIncome, 500);
   });
 
+  test('currentMonthKey usa a hora LOCAL: 31/01 às 23h30 ainda é janeiro (não vira fevereiro em UTC)', () {
+    expect(currentMonthKey(now: DateTime(2026, 1, 31, 23, 30)), '2026-01');
+    expect(currentMonthKey(now: DateTime(2026, 12, 31, 23, 59)), '2026-12');
+    expect(currentMonthKey(now: DateTime(2026, 2, 1, 0, 5)), '2026-02');
+  });
+
   test('currentMonthKey usa o formato YYYY-MM', () {
     expect(currentMonthKey(), matches(RegExp(r'^\d{4}-\d{2}$')));
   });
