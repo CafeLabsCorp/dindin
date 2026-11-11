@@ -1118,6 +1118,12 @@ abstract class AppLocalizations {
   /// **'Pontual'**
   String get oneTimeChip;
 
+  /// No description provided for @deleteBlockedByTransferTooltip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Desfaça as transferências dessa caixinha antes de removê-la'**
+  String get deleteBlockedByTransferTooltip;
+
   /// No description provided for @deleteBlockedByDebtTooltip.
   ///
   /// In pt, this message translates to:

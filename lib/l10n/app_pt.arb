@@ -266,6 +266,7 @@
   "categoriesEmptyState": "Nenhuma categoria ainda. Crie a primeira acima.",
   "recurringChip": "Recorrente",
   "oneTimeChip": "Pontual",
+  "deleteBlockedByTransferTooltip": "Desfaça as transferências dessa caixinha antes de removê-la",
   "deleteBlockedByDebtTooltip": "Quite a dívida dessa caixinha (saldo de volta a zero) antes de removê-la",
   "removeCategoryTooltip": "Remover categoria",
   "editCategoryTitle": "Editar categoria",

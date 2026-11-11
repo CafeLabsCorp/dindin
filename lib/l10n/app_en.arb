@@ -195,6 +195,7 @@
   "categoriesEmptyState": "No categories yet. Create the first one above.",
   "recurringChip": "Recurring",
   "oneTimeChip": "One-time",
+  "deleteBlockedByTransferTooltip": "Undo this envelope's transfers before removing it",
   "deleteBlockedByDebtTooltip": "Settle this envelope's debt (balance back to zero) before removing it",
   "removeCategoryTooltip": "Remove category",
   "editCategoryTitle": "Edit category",

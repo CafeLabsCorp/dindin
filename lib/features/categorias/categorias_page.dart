@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
+import '../../models/allocation.dart';
 import '../../models/category.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
@@ -147,6 +148,14 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     final l10n = AppLocalizations.of(context)!;
     final categoriesAsync = ref.watch(categoriesProvider);
     final summary = ref.watch(summaryProvider);
+    // Caixinhas that hold a transfer leg can't be deleted (see
+    // `FirestoreService.deleteCategory`); disable the action up front. Reads
+    // the unwindowed ledger so an old transfer outside the list window still
+    // counts.
+    final inTransfer = <String>{
+      for (final a in ref.watch(allAllocationsProvider).value ?? const <Allocation>[])
+        if (a.transferId != null) a.categoryId,
+    };
     final dark = Theme.of(context).brightness == Brightness.dark;
 
     return ListView(
@@ -291,6 +300,8 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                             (summary?.balancesByCategory[categories[i].id] ??
                                     0) <
                                 0;
+                        final hasTransfer = inTransfer.contains(categories[i].id);
+                        final deleteBlocked = hasUnsettledDebt || hasTransfer;
                         return InkWell(
                           onTap: () => _editCategory(categories[i]),
                           child: Container(
@@ -339,14 +350,16 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: hasUnsettledDebt
+                                      onPressed: deleteBlocked
                                           ? null
                                           : () => _delete(categories[i].id),
                                       icon: const Icon(Icons.delete_outline),
                                       tooltip: hasUnsettledDebt
                                           ? l10n.deleteBlockedByDebtTooltip
-                                          : l10n.removeCategoryTooltip,
-                                      color: hasUnsettledDebt
+                                          : hasTransfer
+                                              ? l10n.deleteBlockedByTransferTooltip
+                                              : l10n.removeCategoryTooltip,
+                                      color: deleteBlocked
                                           ? null
                                           : Theme.of(context).colorScheme.error,
                                     ),

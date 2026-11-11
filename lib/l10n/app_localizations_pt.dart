@@ -629,6 +629,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get oneTimeChip => 'Pontual';
 
   @override
+  String get deleteBlockedByTransferTooltip =>
+      'Desfaça as transferências dessa caixinha antes de removê-la';
+
+  @override
   String get deleteBlockedByDebtTooltip =>
       'Quite a dívida dessa caixinha (saldo de volta a zero) antes de removê-la';
 

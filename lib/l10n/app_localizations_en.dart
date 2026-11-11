@@ -631,6 +631,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oneTimeChip => 'One-time';
 
   @override
+  String get deleteBlockedByTransferTooltip =>
+      'Undo this envelope\'s transfers before removing it';
+
+  @override
   String get deleteBlockedByDebtTooltip =>
       'Settle this envelope\'s debt (balance back to zero) before removing it';
 

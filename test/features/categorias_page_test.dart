@@ -232,6 +232,50 @@ void main() {
     expect(find.byTooltip('Remover categoria'), findsNothing);
   });
 
+  testWidgets('ícone de remover fica desabilitado (com explicação) quando a caixinha participou de uma transferência', (tester) async {
+    const origem = Category(id: 'c1', name: 'Casa', recurring: true, createdAt: '2026-01-01');
+    const destino = Category(id: 'c2', name: 'Lazer', recurring: false, createdAt: '2026-01-01');
+    await pump(
+      tester,
+      categories: [origem, destino],
+      allocations: [
+        const Allocation(id: 'a1', categoryId: 'c1', amount: 300, date: '2026-01-02'),
+        const Allocation(id: 'a2', categoryId: 'c1', amount: -100, date: '2026-01-03', transferId: 't1'),
+        const Allocation(id: 'a3', categoryId: 'c2', amount: 100, date: '2026-01-03', transferId: 't1'),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    // Both ends of the transfer are blocked, with the transfer explanation.
+    final blocked = find.byTooltip('Desfaça as transferências dessa caixinha antes de removê-la');
+    expect(blocked, findsNWidgets(2));
+    for (final e in blocked.evaluate()) {
+      final button = tester.widget<IconButton>(
+        find.ancestor(of: find.byWidget(e.widget), matching: find.byType(IconButton)),
+      );
+      expect(button.onPressed, isNull);
+    }
+    expect(find.byTooltip('Remover categoria'), findsNothing);
+  });
+
+  testWidgets('ícone de remover continua habilitado numa caixinha sem transferência, mesmo havendo outra com transferência', (tester) async {
+    const origem = Category(id: 'c1', name: 'Casa', recurring: true, createdAt: '2026-01-01');
+    const destino = Category(id: 'c2', name: 'Lazer', recurring: false, createdAt: '2026-01-01');
+    const livre = Category(id: 'c3', name: 'Viagem', recurring: false, createdAt: '2026-01-01');
+    await pump(
+      tester,
+      categories: [origem, destino, livre],
+      allocations: [
+        const Allocation(id: 'a1', categoryId: 'c1', amount: 300, date: '2026-01-02'),
+        const Allocation(id: 'a2', categoryId: 'c1', amount: -100, date: '2026-01-03', transferId: 't1'),
+        const Allocation(id: 'a3', categoryId: 'c2', amount: 100, date: '2026-01-03', transferId: 't1'),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Remover categoria'), findsOneWidget);
+  });
+
   testWidgets('ícone de remover fica habilitado quando a caixinha (spend) está com saldo positivo', (tester) async {
     await pump(
       tester,
