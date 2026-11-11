@@ -273,6 +273,7 @@
   "errorNotFound": "This entry no longer exists.",
   "errorUnsupportedEdit": "This change isn't supported — remove it and log it again.",
   "errorSettleDebt": "Settle this envelope's debt (balance back to zero) before converting it into a savings box or removing it.",
+  "errorCategoryHasTransfer": "This envelope took part in a transfer. Undo the transfer first, then remove it.",
   "errorExceedsBalance": "This amount exceeds the available balance.",
   "errorGenericSave": "Couldn't save. Please try again.",
 

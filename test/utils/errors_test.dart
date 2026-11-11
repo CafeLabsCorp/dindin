@@ -43,6 +43,17 @@ void main() {
       );
     });
 
+    test('maps the transfer delete guard to its own pt-BR message', () {
+      final error = StateError(
+        'cannot delete a caixinha that took part in a transfer; undo the transfer first',
+      );
+      expect(
+        friendlyErrorMessage(l10n, error),
+        'Essa caixinha participou de uma transferência. Desfaça a transferência '
+        'primeiro e depois remova a caixinha.',
+      );
+    });
+
     test('maps "not found" to a pt-BR "no longer exists" message', () {
       expect(
         friendlyErrorMessage(l10n, StateError('category not found')),

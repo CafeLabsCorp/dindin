@@ -665,11 +665,15 @@ Doing 3 before 2 leaves balances desynced on day one.
   target (caixinha vs account). Re-homing is delete + recreate. These edit
   paths are not reachable from the current UI (only create/delete are wired),
   so this is not a user-visible regression today.
-- **Transfers are not fully supported in `deleteCategory`.** Deleting a
-  category that holds transfer legs would orphan the paired leg in another
-  caixinha and skew that caixinha's balance. Transfers are not reachable from
-  the UI yet; wire a dedicated flow before enabling them. No production data
-  has transfer legs today.
+- **`deleteCategory` refuses a caixinha that took part in a transfer.**
+  Transfers are reachable from the UI. Deleting a caixinha that holds a
+  transfer leg would orphan the paired leg in the other caixinha and, for a
+  source caixinha, push `meta/account` above the ledger (the sum reversed into
+  the account only counts plain allocations). The client throws a `StateError`
+  ("took part in a transfer; undo the transfer first", localized as
+  `errorCategoryHasTransfer`); the user undoes the transfer (`deleteAllocation`
+  on either leg removes both) and then deletes. Pinned by the `deleteCategory
+  cascade` tests.
 - **F1 — restoring a backup with a FROZEN debt could fail partway through —
   FIXED, verified against the emulator.** A frozen debt is a `spend` caixinha
   that went negative and then either had its `allowNegative` toggle turned

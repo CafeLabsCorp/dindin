@@ -27,6 +27,9 @@ String friendlyErrorMessage(AppLocalizations l10n, Object error) {
       message.contains('moving')) {
     return l10n.errorUnsupportedEdit;
   }
+  if (message.contains('took part in a transfer')) {
+    return l10n.errorCategoryHasTransfer;
+  }
   if (message.contains('settle the debt')) {
     return l10n.errorSettleDebt;
   }

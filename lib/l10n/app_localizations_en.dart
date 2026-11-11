@@ -882,6 +882,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Settle this envelope\'s debt (balance back to zero) before converting it into a savings box or removing it.';
 
   @override
+  String get errorCategoryHasTransfer =>
+      'This envelope took part in a transfer. Undo the transfer first, then remove it.';
+
+  @override
   String get errorExceedsBalance =>
       'This amount exceeds the available balance.';
 

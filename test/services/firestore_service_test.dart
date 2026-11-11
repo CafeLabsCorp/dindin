@@ -1503,7 +1503,7 @@ void main() {
       expect(remainingExps.docs, isEmpty);
     });
 
-    test('a transfer leg does not get double-reversed into the account (only plain allocations are summed back)', () async {
+    test('refuses to delete a caixinha that holds a transfer leg (destination), leaving every doc and balance untouched', () async {
       await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
       final origem = await svc.createCategory(name: 'Casa', recurring: true);
       final destino = await svc.createCategory(name: 'Lazer', recurring: false);
@@ -1514,13 +1514,54 @@ void main() {
         amount: 100,
         date: '2026-01-03',
       );
-      // account = 500 - 300 (plain allocation) = 200. The transfer doesn't touch it.
-      expect(await accountBalance(), 200);
 
-      await svc.deleteCategory(destino.id);
-      // destino only held a transfer leg (no plain allocation) -> account
-      // reversal sum is 0 -> account balance stays 200, not 300.
+      await expectLater(
+        () => svc.deleteCategory(destino.id),
+        throwsA(predicate((e) => e.toString().contains('took part in a transfer'))),
+      );
+
       expect(await accountBalance(), 200);
+      expect(await categoryBalance(origem.id), 200);
+      expect(await categoryBalance(destino.id), 100);
+      final cat = await fake.doc('users/u1/categories/${destino.id}').get();
+      expect(cat.exists, isTrue);
+    });
+
+    test('refuses to delete the SOURCE caixinha of a transfer too (A receives, transfers it all to B, deleting A would inflate the account)', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
+      final a = await svc.createCategory(name: 'A', recurring: true);
+      final b = await svc.createCategory(name: 'B', recurring: true);
+      await svc.createAllocation(categoryId: a.id, amount: 100, date: '2026-01-02');
+      await svc.createTransfer(
+        fromCategoryId: a.id,
+        toCategoryId: b.id,
+        amount: 100,
+        date: '2026-01-03',
+      );
+
+      await expectLater(
+        () => svc.deleteCategory(a.id),
+        throwsA(isA<StateError>()),
+      );
+      expect(await accountBalance(), 400); // not 500
+    });
+
+    test('after undoing the transfer, the caixinha can be deleted and the account is restored by its plain allocation', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
+      final a = await svc.createCategory(name: 'A', recurring: true);
+      final b = await svc.createCategory(name: 'B', recurring: true);
+      await svc.createAllocation(categoryId: a.id, amount: 100, date: '2026-01-02');
+      final transferId = await svc.createTransfer(
+        fromCategoryId: a.id,
+        toCategoryId: b.id,
+        amount: 100,
+        date: '2026-01-03',
+      );
+
+      await svc.deleteTransfer(transferId);
+      await svc.deleteCategory(a.id);
+
+      expect(await accountBalance(), 500);
     });
   });
 

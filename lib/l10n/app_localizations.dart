@@ -1532,6 +1532,12 @@ abstract class AppLocalizations {
   /// **'Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho ou removê-la.'**
   String get errorSettleDebt;
 
+  /// No description provided for @errorCategoryHasTransfer.
+  ///
+  /// In pt, this message translates to:
+  /// **'Essa caixinha participou de uma transferência. Desfaça a transferência primeiro e depois remova a caixinha.'**
+  String get errorCategoryHasTransfer;
+
   /// No description provided for @errorExceedsBalance.
   ///
   /// In pt, this message translates to:

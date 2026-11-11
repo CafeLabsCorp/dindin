@@ -385,6 +385,7 @@
   "errorNotFound": "Esse lançamento não existe mais.",
   "errorUnsupportedEdit": "Essa alteração não é suportada — remova e lance de novo.",
   "errorSettleDebt": "Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho ou removê-la.",
+  "errorCategoryHasTransfer": "Essa caixinha participou de uma transferência. Desfaça a transferência primeiro e depois remova a caixinha.",
   "errorExceedsBalance": "Esse valor ultrapassa o saldo disponível.",
   "errorGenericSave": "Não foi possível salvar. Tente novamente.",
 

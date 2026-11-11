@@ -880,6 +880,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho ou removê-la.';
 
   @override
+  String get errorCategoryHasTransfer =>
+      'Essa caixinha participou de uma transferência. Desfaça a transferência primeiro e depois remova a caixinha.';
+
+  @override
   String get errorExceedsBalance => 'Esse valor ultrapassa o saldo disponível.';
 
   @override

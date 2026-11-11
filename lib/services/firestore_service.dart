@@ -446,20 +446,25 @@ class FirestoreService {
   /// is what lets the cascaded ledger deletes fall through the rules'
   /// teardown path.
   ///
-  /// NOTE: a category holding transfer legs is not fully supported here (the
-  /// paired leg in another caixinha would be orphaned). Transfers are not
-  /// reachable from the UI yet; see docs/BACKEND.md.
+  /// A caixinha that took part in a transfer can't be deleted: the paired leg
+  /// in the other caixinha would be orphaned and the account balance would
+  /// drift away from the ledger. The user has to undo the transfer first
+  /// (`deleteAllocation` on either leg removes both).
   Future<void> deleteCategory(String id) async {
     final allocs = await _allocations.where('categoryId', isEqualTo: id).get();
     final exps = await _expenses.where('categoryId', isEqualTo: id).get();
 
-    // Sum only PLAIN allocations for the account reversal; transfer legs net to
-    // zero against the account.
+    if (allocs.docs.any((d) => d.data()['transferId'] != null)) {
+      throw StateError(
+        'cannot delete a caixinha that took part in a transfer; undo the '
+        'transfer first',
+      );
+    }
+    // No transfer legs left, so every allocation is a plain one and the whole
+    // sum goes back to the account.
     double allocSum = 0;
     for (final d in allocs.docs) {
-      if (d.data()['transferId'] == null) {
-        allocSum += (d.data()['amount'] as num).toDouble();
-      }
+      allocSum += (d.data()['amount'] as num).toDouble();
     }
 
     await _db.runTransaction((tx) async {
