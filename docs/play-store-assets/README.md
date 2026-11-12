@@ -7,4 +7,4 @@ Graphics uploaded to the Dindin store listing on Google Play (see `../PLAY_CONSO
 - `capturas/01.png` … `06.png` — the 6 phone screenshots, in listing order
 - `anteriores/` — the first listing graphics (2026-09-24, old logo), kept for reference.
 
-The brand manual defines the dark paper as `#201C17`, one step above the `#16130F` used here; if the listing is ever redone to match the manual, regenerate both files.
+`#16130F` is the official dark background (decided 2026-11-12; the brand manual was corrected to match). Use it for any new store art.
