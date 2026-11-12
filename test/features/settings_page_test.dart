@@ -8,6 +8,7 @@ import 'package:dindin/features/settings/settings_page.dart';
 import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/providers/locale_provider.dart';
 import 'package:dindin/providers/providers.dart';
+import 'package:dindin/providers/theme_provider.dart';
 import 'package:dindin/services/auth_service.dart';
 import 'package:dindin/services/firestore_service.dart';
 import 'package:dindin/theme/theme.dart';
@@ -66,6 +67,8 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: ref.watch(themeModeProvider),
             home: const Scaffold(body: SettingsPage()),
           ),
         ),
@@ -119,6 +122,30 @@ void main() {
     expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('Sair'), findsNothing);
     expect(find.text('Language'), findsOneWidget);
+  });
+
+  testWidgets('seletor de tema: Escuro e Claro trocam o tema do app, Sistema volta a seguir o aparelho', (tester) async {
+    await pumpPage(tester, startLocale: const Locale('pt'));
+    Brightness current() => Theme.of(tester.element(find.byType(SettingsPage))).brightness;
+
+    // Test binding's platform brightness is light, so "Sistema" resolves to light.
+    expect(find.text('Tema'), findsOneWidget);
+    expect(current(), Brightness.light);
+
+    await tester.tap(find.text('Escuro'));
+    await tester.pumpAndSettle();
+    expect(current(), Brightness.dark);
+
+    await tester.tap(find.text('Claro'));
+    await tester.pumpAndSettle();
+    expect(current(), Brightness.light);
+
+    await tester.tap(find.text('Escuro'));
+    await tester.pumpAndSettle();
+    // Two "Sistema" segments exist (idioma and tema); the theme one is the last.
+    await tester.tap(find.text('Sistema').last);
+    await tester.pumpAndSettle();
+    expect(current(), Brightness.light);
   });
 
   testWidgets('tocar em "Português" depois de já estar em inglês volta pro pt', (tester) async {

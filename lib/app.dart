@@ -13,6 +13,7 @@ import 'features/receitas/receitas_page.dart';
 import 'features/settings/settings_page.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/locale_provider.dart';
+import 'providers/theme_provider.dart';
 import 'providers/providers.dart';
 import 'theme/theme.dart';
 import 'widgets/app_shell.dart';
@@ -86,6 +87,8 @@ class _DindinAppState extends ConsumerState<DindinApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      // System by default; an explicit light/dark choice from Ajustes wins.
+      themeMode: ref.watch(themeModeProvider),
       // localeProvider is null by default ("follow system") — pt is what
       // AppLocalizations falls back to when the system locale isn't
       // supported (see l10n.yaml), matching the product's Portuguese-first

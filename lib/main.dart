@@ -10,6 +10,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'app.dart';
 import 'firebase_options.dart';
 import 'providers/locale_provider.dart';
+import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,9 +18,13 @@ void main() async {
   await _activateAppCheck();
   await initializeDateFormatting('pt_BR');
   final savedLocale = await loadSavedLocale();
+  final savedThemeMode = await loadSavedThemeMode();
   runApp(
     ProviderScope(
-      overrides: [localeProvider.overrideWith((ref) => savedLocale)],
+      overrides: [
+        localeProvider.overrideWith((ref) => savedLocale),
+        themeModeProvider.overrideWith((ref) => savedThemeMode),
+      ],
       child: const DindinApp(),
     ),
   );

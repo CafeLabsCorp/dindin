@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../providers/locale_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../utils/errors.dart';
@@ -327,6 +328,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
                 ],
                 selected: {ref.watch(localeProvider)},
                 onSelectionChanged: (set) => setLocalePreference(ref, set.first),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.themeSectionLabel, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              // Same control and narrow-screen care as the language selector
+              // above: the check icon is dropped so the labels never wrap.
+              SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(value: ThemeMode.system, label: Text(l10n.themeSystemOption)),
+                  ButtonSegment(value: ThemeMode.light, label: Text(l10n.themeLightOption)),
+                  ButtonSegment(value: ThemeMode.dark, label: Text(l10n.themeDarkOption)),
+                ],
+                selected: {ref.watch(themeModeProvider)},
+                onSelectionChanged: (set) => setThemePreference(ref, set.first),
               ),
             ],
           ),
