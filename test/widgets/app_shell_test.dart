@@ -17,6 +17,7 @@ import 'package:dindin/l10n/app_localizations.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/services/app_update_service.dart';
 import 'package:dindin/services/auth_service.dart';
+import 'package:dindin/services/firestore_service.dart' show RecurringChargeReport;
 import 'package:dindin/theme/theme.dart';
 import 'package:dindin/widgets/app_shell.dart';
 import 'package:dindin/widgets/page_header.dart';
@@ -360,6 +361,47 @@ void main() {
       await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('update-indicator')), findsOneWidget);
+    });
+  });
+
+  group('voltar do segundo plano em outro dia', () {
+    // The catch-up is overridden with a counter so we can see whether the
+    // provider was re-run; todayProvider is pinned to a chosen day.
+    Future<int Function()> pumpWithDay(WidgetTester tester, DateTime day) async {
+      var runs = 0;
+      await pump(
+        tester,
+        extraOverrides: [
+          todayProvider.overrideWith((ref) => day),
+          recurringChargesCatchUpProvider.overrideWith((ref) async {
+            runs++;
+            return const RecurringChargeReport();
+          }),
+        ],
+      );
+      return () => runs;
+    }
+
+    testWidgets('o dia mudou: a data e o catch-up das cobranças são renovados', (tester) async {
+      final runs = await pumpWithDay(tester, DateTime(2020, 1, 1));
+      expect(runs(), 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(runs(), 2);
+    });
+
+    testWidgets('mesmo dia: voltar do segundo plano não roda o catch-up de novo', (tester) async {
+      final runs = await pumpWithDay(tester, DateTime.now());
+      expect(runs(), 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(runs(), 1);
     });
   });
 }

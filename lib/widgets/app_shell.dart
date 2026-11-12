@@ -84,9 +84,25 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
 
   /// Back from the background: the user may have updated (or Play may have
   /// published) in the meantime, so the indicator is re-checked — silently.
+  /// The calendar may also have moved on: see [_refreshDayIfChanged].
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshUpdateAvailable();
+    if (state == AppLifecycleState.resumed) {
+      _refreshUpdateAvailable();
+      _refreshDayIfChanged();
+    }
+  }
+
+  /// [todayProvider] is read once, and the recurring-charge catch-up runs once
+  /// per session, so an app left in the background for days kept the day it
+  /// started on: "pending" and the date of an early payment went stale, and a
+  /// charge that fell due meanwhile waited for a restart. When the app comes
+  /// back on a different calendar day, both are refreshed (at most once per
+  /// day: the second resume of the same day finds them current).
+  void _refreshDayIfChanged() {
+    if (isoDateFrom(ref.read(todayProvider)) == isoDateFrom(DateTime.now())) return;
+    ref.invalidate(todayProvider);
+    ref.invalidate(recurringChargesCatchUpProvider);
   }
 
   /// Asks Play and updates the fixed indicator. Returns the service when an
