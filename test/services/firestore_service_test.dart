@@ -370,6 +370,21 @@ void main() {
     });
 
     group('catchUpSubscriptions', () {
+      test('one broken subscription does not stop the others: they are billed, then the failure is rethrown', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
+        await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
+        // Sorts before 's1', so a loop that aborts on the first failure never reaches it.
+        await fake.doc('users/u1/subscriptions/a-broken').set({'name': 123});
+        await seed(
+          const Subscription(id: 's1', name: 'Netflix', amount: 40, dueDay: 5, createdAt: '2026-01-01'),
+        );
+
+        await expectLater(svc.catchUpSubscriptions(), throwsA(anything));
+
+        expect(await expenses(), hasLength(1));
+        expect(await accountBalance(), 60);
+      });
+
       test('charges once for a due date that has already passed', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 10));
         await svc.createIncome(date: '2026-01-01', amount: 100, source: IncomeSource.freela);
@@ -1074,6 +1089,28 @@ void main() {
     });
 
     group('catchUpInstallmentPurchases', () {
+      test('one broken purchase does not stop the others: they are billed, then the failure is rethrown', () async {
+        svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 5));
+        await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);
+        await fake.doc('users/u1/installmentPurchases/a-broken').set({'name': 123});
+        await seed(
+          const InstallmentPurchase(
+            id: 'p1',
+            name: 'Notebook Dell',
+            totalAmount: 100,
+            installments: 3,
+            purchaseDate: '2025-12-20',
+            firstChargeDate: '2026-01-05',
+            createdAt: '2025-12-20',
+          ),
+        );
+
+        await expectLater(svc.catchUpInstallmentPurchases(), throwsA(anything));
+
+        expect(await expenses(), hasLength(1));
+        expect((await purchase('p1'))!.chargedInstallments, 1);
+      });
+
       test('charges the first installment once its date arrives', () async {
         svc = FirestoreService(uid: 'u1', firestore: fake, clock: () => DateTime(2026, 1, 5));
         await svc.createIncome(date: '2026-01-01', amount: 1000, source: IncomeSource.freela);

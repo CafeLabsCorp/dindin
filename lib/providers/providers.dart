@@ -151,21 +151,36 @@ final todayProvider = Provider<DateTime>((ref) => DateTime.now());
 final recurringChargesCatchUpProvider = FutureProvider<RecurringChargeReport>((ref) async {
   final firestore = ref.watch(firestoreServiceProvider);
   if (firestore == null) return const RecurringChargeReport();
-  try {
-    final subscriptions = await firestore.catchUpSubscriptions();
-    final installments = await firestore.catchUpInstallmentPurchases();
-    // What this app open cost the user, for the screen to actually say so —
-    // these charges are posted without any interaction, so nothing else would.
-    return subscriptions + installments;
-  } catch (error, stackTrace) {
-    developer.log(
-      'recurring charge catch-up failed',
-      name: 'dindin.recurringCharges',
-      error: error,
-      stackTrace: stackTrace,
-    );
-    rethrow;
+  // Each catch-up runs even when the other fails: a broken subscription used
+  // to skip the installment purchases entirely. The first failure is rethrown
+  // once both were tried, so the provider still ends as an AsyncError.
+  var report = const RecurringChargeReport();
+  Object? firstError;
+  StackTrace? firstStack;
+  Future<void> run(Future<RecurringChargeReport> Function() catchUp) async {
+    try {
+      // What this app open cost the user, for the screen to actually say so —
+      // these charges are posted without any interaction, so nothing else
+      // would.
+      report = report + await catchUp();
+    } catch (error, stackTrace) {
+      developer.log(
+        'recurring charge catch-up failed',
+        name: 'dindin.recurringCharges',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      firstError ??= error;
+      firstStack ??= stackTrace;
+    }
   }
+
+  await run(firestore.catchUpSubscriptions);
+  await run(firestore.catchUpInstallmentPurchases);
+  if (firstError != null) {
+    Error.throwWithStackTrace(firstError!, firstStack!);
+  }
+  return report;
 });
 
 /// Combines the full, unwindowed ledger into the same summary shape as the

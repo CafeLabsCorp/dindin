@@ -1087,12 +1087,25 @@ class FirestoreService {
     final today = _now();
     var charged = 0;
     var chargedTotal = 0.0;
+    // One malformed or rule-denied doc must not stop the others from being
+    // billed: keep going, then surface the first failure at the end so the
+    // provider still records that the run did not finish cleanly.
+    Object? firstError;
+    StackTrace? firstStack;
     for (final doc in snap.docs) {
-      final subscription = Subscription.fromMap(doc.id, doc.data());
-      if (!subscription.autoChargeEnabled) continue;
-      final result = await _chargePendingDueDates(doc.reference, today);
-      charged += result.count;
-      chargedTotal += result.total;
+      try {
+        final subscription = Subscription.fromMap(doc.id, doc.data());
+        if (!subscription.autoChargeEnabled) continue;
+        final result = await _chargePendingDueDates(doc.reference, today);
+        charged += result.count;
+        chargedTotal += result.total;
+      } catch (error, stack) {
+        firstError ??= error;
+        firstStack ??= stack;
+      }
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStack!);
     }
     return RecurringChargeReport(
       count: charged,
@@ -1390,84 +1403,96 @@ class FirestoreService {
     final today = _now();
     var charged = 0;
     var chargedTotal = 0.0;
+    // See [catchUpSubscriptions]: one failing purchase must not block the
+    // others; the first failure is rethrown after every purchase was tried.
+    Object? firstError;
+    StackTrace? firstStack;
     for (final doc in snap.docs) {
-      final purchase = InstallmentPurchase.fromMap(doc.id, doc.data());
-      // Settled, not merely "all occurrences billed": an early payoff ends
-      // the purchase with occurrences still on the calendar.
-      if (schedule.isSettled(purchase)) continue;
-      for (final index in schedule.pendingInstallmentIndexes(purchase, today)) {
-        final dueIso = schedule.isoDate(
-          schedule.installmentDueDate(purchase, index, today: today),
-        );
-        // See [catchUpSubscriptions]: the amount actually billed, read fresh
-        // inside the transaction (an early payoff can shrink the final one).
-        var billed = 0.0;
-        final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
-          // Re-read inside the transaction, for the same two reasons spelled
-          // out in [catchUpSubscriptions]: it puts the doc in the read set so
-          // a concurrent charge conflicts, and the retry that conflict
-          // triggers then sees the bumped `chargedInstallments` instead of
-          // the stale `purchase` captured outside. `chargedInstallments`
-          // must be exactly [index] — that is what makes this installment
-          // the next one owed.
-          final fresh = await tx.get(doc.reference);
-          final data = fresh.data();
-          if (data == null) {
-            return _ChargeOutcome.superseded; // deleted meanwhile
-          }
-          final current = InstallmentPurchase.fromMap(doc.id, data);
-          if (current.chargedInstallments != index) {
-            return _ChargeOutcome.superseded;
-          }
-          // Recomputed from the FRESH doc, so an early payoff committed
-          // between the planning pass above and this transaction cancels the
-          // charge instead of billing a debt that no longer exists.
-          final outstanding = schedule.outstandingAmount(current);
-          if (outstanding <= _eps) return _ChargeOutcome.superseded;
-          final amount = schedule.installmentChargeAmount(
-            current,
-            index,
-            outstanding,
+      try {
+        final purchase = InstallmentPurchase.fromMap(doc.id, doc.data());
+        // Settled, not merely "all occurrences billed": an early payoff ends
+        // the purchase with occurrences still on the calendar.
+        if (schedule.isSettled(purchase)) continue;
+        for (final index in schedule.pendingInstallmentIndexes(purchase, today)) {
+          final dueIso = schedule.isoDate(
+            schedule.installmentDueDate(purchase, index, today: today),
           );
+          // See [catchUpSubscriptions]: the amount actually billed, read fresh
+          // inside the transaction (an early payoff can shrink the final one).
+          var billed = 0.0;
+          final outcome = await _db.runTransaction<_ChargeOutcome>((tx) async {
+            // Re-read inside the transaction, for the same two reasons spelled
+            // out in [catchUpSubscriptions]: it puts the doc in the read set so
+            // a concurrent charge conflicts, and the retry that conflict
+            // triggers then sees the bumped `chargedInstallments` instead of
+            // the stale `purchase` captured outside. `chargedInstallments`
+            // must be exactly [index] — that is what makes this installment
+            // the next one owed.
+            final fresh = await tx.get(doc.reference);
+            final data = fresh.data();
+            if (data == null) {
+              return _ChargeOutcome.superseded; // deleted meanwhile
+            }
+            final current = InstallmentPurchase.fromMap(doc.id, data);
+            if (current.chargedInstallments != index) {
+              return _ChargeOutcome.superseded;
+            }
+            // Recomputed from the FRESH doc, so an early payoff committed
+            // between the planning pass above and this transaction cancels the
+            // charge instead of billing a debt that no longer exists.
+            final outstanding = schedule.outstandingAmount(current);
+            if (outstanding <= _eps) return _ChargeOutcome.superseded;
+            final amount = schedule.installmentChargeAmount(
+              current,
+              index,
+              outstanding,
+            );
 
-          final (sourceOutcome, source) = await _readChargeSource(
-            tx,
-            current.categoryId,
-            amount,
-          );
-          if (source == null) return sourceOutcome;
+            final (sourceOutcome, source) = await _readChargeSource(
+              tx,
+              current.categoryId,
+              amount,
+            );
+            if (source == null) return sourceOutcome;
 
-          final expenseDoc = _expenses.doc();
-          final expense = Expense(
-            id: expenseDoc.id,
-            date: dueIso,
-            amount: amount,
-            categoryId: current.categoryId,
-            description:
-                '${current.name} (${index + 1}/${current.installments})',
-            // Links the generated expense back to the purchase that produced
-            // it — see [catchUpSubscriptions].
-            sourceType: ExpenseSource.installment.value,
-            sourceId: current.id,
-          );
-          tx.set(expenseDoc, expense.toMap());
-          tx.set(source.ref, {'balance': source.newBalance});
-          // A full overwrite (not a merge) — every other field is copied
-          // from the just-read [current] unchanged.
-          tx.set(
-            doc.reference,
-            current.copyWith(chargedInstallments: index + 1).toMap(),
-          );
-          billed = amount;
-          return _ChargeOutcome.charged;
-        });
-        // Insufficient balance / missing caixinha -> retry next run, and stay
-        // visible as pending meanwhile.
-        // Superseded -> another runner owns this purchase's catch-up.
-        if (outcome != _ChargeOutcome.charged) break;
-        charged++;
-        chargedTotal += billed;
+            final expenseDoc = _expenses.doc();
+            final expense = Expense(
+              id: expenseDoc.id,
+              date: dueIso,
+              amount: amount,
+              categoryId: current.categoryId,
+              description:
+                  '${current.name} (${index + 1}/${current.installments})',
+              // Links the generated expense back to the purchase that produced
+              // it — see [catchUpSubscriptions].
+              sourceType: ExpenseSource.installment.value,
+              sourceId: current.id,
+            );
+            tx.set(expenseDoc, expense.toMap());
+            tx.set(source.ref, {'balance': source.newBalance});
+            // A full overwrite (not a merge) — every other field is copied
+            // from the just-read [current] unchanged.
+            tx.set(
+              doc.reference,
+              current.copyWith(chargedInstallments: index + 1).toMap(),
+            );
+            billed = amount;
+            return _ChargeOutcome.charged;
+          });
+          // Insufficient balance / missing caixinha -> retry next run, and stay
+          // visible as pending meanwhile.
+          // Superseded -> another runner owns this purchase's catch-up.
+          if (outcome != _ChargeOutcome.charged) break;
+          charged++;
+          chargedTotal += billed;
+        }
+          } catch (error, stack) {
+        firstError ??= error;
+        firstStack ??= stack;
       }
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStack!);
     }
     return RecurringChargeReport(
       count: charged,
