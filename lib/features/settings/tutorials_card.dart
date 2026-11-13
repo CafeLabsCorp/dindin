@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -13,8 +14,11 @@ import '../../widgets/saved_feedback.dart';
 /// row per page, and a way to see any of them again (`docs/onboarding-design.md`
 /// §5). "Rever" forgets that page's outcome and opens the page, where the
 /// tutorial starts on its own.
-class TutorialsCard extends ConsumerWidget {
+class TutorialsCard extends ConsumerStatefulWidget {
   const TutorialsCard({super.key});
+
+  @override
+  ConsumerState<TutorialsCard> createState() => _TutorialsCardState();
 
   /// Pages in the order of the app menu, each with its route.
   static const _pages = <(TutorialPage, String)>[
@@ -36,9 +40,14 @@ class TutorialsCard extends ConsumerWidget {
     TutorialPage.categorias => l10n.navCategorias,
     TutorialPage.ajustes => l10n.navAjustes,
   };
+}
+
+/// Whether the list is shown while all seven are seen (it collapses then).
+class _TutorialsCardState extends ConsumerState<TutorialsCard> {
+  bool _expanded = false;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final tokens = context.tokens;
     final primary = Theme.of(context).colorScheme.primary;
@@ -47,8 +56,11 @@ class TutorialsCard extends ConsumerWidget {
     final progress = ref.watch(tutorialProgressProvider).value;
     if (progress == null) return const SizedBox.shrink();
 
-    final seen = {for (final (page, _) in _pages) page: ref.watch(tutorialSeenProvider(page)) == true};
+    final seen = {for (final (page, _) in TutorialsCard._pages) page: ref.watch(tutorialSeenProvider(page)) == true};
     final seenCount = seen.values.where((v) => v).length;
+    final allSeen = seenCount == TutorialsCard._pages.length;
+    // All seven seen: the list folds into one line ("Mostrar" opens it again).
+    final showList = !allSeen || _expanded;
 
     String statusOf(TutorialPage page) {
       if (!seen[page]!) return l10n.tutorialStatusNotYet;
@@ -64,6 +76,12 @@ class TutorialsCard extends ConsumerWidget {
         children: [
           Row(
             children: [
+              if (allSeen) ...[
+                // The wax seal: the only terracotta point of the onboarding, a
+                // quiet reward for having seen everything. Decorative.
+                ExcludeSemantics(child: SvgPicture.asset('assets/illustrations/dindin-selo.svg', height: 32)),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Text(
                   l10n.tutorialsSectionLabel,
@@ -71,7 +89,7 @@ class TutorialsCard extends ConsumerWidget {
                 ),
               ),
               Text(
-                l10n.tutorialsProgress(seenCount, _pages.length),
+                l10n.tutorialsProgress(seenCount, TutorialsCard._pages.length),
                 style: TextStyle(fontSize: 12, color: tokens.subtle),
               ),
             ],
@@ -83,7 +101,7 @@ class TutorialsCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(4),
             child: ExcludeSemantics(
               child: LinearProgressIndicator(
-                value: seenCount / _pages.length,
+                value: seenCount / TutorialsCard._pages.length,
                 minHeight: 6,
                 backgroundColor: tokens.border,
                 valueColor: AlwaysStoppedAnimation(primary),
@@ -91,16 +109,39 @@ class TutorialsCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 4),
-          for (final (page, route) in _pages)
-            _TutorialRow(
-              name: _pageName(l10n, page),
-              status: statusOf(page),
-              seen: seen[page]!,
-              onTap: () async {
-                // Forget it first, then go: the page's tutorial starts by itself.
-                await resetTutorial(ref, page);
-                if (context.mounted) context.go(route);
-              },
+          if (showList)
+            for (final (page, route) in TutorialsCard._pages)
+              _TutorialRow(
+                name: TutorialsCard._pageName(l10n, page),
+                status: statusOf(page),
+                seen: seen[page]!,
+                onTap: () async {
+                  // Forget it first, then go: the page's tutorial starts by itself.
+                  await resetTutorial(ref, page);
+                  if (context.mounted) context.go(route);
+                },
+              )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: Row(
+                children: [
+                  Expanded(child: Text(l10n.tutorialsAllSeen, style: TextStyle(color: tokens.muted))),
+                  TextButton(
+                    onPressed: () => setState(() => _expanded = true),
+                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    child: Text(l10n.tutorialsShow),
+                  ),
+                ],
+              ),
+            ),
+          if (allSeen && _expanded)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() => _expanded = false),
+                child: Text(l10n.tutorialsHide),
+              ),
             ),
           const SizedBox(height: 8),
           OutlinedButton(

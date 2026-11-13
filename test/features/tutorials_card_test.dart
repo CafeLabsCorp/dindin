@@ -2,6 +2,7 @@
 // the Ajustes page's own tutorial (docs/onboarding-design.md §5 and §3).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
@@ -164,6 +165,55 @@ void main() {
 
     expect(find.text('Parcelamentos'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('selo ao completar os 7', () {
+    final all = {
+      for (final page in TutorialPage.values)
+        page: const TutorialEntry(state: TutorialState.done, version: 1),
+    };
+
+    testWidgets('com 7 de 7 aparece o selo e a lista recolhe numa linha', (tester) async {
+      await pumpCard(tester, progress: Stream.value(all));
+
+      expect(find.text('7 de 7 vistos'), findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget, reason: 'o selo');
+      expect(find.text('Você já viu todos. Pode rever qualquer um.'), findsOneWidget);
+      expect(find.text('Receitas'), findsNothing, reason: 'a lista está recolhida');
+      expect(find.text('Rever todos'), findsOneWidget);
+    });
+
+    testWidgets('"Mostrar" abre a lista e "Ocultar" recolhe de novo', (tester) async {
+      await pumpCard(tester, progress: Stream.value(all));
+
+      await tester.tap(find.text('Mostrar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Receitas'), findsOneWidget);
+      expect(find.text('Rever'), findsNWidgets(7));
+      expect(find.text('Você já viu todos. Pode rever qualquer um.'), findsNothing);
+
+      await tester.tap(find.text('Ocultar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Receitas'), findsNothing);
+      expect(find.text('Você já viu todos. Pode rever qualquer um.'), findsOneWidget);
+    });
+
+    testWidgets('o selo é decorativo pro leitor de tela', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpCard(tester, progress: Stream.value(all));
+
+      expect(find.bySemanticsLabel(RegExp('selo', caseSensitive: false)), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('com menos de 7 não há selo nem recolhimento', (tester) async {
+      await pumpCard(tester);
+
+      expect(find.byType(SvgPicture), findsNothing);
+      expect(find.text('Você já viu todos. Pode rever qualquer um.'), findsNothing);
+      expect(find.text('Mostrar'), findsNothing);
+      expect(find.text('Receitas'), findsOneWidget);
+    });
   });
 
   group('tutorial da própria página de Ajustes', () {

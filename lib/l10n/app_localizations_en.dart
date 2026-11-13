@@ -1089,6 +1089,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyEmptyAction => 'Go to Income';
 
   @override
+  String get tutorialsAllSeen =>
+      'You\'ve seen them all. You can review any of them.';
+
+  @override
+  String get tutorialsShow => 'Show';
+
+  @override
+  String get tutorialsHide => 'Hide';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

@@ -1087,6 +1087,15 @@ class AppLocalizationsPt extends AppLocalizations {
   String get historyEmptyAction => 'Ir para Receitas';
 
   @override
+  String get tutorialsAllSeen => 'Você já viu todos. Pode rever qualquer um.';
+
+  @override
+  String get tutorialsShow => 'Mostrar';
+
+  @override
+  String get tutorialsHide => 'Ocultar';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

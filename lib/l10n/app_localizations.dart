@@ -1928,6 +1928,24 @@ abstract class AppLocalizations {
   /// **'Ir para Receitas'**
   String get historyEmptyAction;
 
+  /// No description provided for @tutorialsAllSeen.
+  ///
+  /// In pt, this message translates to:
+  /// **'Você já viu todos. Pode rever qualquer um.'**
+  String get tutorialsAllSeen;
+
+  /// No description provided for @tutorialsShow.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mostrar'**
+  String get tutorialsShow;
+
+  /// No description provided for @tutorialsHide.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ocultar'**
+  String get tutorialsHide;
+
   /// No description provided for @tutorialAnnouncement.
   ///
   /// In pt, this message translates to:

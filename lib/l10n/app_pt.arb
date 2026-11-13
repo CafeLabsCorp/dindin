@@ -426,6 +426,9 @@
   "dashboardQuickIncome": "Lançar receita",
   "dashboardQuickExpense": "Lançar gasto",
   "historyEmptyAction": "Ir para Receitas",
+  "tutorialsAllSeen": "Você já viu todos. Pode rever qualquer um.",
+  "tutorialsShow": "Mostrar",
+  "tutorialsHide": "Ocultar",
   "tutorialAnnouncement": "Tutorial de {page}, passo {current} de {total}. {title}. {body}",
   "@tutorialAnnouncement": {
     "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }
