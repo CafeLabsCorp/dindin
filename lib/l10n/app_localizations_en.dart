@@ -807,6 +807,38 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get tutorialDashboard1Title => 'This is where you switch screens';
+
+  @override
+  String get tutorialDashboard1Body =>
+      'Tap the page name to open the menu with Income, Expenses and the other screens.';
+
+  @override
+  String get tutorialDashboard1BodyWide =>
+      'The app\'s screens are in this bar.';
+
+  @override
+  String get tutorialDashboard2Title => 'Money lands in your account';
+
+  @override
+  String get tutorialDashboard2Body =>
+      'Every income you add shows up here. It isn\'t in any envelope yet.';
+
+  @override
+  String get tutorialDashboard3Title => 'Then split it up';
+
+  @override
+  String get tutorialDashboard3Body =>
+      'Allocate moves part of your account into an envelope. You create envelopes in Categories.';
+
+  @override
+  String get tutorialDashboard4Title => 'Your envelopes';
+
+  @override
+  String get tutorialDashboard4Body =>
+      'Each one shows how much it holds. Transfer moves money from one to another.';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

@@ -1424,6 +1424,60 @@ abstract class AppLocalizations {
   /// **'{current} de {total}'**
   String tutorialStepCounter(int current, int total);
 
+  /// No description provided for @tutorialDashboard1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Aqui você troca de tela'**
+  String get tutorialDashboard1Title;
+
+  /// No description provided for @tutorialDashboard1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Toque no nome da página para abrir o menu com Receitas, Gastos e as outras telas.'**
+  String get tutorialDashboard1Body;
+
+  /// No description provided for @tutorialDashboard1BodyWide.
+  ///
+  /// In pt, this message translates to:
+  /// **'As telas do app ficam nesta barra.'**
+  String get tutorialDashboard1BodyWide;
+
+  /// No description provided for @tutorialDashboard2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'O dinheiro entra na conta'**
+  String get tutorialDashboard2Title;
+
+  /// No description provided for @tutorialDashboard2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cada receita que você lança cai aqui. Ela ainda não está em nenhuma caixinha.'**
+  String get tutorialDashboard2Body;
+
+  /// No description provided for @tutorialDashboard3Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Depois, distribua'**
+  String get tutorialDashboard3Title;
+
+  /// No description provided for @tutorialDashboard3Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Alocar manda parte da conta para uma caixinha. As caixinhas você cria em Categorias.'**
+  String get tutorialDashboard3Body;
+
+  /// No description provided for @tutorialDashboard4Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Suas caixinhas'**
+  String get tutorialDashboard4Title;
+
+  /// No description provided for @tutorialDashboard4Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cada uma mostra quanto tem. Transferir move dinheiro de uma para outra.'**
+  String get tutorialDashboard4Body;
+
   /// No description provided for @tutorialAnnouncement.
   ///
   /// In pt, this message translates to:

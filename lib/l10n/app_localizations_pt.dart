@@ -805,6 +805,37 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get tutorialDashboard1Title => 'Aqui você troca de tela';
+
+  @override
+  String get tutorialDashboard1Body =>
+      'Toque no nome da página para abrir o menu com Receitas, Gastos e as outras telas.';
+
+  @override
+  String get tutorialDashboard1BodyWide => 'As telas do app ficam nesta barra.';
+
+  @override
+  String get tutorialDashboard2Title => 'O dinheiro entra na conta';
+
+  @override
+  String get tutorialDashboard2Body =>
+      'Cada receita que você lança cai aqui. Ela ainda não está em nenhuma caixinha.';
+
+  @override
+  String get tutorialDashboard3Title => 'Depois, distribua';
+
+  @override
+  String get tutorialDashboard3Body =>
+      'Alocar manda parte da conta para uma caixinha. As caixinhas você cria em Categorias.';
+
+  @override
+  String get tutorialDashboard4Title => 'Suas caixinhas';
+
+  @override
+  String get tutorialDashboard4Body =>
+      'Cada uma mostra quanto tem. Transferir move dinheiro de uma para outra.';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

@@ -336,6 +336,15 @@
   "@tutorialStepCounter": {
     "placeholders": { "current": { "type": "int" }, "total": { "type": "int" } }
   },
+  "tutorialDashboard1Title": "Aqui você troca de tela",
+  "tutorialDashboard1Body": "Toque no nome da página para abrir o menu com Receitas, Gastos e as outras telas.",
+  "tutorialDashboard1BodyWide": "As telas do app ficam nesta barra.",
+  "tutorialDashboard2Title": "O dinheiro entra na conta",
+  "tutorialDashboard2Body": "Cada receita que você lança cai aqui. Ela ainda não está em nenhuma caixinha.",
+  "tutorialDashboard3Title": "Depois, distribua",
+  "tutorialDashboard3Body": "Alocar manda parte da conta para uma caixinha. As caixinhas você cria em Categorias.",
+  "tutorialDashboard4Title": "Suas caixinhas",
+  "tutorialDashboard4Body": "Cada uma mostra quanto tem. Transferir move dinheiro de uma para outra.",
   "tutorialAnnouncement": "Tutorial de {page}, passo {current} de {total}. {title}. {body}",
   "@tutorialAnnouncement": {
     "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }

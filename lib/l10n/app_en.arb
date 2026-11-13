@@ -254,6 +254,15 @@
   "@tutorialStepCounter": {
     "placeholders": { "current": { "type": "int" }, "total": { "type": "int" } }
   },
+  "tutorialDashboard1Title": "This is where you switch screens",
+  "tutorialDashboard1Body": "Tap the page name to open the menu with Income, Expenses and the other screens.",
+  "tutorialDashboard1BodyWide": "The app's screens are in this bar.",
+  "tutorialDashboard2Title": "Money lands in your account",
+  "tutorialDashboard2Body": "Every income you add shows up here. It isn't in any envelope yet.",
+  "tutorialDashboard3Title": "Then split it up",
+  "tutorialDashboard3Body": "Allocate moves part of your account into an envelope. You create envelopes in Categories.",
+  "tutorialDashboard4Title": "Your envelopes",
+  "tutorialDashboard4Body": "Each one shows how much it holds. Transfer moves money from one to another.",
   "tutorialAnnouncement": "{page} tutorial, step {current} of {total}. {title}. {body}",
   "@tutorialAnnouncement": {
     "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }

@@ -64,6 +64,10 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
   /// as it's true — unlike the snackbar, which shows once per app open.
   bool _updateAvailable = false;
 
+  /// The side rail on wide screens, so the onboarding tutorial can light it up
+  /// where narrow screens light up the page title.
+  final GlobalKey _railKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -271,6 +275,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
         body: Row(
           children: [
             NavigationRail(
+              key: _railKey,
               selectedIndex: navigationShell.currentIndex,
               onDestinationSelected: (i) => navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
               labelType: NavigationRailLabelType.all,
@@ -305,7 +310,12 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
             const VerticalDivider(width: 1),
             Expanded(
               child: SafeArea(
-                child: Padding(padding: const EdgeInsets.all(24), child: navigationShell),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  // No menu on wide screens (openMenu null); the wrapper only
+                  // hands pages the rail's key for the tutorial.
+                  child: AppNavigation(openMenu: null, railKey: _railKey, child: navigationShell),
+                ),
               ),
             ),
           ],
@@ -460,10 +470,14 @@ class AppNavigation extends InheritedWidget {
   /// Whether Play has a newer build; headers show a dot on the menu trigger.
   final bool updateAvailable;
 
+  /// Key of the side rail (wide screens only), for the onboarding tutorial.
+  final GlobalKey? railKey;
+
   const AppNavigation({
     super.key,
     required this.openMenu,
     this.updateAvailable = false,
+    this.railKey,
     required super.child,
   });
 

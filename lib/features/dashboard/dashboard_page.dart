@@ -1,11 +1,15 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../widgets/page_header.dart';
+import '../../widgets/tutorial/tutorial.dart';
+import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
+import '../../models/tutorial_progress.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../../theme/theme.dart';
@@ -20,11 +24,59 @@ import '../../widgets/saved_feedback.dart';
 import '../../widgets/catch_up_refresh.dart';
 import '../../widgets/data_loading_view.dart';
 
-class DashboardPage extends ConsumerWidget {
+class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends ConsumerState<DashboardPage> {
+  // Elements the onboarding tutorial lights up (see _tutorialSteps).
+  final _titleKey = GlobalKey();
+  final _accountCardKey = GlobalKey();
+  final _allocateKey = GlobalKey();
+  final _caixinhasCardKey = GlobalKey();
+
+  /// The four steps of this page's tutorial (docs/onboarding-design.md §3).
+  /// Step 1 lights up the page title on narrow screens (tapping it opens the
+  /// real menu) and the side rail on wide ones.
+  List<TutorialStep> _tutorialSteps(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final navigation = AppNavigation.of(context);
+    final railKey = navigation?.railKey;
+    final wide = navigation?.openMenu == null && railKey != null;
+    return [
+      TutorialStep(
+        target: wide ? railKey : _titleKey,
+        title: l10n.tutorialDashboard1Title,
+        body: wide ? l10n.tutorialDashboard1BodyWide : l10n.tutorialDashboard1Body,
+        radius: wide ? 0 : 8,
+        onTargetTap: wide ? null : navigation?.openMenu,
+      ),
+      TutorialStep(
+        target: _accountCardKey,
+        title: l10n.tutorialDashboard2Title,
+        body: l10n.tutorialDashboard2Body,
+        radius: 16,
+      ),
+      TutorialStep(
+        target: _allocateKey,
+        title: l10n.tutorialDashboard3Title,
+        body: l10n.tutorialDashboard3Body,
+        radius: 20,
+      ),
+      TutorialStep(
+        target: _caixinhasCardKey,
+        title: l10n.tutorialDashboard4Title,
+        body: l10n.tutorialDashboard4Body,
+        radius: 16,
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final summary = ref.watch(summaryProvider);
     final categories = ref.watch(categoriesProvider).value;
@@ -83,16 +135,24 @@ class DashboardPage extends ConsumerWidget {
         .toList();
     final canTransfer = categories.length >= 2 && eligibleOrigins.isNotEmpty;
 
-    return CatchUpRefresh(
+    return TutorialHost(
+      page: TutorialPage.dashboard,
+      pageName: l10n.dashboardTitle,
+      steps: _tutorialSteps,
+      child: CatchUpRefresh(
       child: ListView(
         // Always scrollable, so the gesture works even when the content fits.
         physics: const AlwaysScrollableScrollPhysics(),
+        // The page is short: build every card up front so the tutorial can
+        // always find the one it lights up, even below the fold.
+        scrollCacheExtent: const ScrollCacheExtent.pixels(4000),
         children: [
           PageHeader(
             title: l10n.dashboardTitle,
             subtitle: l10n.dashboardSubtitle,
             onOpenMenu: AppNavigation.of(context)?.openMenu,
             menuLabel: l10n.navMenu,
+            titleKey: _titleKey,
           ),
           const SizedBox(height: 24),
           StatTile(
@@ -101,6 +161,7 @@ class DashboardPage extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           AppCard(
+            key: _accountCardKey,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -134,6 +195,7 @@ class DashboardPage extends ConsumerWidget {
                   ),
                 ),
                 FilledButton.tonal(
+                  key: _allocateKey,
                   onPressed: categories.isEmpty || summary.accountBalance <= 0
                       ? null
                       : () => _showAllocateDialog(
@@ -172,6 +234,7 @@ class DashboardPage extends ConsumerWidget {
                 ),
               ];
               final caixinhasCard = AppCard(
+                key: _caixinhasCardKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -427,6 +490,7 @@ class DashboardPage extends ConsumerWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

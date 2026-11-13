@@ -25,12 +25,16 @@ class PageHeader extends StatelessWidget {
   /// announces the title as something that opens navigation.
   final String? menuLabel;
 
+  /// Lets the onboarding tutorial find (and light up) the tappable title.
+  final GlobalKey? titleKey;
+
   const PageHeader({
     super.key,
     required this.title,
     required this.subtitle,
     this.onOpenMenu,
     this.menuLabel,
+    this.titleKey,
   });
 
   @override
@@ -51,6 +55,7 @@ class PageHeader extends StatelessWidget {
             child: Tooltip(
               message: menuLabel ?? '',
               child: InkWell(
+                key: titleKey,
                 onTap: onOpenMenu,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
