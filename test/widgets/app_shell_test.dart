@@ -28,12 +28,20 @@ class _FakeUpdateService implements AppUpdateService {
   _FakeUpdateService({required this.available});
   bool available;
   int started = 0;
+  int restarted = 0;
+  bool downloads = false;
 
   @override
   Future<bool> isUpdateAvailable() async => available;
 
   @override
-  Future<void> startUpdate() async => started++;
+  Future<bool> startUpdate() async {
+    started++;
+    return downloads;
+  }
+
+  @override
+  Future<void> restartToInstall() async => restarted++;
 }
 
 class _MockUser extends Mock implements User {}
@@ -310,6 +318,20 @@ void main() {
       await tester.pump();
       expect(service.started, 1);
       expect(find.text('page:Dashboard'), findsOneWidget, reason: 'não bloqueia o app');
+    });
+
+    testWidgets('baixou: oferece "Reiniciar" e só reinicia quando a pessoa toca', (tester) async {
+      final service = _FakeUpdateService(available: true)..downloads = true;
+      await pump(tester, extraOverrides: [appUpdateServiceProvider.overrideWithValue(service)]);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.text('Atualizar'));
+      await tester.pumpAndSettle(); // the offer closes, the "ready" one takes its place
+      expect(find.text('Atualização pronta. Reinicie para usar a versão nova.'), findsOneWidget);
+      expect(service.restarted, 0, reason: 'não reinicia sozinho');
+      await tester.tap(find.text('Reiniciar'));
+      await tester.pump();
+      expect(service.restarted, 1);
     });
 
     testWidgets('sem versão nova: nada aparece', (tester) async {

@@ -72,6 +72,13 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Applies the Analytics opt-out toggle (Ajustes -> Privacidade) to the SDK.
+    // `fireImmediately` covers the first resolved value (right after sign-in)
+    // and the listener every later toggle, outside of `build`.
+    ref.listenManual(analyticsOptOutProvider, (_, next) {
+      final optOut = next.value;
+      if (optOut != null) ref.read(analyticsServiceProvider).setEnabled(!optOut);
+    }, fireImmediately: true);
     // Once per app open, after the first frame so there is a navigator to
     // show the dialog on.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -135,7 +142,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
       SnackBar(
         content: Text(l10n.updateAvailableMessage),
         duration: const Duration(seconds: 12),
-        action: SnackBarAction(label: l10n.updateAction, onPressed: service.startUpdate),
+        action: SnackBarAction(label: l10n.updateAction, onPressed: _startUpdate),
       ),
     );
   }
@@ -232,16 +239,6 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     // someone else.
     ref.watch(recurringChargesCatchUpProvider);
 
-    // Applies the Analytics opt-out toggle (Ajustes -> Privacidade) to the
-    // SDK. `ref.watch` (not `ref.listen`) on purpose: it re-runs this on
-    // every build where the value changed, which covers BOTH the first
-    // resolved value (right after sign-in) and every later toggle with one
-    // mechanism — `AnalyticsService.setEnabled` is idempotent and cheap, so
-    // re-applying the same value on an unrelated rebuild costs nothing.
-    final analyticsOptOut = ref.watch(analyticsOptOutProvider).value;
-    if (analyticsOptOut != null) {
-      ref.read(analyticsServiceProvider).setEnabled(!analyticsOptOut);
-    }
 
     // Tell the user money just left their account. These charges are posted
     // with no interaction at all, so without this the only trace is rows
@@ -294,7 +291,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
                             child: TextButton.icon(
                               key: const ValueKey('update-indicator'),
                               onPressed: _startUpdate,
-                              icon: Badge(smallSize: 8, child: const Icon(Icons.system_update_alt)),
+                              icon: ExcludeSemantics(child: Badge(smallSize: 8, child: const Icon(Icons.system_update_alt))),
                               label: Text(l10n.updateAction),
                             ),
                           ),
@@ -374,8 +371,22 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
   /// Starts the Play update from the fixed indicator. The check is repeated
   /// afterwards so the indicator goes away once the app is up to date.
   Future<void> _startUpdate() async {
-    await ref.read(appUpdateServiceProvider).startUpdate();
-    if (mounted) await _refreshUpdateAvailable();
+    final service = ref.read(appUpdateServiceProvider);
+    final ready = await service.startUpdate();
+    if (!mounted) return;
+    if (ready) {
+      // Downloaded: restarting is the user's call, never done on its own.
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(l10n.updateReadyMessage),
+          duration: const Duration(seconds: 30),
+          action: SnackBarAction(label: l10n.updateRestartAction, onPressed: service.restartToInstall),
+        ),
+      );
+      return;
+    }
+    await _refreshUpdateAvailable();
   }
 
   /// Every destination, as a list that drops down from the top over a dimmed
@@ -416,7 +427,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
                   if (_updateAvailable)
                     ListTile(
                       key: const ValueKey('update-indicator'),
-                      leading: Badge(smallSize: 8, child: const Icon(Icons.system_update_alt)),
+                      leading: ExcludeSemantics(child: Badge(smallSize: 8, child: const Icon(Icons.system_update_alt))),
                       title: Text(AppLocalizations.of(dialogContext)!.updateAction),
                       subtitle: Text(AppLocalizations.of(dialogContext)!.updateAvailableMessage),
                       onTap: () {
@@ -551,10 +562,13 @@ class _StickyTitle extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Badge(
-                          isLabelVisible: updateAvailable,
-                          smallSize: 8,
-                          child: const MenuChevronChip(size: 28),
+                        Semantics(
+                          label: updateAvailable ? AppLocalizations.of(context)!.updateAvailableMessage : null,
+                          child: Badge(
+                            isLabelVisible: updateAvailable,
+                            smallSize: 8,
+                            child: const MenuChevronChip(size: 28),
+                          ),
                         ),
                       ],
                     ),

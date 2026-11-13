@@ -25,14 +25,30 @@ class AppUpdateService {
     }
   }
 
-  /// Downloads the update, then restarts the app on the new version once it is
-  /// ready. Play shows its own progress UI while it downloads. Best-effort.
-  Future<void> startUpdate() async {
+  /// Asks Play to download the update and waits for the download to finish.
+  /// Play shows its own progress UI. Returns true only once the new version is
+  /// downloaded and ready: the caller then offers [restartToInstall], because
+  /// restarting is the user's call (it may be mid-entry). Best-effort: false
+  /// when the user declined, the download failed or Play is not available.
+  Future<bool> startUpdate() async {
+    if (!_supported) return false;
     try {
+      // Listen before starting so a fast download can't slip past.
+      final done = InAppUpdate.installUpdateListener.firstWhere(
+        (s) => s == InstallStatus.downloaded || s == InstallStatus.failed || s == InstallStatus.canceled,
+      );
       final result = await InAppUpdate.startFlexibleUpdate();
-      if (result == AppUpdateResult.success) {
-        await InAppUpdate.completeFlexibleUpdate();
-      }
+      if (result != AppUpdateResult.success) return false;
+      return await done == InstallStatus.downloaded;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Installs the downloaded update and restarts the app on it.
+  Future<void> restartToInstall() async {
+    try {
+      await InAppUpdate.completeFlexibleUpdate();
     } catch (_) {}
   }
 }
