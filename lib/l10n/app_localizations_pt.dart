@@ -836,6 +836,111 @@ class AppLocalizationsPt extends AppLocalizations {
       'Cada uma mostra quanto tem. Transferir move dinheiro de uma para outra.';
 
   @override
+  String get tutorialReceitas1Title => 'Lance o que entrou';
+
+  @override
+  String get tutorialReceitas1Body =>
+      'Preencha o valor e de onde veio. A data já vem com hoje.';
+
+  @override
+  String get tutorialReceitas2Title => 'É só lançar';
+
+  @override
+  String get tutorialReceitas2Body =>
+      'O valor cai na sua conta. Para separar em caixinhas, use Alocar no Dashboard.';
+
+  @override
+  String get tutorialReceitas3Title => 'Tudo o que entrou fica aqui';
+
+  @override
+  String get tutorialReceitas3Body =>
+      'Toque numa receita para corrigir. As datas acima filtram a lista.';
+
+  @override
+  String get tutorialGastos1Title => 'Lance um gasto';
+
+  @override
+  String get tutorialGastos1Body =>
+      'Valor e data. A descrição é opcional, mas ajuda a lembrar depois.';
+
+  @override
+  String get tutorialGastos2Title => 'Escolha de onde sai';
+
+  @override
+  String get tutorialGastos2Body =>
+      'Da conta ou de uma caixinha. O saldo disponível aparece logo abaixo.';
+
+  @override
+  String get tutorialGastos3Title => 'Seus gastos ficam aqui';
+
+  @override
+  String get tutorialGastos3Body =>
+      'Toque num gasto para editar. As datas acima filtram a lista.';
+
+  @override
+  String get tutorialAssinaturas1Title => 'Cadastre uma vez';
+
+  @override
+  String get tutorialAssinaturas1Body =>
+      'Nome, valor e o dia da cobrança. Streaming, academia, aluguel.';
+
+  @override
+  String get tutorialAssinaturas2Title => 'Lançado no dia certo';
+
+  @override
+  String get tutorialAssinaturas2Body =>
+      'No dia da cobrança, o gasto sai da conta ou da caixinha escolhida, na próxima vez que você abrir o app.';
+
+  @override
+  String get tutorialAssinaturas3Title => 'Suas assinaturas';
+
+  @override
+  String get tutorialAssinaturas3Body =>
+      'Toque numa para editar. Cobrar agora lança antes do dia.';
+
+  @override
+  String get tutorialParcelamentos1Title => 'Uma compra, várias parcelas';
+
+  @override
+  String get tutorialParcelamentos1Body =>
+      'Informe o valor total e em quantas vezes. O Dindin divide pelos meses.';
+
+  @override
+  String get tutorialParcelamentos2Title => 'Cada parcela sai daqui';
+
+  @override
+  String get tutorialParcelamentos2Body =>
+      'Da conta ou de uma caixinha, no mês de cada cobrança.';
+
+  @override
+  String get tutorialParcelamentos3Title => 'Adiantar ou quitar';
+
+  @override
+  String get tutorialParcelamentos3Body =>
+      'Em cada compra, você pode pagar mais que a parcela ou quitar o que falta.';
+
+  @override
+  String get tutorialCategorias1Title => 'Cada categoria vira uma caixinha';
+
+  @override
+  String get tutorialCategorias1Body =>
+      'Dê um nome, como Mercado ou Viagem, e toque em Adicionar.';
+
+  @override
+  String get tutorialCategorias2Title => 'Guardar ou gastar';
+
+  @override
+  String get tutorialCategorias2Body =>
+      'Guardar é para juntar até uma meta. Gastar é para ter um limite por mês.';
+
+  @override
+  String get tutorialCategorias3Title => 'Suas caixinhas';
+
+  @override
+  String get tutorialCategorias3Body =>
+      'Toque numa para mudar o nome, a meta ou o limite.';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

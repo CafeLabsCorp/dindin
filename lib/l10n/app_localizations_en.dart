@@ -839,6 +839,111 @@ class AppLocalizationsEn extends AppLocalizations {
       'Each one shows how much it holds. Transfer moves money from one to another.';
 
   @override
+  String get tutorialReceitas1Title => 'Add what came in';
+
+  @override
+  String get tutorialReceitas1Body =>
+      'Fill in the amount and where it came from. The date starts as today.';
+
+  @override
+  String get tutorialReceitas2Title => 'Then add it';
+
+  @override
+  String get tutorialReceitas2Body =>
+      'The amount goes to your account. To split it into envelopes, use Allocate on the Dashboard.';
+
+  @override
+  String get tutorialReceitas3Title => 'Everything that came in';
+
+  @override
+  String get tutorialReceitas3Body =>
+      'Tap an income to fix it. The dates above filter the list.';
+
+  @override
+  String get tutorialGastos1Title => 'Add an expense';
+
+  @override
+  String get tutorialGastos1Body =>
+      'Amount and date. The description is optional, but it helps later.';
+
+  @override
+  String get tutorialGastos2Title => 'Choose where it comes from';
+
+  @override
+  String get tutorialGastos2Body =>
+      'Your account or an envelope. The available balance shows right below.';
+
+  @override
+  String get tutorialGastos3Title => 'Your expenses';
+
+  @override
+  String get tutorialGastos3Body =>
+      'Tap one to edit it. The dates above filter the list.';
+
+  @override
+  String get tutorialAssinaturas1Title => 'Set it up once';
+
+  @override
+  String get tutorialAssinaturas1Body =>
+      'Name, amount and billing day. Streaming, gym, rent.';
+
+  @override
+  String get tutorialAssinaturas2Title => 'Charged on the right day';
+
+  @override
+  String get tutorialAssinaturas2Body =>
+      'On the billing day, the expense comes out of the account or envelope you picked, the next time you open the app.';
+
+  @override
+  String get tutorialAssinaturas3Title => 'Your subscriptions';
+
+  @override
+  String get tutorialAssinaturas3Body =>
+      'Tap one to edit it. Charge now posts it before the day.';
+
+  @override
+  String get tutorialParcelamentos1Title => 'One purchase, many installments';
+
+  @override
+  String get tutorialParcelamentos1Body =>
+      'Enter the total and how many installments. Dindin splits it across the months.';
+
+  @override
+  String get tutorialParcelamentos2Title => 'Each installment comes from here';
+
+  @override
+  String get tutorialParcelamentos2Body =>
+      'Your account or an envelope, in each billing month.';
+
+  @override
+  String get tutorialParcelamentos3Title => 'Pay early or pay off';
+
+  @override
+  String get tutorialParcelamentos3Body =>
+      'On each purchase you can pay more than the installment or pay off the rest.';
+
+  @override
+  String get tutorialCategorias1Title => 'Each category becomes an envelope';
+
+  @override
+  String get tutorialCategorias1Body =>
+      'Give it a name, like Groceries or Travel, and tap Add.';
+
+  @override
+  String get tutorialCategorias2Title => 'Save or spend';
+
+  @override
+  String get tutorialCategorias2Body =>
+      'Save is for reaching a goal. Spend is for a monthly limit.';
+
+  @override
+  String get tutorialCategorias3Title => 'Your envelopes';
+
+  @override
+  String get tutorialCategorias3Body =>
+      'Tap one to change its name, goal or limit.';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

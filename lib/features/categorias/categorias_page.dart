@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../models/tutorial_progress.dart';
+import '../../widgets/tutorial/tutorial.dart';
+import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/allocation.dart';
@@ -25,6 +28,11 @@ class CategoriasPage extends ConsumerStatefulWidget {
 }
 
 class _CategoriasPageState extends ConsumerState<CategoriasPage> {
+  // Elements the onboarding tutorial lights up.
+  final _nameRowKey = GlobalKey();
+  final _kindKey = GlobalKey();
+  final _listKey = GlobalKey();
+
   final _nameController = TextEditingController();
   final _monthlyBudgetController = TextEditingController();
   final _goalController = TextEditingController();
@@ -143,6 +151,31 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     );
   }
 
+  /// This page's tutorial (docs/onboarding-design.md §3).
+  List<TutorialStep> _tutorialSteps(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      TutorialStep(
+        target: _nameRowKey,
+        title: l10n.tutorialCategorias1Title,
+        body: l10n.tutorialCategorias1Body,
+        radius: 12,
+      ),
+      TutorialStep(
+        target: _kindKey,
+        title: l10n.tutorialCategorias2Title,
+        body: l10n.tutorialCategorias2Body,
+        radius: 20,
+      ),
+      TutorialStep(
+        target: _listKey,
+        title: l10n.tutorialCategorias3Title,
+        body: l10n.tutorialCategorias3Body,
+        radius: 16,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -158,7 +191,11 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     };
     final dark = Theme.of(context).brightness == Brightness.dark;
 
-    return ListView(
+    return TutorialHost(
+      page: TutorialPage.categorias,
+      pageName: l10n.categoriasTitle,
+      steps: _tutorialSteps,
+      child: ListView(
       children: [
         PageHeader(
           title: l10n.categoriasTitle,
@@ -172,6 +209,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                key: _nameRowKey,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
@@ -192,6 +230,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
               ),
               const SizedBox(height: 12),
               SegmentedButton<CategoryKind>(
+                key: _kindKey,
                 segments: [
                   ButtonSegment(
                     value: CategoryKind.save,
@@ -281,6 +320,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
         ),
         const SizedBox(height: 16),
         AppCard(
+          key: _listKey,
           child: categoriesAsync.when(
             data: (categories) {
               if (categories.isEmpty) {
@@ -462,6 +502,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
           ),
         ),
       ],
+    ),
     );
   }
 }

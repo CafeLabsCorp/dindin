@@ -1478,6 +1478,186 @@ abstract class AppLocalizations {
   /// **'Cada uma mostra quanto tem. Transferir move dinheiro de uma para outra.'**
   String get tutorialDashboard4Body;
 
+  /// No description provided for @tutorialReceitas1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lance o que entrou'**
+  String get tutorialReceitas1Title;
+
+  /// No description provided for @tutorialReceitas1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Preencha o valor e de onde veio. A data já vem com hoje.'**
+  String get tutorialReceitas1Body;
+
+  /// No description provided for @tutorialReceitas2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'É só lançar'**
+  String get tutorialReceitas2Title;
+
+  /// No description provided for @tutorialReceitas2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'O valor cai na sua conta. Para separar em caixinhas, use Alocar no Dashboard.'**
+  String get tutorialReceitas2Body;
+
+  /// No description provided for @tutorialReceitas3Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Tudo o que entrou fica aqui'**
+  String get tutorialReceitas3Title;
+
+  /// No description provided for @tutorialReceitas3Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Toque numa receita para corrigir. As datas acima filtram a lista.'**
+  String get tutorialReceitas3Body;
+
+  /// No description provided for @tutorialGastos1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lance um gasto'**
+  String get tutorialGastos1Title;
+
+  /// No description provided for @tutorialGastos1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Valor e data. A descrição é opcional, mas ajuda a lembrar depois.'**
+  String get tutorialGastos1Body;
+
+  /// No description provided for @tutorialGastos2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Escolha de onde sai'**
+  String get tutorialGastos2Title;
+
+  /// No description provided for @tutorialGastos2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Da conta ou de uma caixinha. O saldo disponível aparece logo abaixo.'**
+  String get tutorialGastos2Body;
+
+  /// No description provided for @tutorialGastos3Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Seus gastos ficam aqui'**
+  String get tutorialGastos3Title;
+
+  /// No description provided for @tutorialGastos3Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Toque num gasto para editar. As datas acima filtram a lista.'**
+  String get tutorialGastos3Body;
+
+  /// No description provided for @tutorialAssinaturas1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cadastre uma vez'**
+  String get tutorialAssinaturas1Title;
+
+  /// No description provided for @tutorialAssinaturas1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nome, valor e o dia da cobrança. Streaming, academia, aluguel.'**
+  String get tutorialAssinaturas1Body;
+
+  /// No description provided for @tutorialAssinaturas2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lançado no dia certo'**
+  String get tutorialAssinaturas2Title;
+
+  /// No description provided for @tutorialAssinaturas2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'No dia da cobrança, o gasto sai da conta ou da caixinha escolhida, na próxima vez que você abrir o app.'**
+  String get tutorialAssinaturas2Body;
+
+  /// No description provided for @tutorialAssinaturas3Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Suas assinaturas'**
+  String get tutorialAssinaturas3Title;
+
+  /// No description provided for @tutorialAssinaturas3Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Toque numa para editar. Cobrar agora lança antes do dia.'**
+  String get tutorialAssinaturas3Body;
+
+  /// No description provided for @tutorialParcelamentos1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Uma compra, várias parcelas'**
+  String get tutorialParcelamentos1Title;
+
+  /// No description provided for @tutorialParcelamentos1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Informe o valor total e em quantas vezes. O Dindin divide pelos meses.'**
+  String get tutorialParcelamentos1Body;
+
+  /// No description provided for @tutorialParcelamentos2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cada parcela sai daqui'**
+  String get tutorialParcelamentos2Title;
+
+  /// No description provided for @tutorialParcelamentos2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Da conta ou de uma caixinha, no mês de cada cobrança.'**
+  String get tutorialParcelamentos2Body;
+
+  /// No description provided for @tutorialParcelamentos3Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Adiantar ou quitar'**
+  String get tutorialParcelamentos3Title;
+
+  /// No description provided for @tutorialParcelamentos3Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Em cada compra, você pode pagar mais que a parcela ou quitar o que falta.'**
+  String get tutorialParcelamentos3Body;
+
+  /// No description provided for @tutorialCategorias1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cada categoria vira uma caixinha'**
+  String get tutorialCategorias1Title;
+
+  /// No description provided for @tutorialCategorias1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Dê um nome, como Mercado ou Viagem, e toque em Adicionar.'**
+  String get tutorialCategorias1Body;
+
+  /// No description provided for @tutorialCategorias2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Guardar ou gastar'**
+  String get tutorialCategorias2Title;
+
+  /// No description provided for @tutorialCategorias2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Guardar é para juntar até uma meta. Gastar é para ter um limite por mês.'**
+  String get tutorialCategorias2Body;
+
+  /// No description provided for @tutorialCategorias3Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Suas caixinhas'**
+  String get tutorialCategorias3Title;
+
+  /// No description provided for @tutorialCategorias3Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Toque numa para mudar o nome, a meta ou o limite.'**
+  String get tutorialCategorias3Body;
+
   /// No description provided for @tutorialAnnouncement.
   ///
   /// In pt, this message translates to:

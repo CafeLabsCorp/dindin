@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../models/tutorial_progress.dart';
+import '../../widgets/tutorial/tutorial.dart';
+import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
@@ -33,6 +36,11 @@ class AssinaturasPage extends ConsumerStatefulWidget {
 }
 
 class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
+  // Elements the onboarding tutorial lights up.
+  final _formKey = GlobalKey();
+  final _sourceKey = GlobalKey();
+  final _listKey = GlobalKey();
+
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
   int _dueDay = 5;
@@ -215,6 +223,31 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
     );
   }
 
+  /// This page's tutorial (docs/onboarding-design.md §3).
+  List<TutorialStep> _tutorialSteps(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      TutorialStep(
+        target: _formKey,
+        title: l10n.tutorialAssinaturas1Title,
+        body: l10n.tutorialAssinaturas1Body,
+        radius: 16,
+      ),
+      TutorialStep(
+        target: _sourceKey,
+        title: l10n.tutorialAssinaturas2Title,
+        body: l10n.tutorialAssinaturas2Body,
+        radius: 12,
+      ),
+      TutorialStep(
+        target: _listKey,
+        title: l10n.tutorialAssinaturas3Title,
+        body: l10n.tutorialAssinaturas3Body,
+        radius: 16,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -225,7 +258,11 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
     final showPending = catchUpState.hasValue;
     final today = ref.watch(todayProvider);
 
-    return CatchUpRefresh(
+    return TutorialHost(
+      page: TutorialPage.assinaturas,
+      pageName: l10n.subscriptionsTitle,
+      steps: _tutorialSteps,
+      child: CatchUpRefresh(
       child: ListView(
         // Always scrollable, so pull-to-refresh works even when the content fits.
         physics: const AlwaysScrollableScrollPhysics(),
@@ -238,6 +275,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
           ),
           const SizedBox(height: 24),
           AppCard(
+            key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -287,6 +325,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                     (
                       width: 180.0,
                       child: ChargeSourceField(
+                        key: _sourceKey,
                         categories: categories,
                         value: _source,
                         onChanged: _submitting
@@ -316,6 +355,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
           ),
           const SizedBox(height: 16),
           AppCard(
+            key: _listKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -364,6 +404,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }

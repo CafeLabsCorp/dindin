@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../models/tutorial_progress.dart';
+import '../../widgets/tutorial/tutorial.dart';
+import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
@@ -34,6 +37,11 @@ class GastosPage extends ConsumerStatefulWidget {
 }
 
 class _GastosPageState extends ConsumerState<GastosPage> {
+  // Elements the onboarding tutorial lights up.
+  final _formKey = GlobalKey();
+  final _sourceKey = GlobalKey();
+  final _listKey = GlobalKey();
+
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime _date = DateTime.now();
@@ -173,6 +181,31 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     });
   }
 
+  /// This page's tutorial (docs/onboarding-design.md §3).
+  List<TutorialStep> _tutorialSteps(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      TutorialStep(
+        target: _formKey,
+        title: l10n.tutorialGastos1Title,
+        body: l10n.tutorialGastos1Body,
+        radius: 16,
+      ),
+      TutorialStep(
+        target: _sourceKey,
+        title: l10n.tutorialGastos2Title,
+        body: l10n.tutorialGastos2Body,
+        radius: 12,
+      ),
+      TutorialStep(
+        target: _listKey,
+        title: l10n.tutorialGastos3Title,
+        body: l10n.tutorialGastos3Body,
+        radius: 16,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -199,7 +232,11 @@ class _GastosPageState extends ConsumerState<GastosPage> {
     final blocked = _blockedByFrozenDebt(categories, availableBalance);
     final filterActive = _filterFrom != null || _filterTo != null;
 
-    return CatchUpRefresh(
+    return TutorialHost(
+      page: TutorialPage.gastos,
+      pageName: l10n.gastosTitle,
+      steps: _tutorialSteps,
+      child: CatchUpRefresh(
       child: ListView(
         // Always scrollable, so pull-to-refresh works even when the content fits.
         physics: const AlwaysScrollableScrollPhysics(),
@@ -234,6 +271,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
           ),
           const SizedBox(height: 16),
           AppCard(
+            key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -270,6 +308,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                     (
                       width: 200.0,
                       child: DropdownButtonFormField<String>(
+                        key: _sourceKey,
                         initialValue: _selection,
                         isExpanded: true,
                         decoration: InputDecoration(labelText: l10n.expenseSourceLabel),
@@ -325,6 +364,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
           ),
           const SizedBox(height: 16),
           AppCard(
+            key: _listKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -422,6 +462,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../models/tutorial_progress.dart';
+import '../../widgets/tutorial/tutorial.dart';
+import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/income.dart';
@@ -27,6 +30,11 @@ class ReceitasPage extends ConsumerStatefulWidget {
 }
 
 class _ReceitasPageState extends ConsumerState<ReceitasPage> {
+  // Elements the onboarding tutorial lights up.
+  final _formKey = GlobalKey();
+  final _submitKey = GlobalKey();
+  final _listKey = GlobalKey();
+
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime _date = DateTime.now();
@@ -132,13 +140,42 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
     });
   }
 
+  /// This page's tutorial (docs/onboarding-design.md §3).
+  List<TutorialStep> _tutorialSteps(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      TutorialStep(
+        target: _formKey,
+        title: l10n.tutorialReceitas1Title,
+        body: l10n.tutorialReceitas1Body,
+        radius: 16,
+      ),
+      TutorialStep(
+        target: _submitKey,
+        title: l10n.tutorialReceitas2Title,
+        body: l10n.tutorialReceitas2Body,
+        radius: 20,
+      ),
+      TutorialStep(
+        target: _listKey,
+        title: l10n.tutorialReceitas3Title,
+        body: l10n.tutorialReceitas3Body,
+        radius: 16,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final incomesAsync = ref.watch(incomesProvider);
     final filterActive = _filterFrom != null || _filterTo != null;
 
-    return CatchUpRefresh(
+    return TutorialHost(
+      page: TutorialPage.receitas,
+      pageName: l10n.receitasTitle,
+      steps: _tutorialSteps,
+      child: CatchUpRefresh(
       child: ListView(
         // Always scrollable, so pull-to-refresh works even when the content fits.
         physics: const AlwaysScrollableScrollPhysics(),
@@ -151,6 +188,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
           ),
           const SizedBox(height: 24),
           AppCard(
+            key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -206,7 +244,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                FilledButton(onPressed: _submitting ? null : _submit, child: Text(l10n.submitIncomeButton)),
+                FilledButton(key: _submitKey, onPressed: _submitting ? null : _submit, child: Text(l10n.submitIncomeButton)),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -217,6 +255,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
           ),
           const SizedBox(height: 16),
           AppCard(
+            key: _listKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -313,6 +352,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }
