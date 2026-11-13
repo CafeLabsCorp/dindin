@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/guided_empty_state.dart';
 import '../../models/tutorial_progress.dart';
 import '../../widgets/tutorial/tutorial.dart';
 import '../../widgets/tutorial/tutorial_host.dart';
@@ -30,6 +31,7 @@ class CategoriasPage extends ConsumerStatefulWidget {
 class _CategoriasPageState extends ConsumerState<CategoriasPage> {
   // Elements the onboarding tutorial lights up.
   final _nameRowKey = GlobalKey();
+  final _nameFocus = FocusNode();
   final _kindKey = GlobalKey();
   final _listKey = GlobalKey();
 
@@ -47,6 +49,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
     _nameController.dispose();
     _monthlyBudgetController.dispose();
     _goalController.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -215,6 +218,7 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
                   Expanded(
                     child: TextField(
                       controller: _nameController,
+                      focusNode: _nameFocus,
                       decoration: InputDecoration(
                         labelText: l10n.categoryNameLabel,
                         hintText: l10n.categoryNameHint,
@@ -324,7 +328,13 @@ class _CategoriasPageState extends ConsumerState<CategoriasPage> {
           child: categoriesAsync.when(
             data: (categories) {
               if (categories.isEmpty) {
-                return EmptyState(l10n.categoriesEmptyState);
+                return GuidedEmptyState(
+                  illustration: const LeavesIllustration(),
+                  title: l10n.emptyCategoriasTitle,
+                  message: l10n.emptyCategoriasBody,
+                  actionLabel: l10n.emptyCategoriasAction,
+                  onAction: () => scrollToAndFocus(_nameRowKey, _nameFocus),
+                );
               }
               return Column(
                 children: [

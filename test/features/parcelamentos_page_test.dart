@@ -90,7 +90,8 @@ void main() {
     await pump(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Nenhum parcelamento cadastrado ainda.'), findsOneWidget);
+    expect(find.text('Nenhum parcelamento ainda'), findsOneWidget);
+    expect(find.text('Cadastrar parcelamento'), findsOneWidget);
   });
 
   testWidgets('mostra quanto ainda falta pagar, não só quantas parcelas', (tester) async {

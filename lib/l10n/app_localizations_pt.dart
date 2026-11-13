@@ -204,9 +204,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get expensesListTitle => 'Gastos lançados';
 
   @override
-  String get expensesEmptyState => 'Nenhum gasto lançado ainda.';
-
-  @override
   String expensesEmptyFilteredRange(String from, String to) {
     return 'Nenhum gasto entre $from e $to.';
   }
@@ -251,9 +248,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get subscriptionsListTitle => 'Assinaturas cadastradas';
-
-  @override
-  String get subscriptionsEmptyState => 'Nenhuma assinatura cadastrada ainda.';
 
   @override
   String subscriptionChargedOnLabel(String day) {
@@ -336,10 +330,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String settledInstallmentPurchasesTitle(int count) {
     return 'Parcelamentos quitados ($count)';
   }
-
-  @override
-  String get installmentPurchasesEmptyState =>
-      'Nenhum parcelamento cadastrado ainda.';
 
   @override
   String installmentSummaryLabel(String count, String amount) {
@@ -530,9 +520,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get incomesListTitle => 'Receitas lançadas';
 
   @override
-  String get incomesEmptyState => 'Nenhuma receita lançada ainda.';
-
-  @override
   String incomesEmptyFilteredRange(String from, String to) {
     return 'Nenhuma receita entre $from e $to.';
   }
@@ -617,10 +604,6 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get recurringGoalHint =>
       'Com meta de valor, isso vira um alvo mensal: a barra reseta todo dia 1, mas o saldo total da caixinha continua acumulando à parte.';
-
-  @override
-  String get categoriesEmptyState =>
-      'Nenhuma categoria ainda. Crie a primeira acima.';
 
   @override
   String get recurringChip => 'Recorrente';
@@ -988,6 +971,93 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get tutorialSettings2Body =>
       'Quer ver um tutorial de novo? Ele fica aqui.';
+
+  @override
+  String get emptyReceitasTitle => 'Nenhuma receita ainda';
+
+  @override
+  String get emptyReceitasBody =>
+      'Lance seu salário ou qualquer valor que entrou. Ele vai para a conta.';
+
+  @override
+  String get emptyReceitasAction => 'Adicionar receita';
+
+  @override
+  String get emptyGastosTitle => 'Nenhum gasto ainda';
+
+  @override
+  String get emptyGastosBody =>
+      'Lance o mercado de hoje, uma conta ou um café. Você escolhe de onde sai.';
+
+  @override
+  String get emptyGastosAction => 'Adicionar gasto';
+
+  @override
+  String get emptyAssinaturasTitle => 'Nenhuma assinatura ainda';
+
+  @override
+  String get emptyAssinaturasBody =>
+      'Streaming, academia, aluguel. Cadastre uma vez com o dia da cobrança.';
+
+  @override
+  String get emptyAssinaturasAction => 'Cadastrar assinatura';
+
+  @override
+  String get emptyParcelamentosTitle => 'Nenhum parcelamento ainda';
+
+  @override
+  String get emptyParcelamentosBody =>
+      'Cadastre a compra uma vez, com o valor total e o número de parcelas.';
+
+  @override
+  String get emptyParcelamentosAction => 'Cadastrar parcelamento';
+
+  @override
+  String get emptyCategoriasTitle => 'Nenhuma caixinha ainda';
+
+  @override
+  String get emptyCategoriasBody =>
+      'Mercado, Viagem, Reserva. Crie a primeira acima.';
+
+  @override
+  String get emptyCategoriasAction => 'Criar caixinha';
+
+  @override
+  String get firstStepsTitle => 'Primeiros passos';
+
+  @override
+  String get firstStepsIntro =>
+      'Três coisas e o Dindin começa a fazer sentido.';
+
+  @override
+  String get firstStepCreate => 'Crie uma caixinha';
+
+  @override
+  String get firstStepCreateAction => 'Criar';
+
+  @override
+  String get firstStepIncome => 'Lance uma receita';
+
+  @override
+  String get firstStepIncomeAction => 'Lançar';
+
+  @override
+  String get firstStepAllocate => 'Aloque na caixinha';
+
+  @override
+  String get firstStepAllocateAction => 'Alocar';
+
+  @override
+  String get firstStepDone => 'Feito';
+
+  @override
+  String get historyEmptyAction => 'Lançar receita';
+
+  @override
+  String get incomesEmptyState => 'Nenhuma receita lançada ainda.';
+
+  @override
+  String get expensesEmptyState => 'Nenhum gasto lançado ainda.';
 
   @override
   String tutorialAnnouncement(

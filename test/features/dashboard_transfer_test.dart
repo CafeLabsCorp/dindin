@@ -75,6 +75,9 @@ void main() {
     final button = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Transferir'));
     expect(button.onPressed, isNotNull);
 
+    // O cartão 'Primeiros passos' empurra o botão pra baixo da dobra: rola até ele.
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Transferir'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Transferir'));
     await tester.pumpAndSettle();
 

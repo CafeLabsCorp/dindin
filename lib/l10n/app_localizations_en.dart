@@ -205,9 +205,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get expensesListTitle => 'Logged expenses';
 
   @override
-  String get expensesEmptyState => 'No expenses logged yet.';
-
-  @override
   String expensesEmptyFilteredRange(String from, String to) {
     return 'No expenses between $from and $to.';
   }
@@ -252,9 +249,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subscriptionsListTitle => 'Registered subscriptions';
-
-  @override
-  String get subscriptionsEmptyState => 'No subscriptions registered yet.';
 
   @override
   String subscriptionChargedOnLabel(String day) {
@@ -338,10 +332,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String settledInstallmentPurchasesTitle(int count) {
     return 'Paid-off installment purchases ($count)';
   }
-
-  @override
-  String get installmentPurchasesEmptyState =>
-      'No installment purchases registered yet.';
 
   @override
   String installmentSummaryLabel(String count, String amount) {
@@ -532,9 +522,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get incomesListTitle => 'Logged income';
 
   @override
-  String get incomesEmptyState => 'No income logged yet.';
-
-  @override
   String incomesEmptyFilteredRange(String from, String to) {
     return 'No income between $from and $to.';
   }
@@ -619,10 +606,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recurringGoalHint =>
       'With a target amount, this becomes a monthly target: the bar resets every day 1, but the envelope\'s total balance keeps accumulating separately.';
-
-  @override
-  String get categoriesEmptyState =>
-      'No categories yet. Create the first one above.';
 
   @override
   String get recurringChip => 'Recurring';
@@ -991,6 +974,92 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tutorialSettings2Body =>
       'Want to see a tutorial again? It\'s here.';
+
+  @override
+  String get emptyReceitasTitle => 'No income yet';
+
+  @override
+  String get emptyReceitasBody =>
+      'Add your salary or any money that came in. It goes to your account.';
+
+  @override
+  String get emptyReceitasAction => 'Add income';
+
+  @override
+  String get emptyGastosTitle => 'No expenses yet';
+
+  @override
+  String get emptyGastosBody =>
+      'Add today\'s groceries, a bill or a coffee. You choose where it comes from.';
+
+  @override
+  String get emptyGastosAction => 'Add expense';
+
+  @override
+  String get emptyAssinaturasTitle => 'No subscriptions yet';
+
+  @override
+  String get emptyAssinaturasBody =>
+      'Streaming, gym, rent. Set it up once with the billing day.';
+
+  @override
+  String get emptyAssinaturasAction => 'Set up subscription';
+
+  @override
+  String get emptyParcelamentosTitle => 'No installment purchases yet';
+
+  @override
+  String get emptyParcelamentosBody =>
+      'Add the purchase once, with the total and the number of installments.';
+
+  @override
+  String get emptyParcelamentosAction => 'Set up installment purchase';
+
+  @override
+  String get emptyCategoriasTitle => 'No envelopes yet';
+
+  @override
+  String get emptyCategoriasBody =>
+      'Groceries, Travel, Savings. Create the first one above.';
+
+  @override
+  String get emptyCategoriasAction => 'Create envelope';
+
+  @override
+  String get firstStepsTitle => 'First steps';
+
+  @override
+  String get firstStepsIntro => 'Three things and Dindin starts to make sense.';
+
+  @override
+  String get firstStepCreate => 'Create an envelope';
+
+  @override
+  String get firstStepCreateAction => 'Create';
+
+  @override
+  String get firstStepIncome => 'Add an income';
+
+  @override
+  String get firstStepIncomeAction => 'Add';
+
+  @override
+  String get firstStepAllocate => 'Allocate to an envelope';
+
+  @override
+  String get firstStepAllocateAction => 'Allocate';
+
+  @override
+  String get firstStepDone => 'Done';
+
+  @override
+  String get historyEmptyAction => 'Add income';
+
+  @override
+  String get incomesEmptyState => 'No income logged yet.';
+
+  @override
+  String get expensesEmptyState => 'No expenses logged yet.';
 
   @override
   String tutorialAnnouncement(

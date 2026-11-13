@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/guided_empty_state.dart';
 import '../../models/tutorial_progress.dart';
 import '../../widgets/tutorial/tutorial.dart';
 import '../../widgets/tutorial/tutorial_host.dart';
@@ -32,6 +33,7 @@ class ReceitasPage extends ConsumerStatefulWidget {
 class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   // Elements the onboarding tutorial lights up.
   final _formKey = GlobalKey();
+  final _amountFocus = FocusNode();
   final _submitKey = GlobalKey();
   final _listKey = GlobalKey();
 
@@ -49,6 +51,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _amountFocus.dispose();
     super.dispose();
   }
 
@@ -216,6 +219,7 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                       width: 140.0,
                       child: TextField(
                         controller: _amountController,
+                        focusNode: _amountFocus,
                         keyboardType: TextInputType.number,
                         inputFormatters: [MoneyInputFormatter()],
                         decoration: InputDecoration(labelText: l10n.amountLabel, hintText: l10n.amountHint),
@@ -324,7 +328,15 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
                 const SizedBox(height: 12),
                 incomesAsync.when(
                   data: (incomes) {
-                    if (incomes.isEmpty) return EmptyState(l10n.incomesEmptyState);
+                    if (incomes.isEmpty) {
+                      return GuidedEmptyState(
+                        illustration: const CoinIllustration(),
+                        title: l10n.emptyReceitasTitle,
+                        message: l10n.emptyReceitasBody,
+                        actionLabel: l10n.emptyReceitasAction,
+                        onAction: () => scrollToAndFocus(_formKey, _amountFocus),
+                      );
+                    }
                     final filtered = incomes.where((i) => isDateWithinRange(i.date, _filterFrom, _filterTo)).toList();
                     if (filtered.isEmpty) {
                       return EmptyState(

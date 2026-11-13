@@ -78,7 +78,6 @@
   },
   "submitExpenseButton": "Lançar gasto",
   "expensesListTitle": "Gastos lançados",
-  "expensesEmptyState": "Nenhum gasto lançado ainda.",
   "expensesEmptyFilteredRange": "Nenhum gasto entre {from} e {to}.",
   "@expensesEmptyFilteredRange": {
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
@@ -102,7 +101,6 @@
   "invalidDueDayError": "Informe um dia entre 1 e 31.",
   "submitSubscriptionButton": "Adicionar assinatura",
   "subscriptionsListTitle": "Assinaturas cadastradas",
-  "subscriptionsEmptyState": "Nenhuma assinatura cadastrada ainda.",
   "subscriptionChargedOnLabel": "Cobra todo dia {day}",
   "@subscriptionChargedOnLabel": {
     "placeholders": { "day": { "type": "String" } }
@@ -133,7 +131,6 @@
   "installmentPurchasesListTitle": "Parcelamentos cadastrados",
   "settledInstallmentPurchasesTitle": "Parcelamentos quitados ({count})",
   "@settledInstallmentPurchasesTitle": {"placeholders": {"count": {"type": "int"}}},
-  "installmentPurchasesEmptyState": "Nenhum parcelamento cadastrado ainda.",
   "installmentSummaryLabel": "{count}x de {amount}",
   "@installmentSummaryLabel": {
     "placeholders": { "count": { "type": "String" }, "amount": { "type": "String" } }
@@ -228,7 +225,6 @@
   "incomeDescriptionHint": "Ex: salário julho",
   "submitIncomeButton": "Lançar receita",
   "incomesListTitle": "Receitas lançadas",
-  "incomesEmptyState": "Nenhuma receita lançada ainda.",
   "incomesEmptyFilteredRange": "Nenhuma receita entre {from} e {to}.",
   "@incomesEmptyFilteredRange": {
     "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
@@ -263,7 +259,6 @@
   "allowNegativeDescription": "Um gasto pode deixar essa caixinha devendo. A próxima alocação quita a dívida automaticamente.",
   "recurringLabel": "Recorrente (repete todo mês)",
   "recurringGoalHint": "Com meta de valor, isso vira um alvo mensal: a barra reseta todo dia 1, mas o saldo total da caixinha continua acumulando à parte.",
-  "categoriesEmptyState": "Nenhuma categoria ainda. Crie a primeira acima.",
   "recurringChip": "Recorrente",
   "oneTimeChip": "Pontual",
   "deleteBlockedByTransferTooltip": "Desfaça as transferências dessa caixinha antes de removê-la",
@@ -395,6 +390,33 @@
   "tutorialSettings1Body": "Exporte um backup dos seus dados quando quiser.",
   "tutorialSettings2Title": "Rever explicações",
   "tutorialSettings2Body": "Quer ver um tutorial de novo? Ele fica aqui.",
+  "emptyReceitasTitle": "Nenhuma receita ainda",
+  "emptyReceitasBody": "Lance seu salário ou qualquer valor que entrou. Ele vai para a conta.",
+  "emptyReceitasAction": "Adicionar receita",
+  "emptyGastosTitle": "Nenhum gasto ainda",
+  "emptyGastosBody": "Lance o mercado de hoje, uma conta ou um café. Você escolhe de onde sai.",
+  "emptyGastosAction": "Adicionar gasto",
+  "emptyAssinaturasTitle": "Nenhuma assinatura ainda",
+  "emptyAssinaturasBody": "Streaming, academia, aluguel. Cadastre uma vez com o dia da cobrança.",
+  "emptyAssinaturasAction": "Cadastrar assinatura",
+  "emptyParcelamentosTitle": "Nenhum parcelamento ainda",
+  "emptyParcelamentosBody": "Cadastre a compra uma vez, com o valor total e o número de parcelas.",
+  "emptyParcelamentosAction": "Cadastrar parcelamento",
+  "emptyCategoriasTitle": "Nenhuma caixinha ainda",
+  "emptyCategoriasBody": "Mercado, Viagem, Reserva. Crie a primeira acima.",
+  "emptyCategoriasAction": "Criar caixinha",
+  "firstStepsTitle": "Primeiros passos",
+  "firstStepsIntro": "Três coisas e o Dindin começa a fazer sentido.",
+  "firstStepCreate": "Crie uma caixinha",
+  "firstStepCreateAction": "Criar",
+  "firstStepIncome": "Lance uma receita",
+  "firstStepIncomeAction": "Lançar",
+  "firstStepAllocate": "Aloque na caixinha",
+  "firstStepAllocateAction": "Alocar",
+  "firstStepDone": "Feito",
+  "historyEmptyAction": "Lançar receita",
+  "incomesEmptyState": "Nenhuma receita lançada ainda.",
+  "expensesEmptyState": "Nenhum gasto lançado ainda.",
   "tutorialAnnouncement": "Tutorial de {page}, passo {current} de {total}. {title}. {body}",
   "@tutorialAnnouncement": {
     "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }

@@ -452,12 +452,6 @@ abstract class AppLocalizations {
   /// **'Gastos lançados'**
   String get expensesListTitle;
 
-  /// No description provided for @expensesEmptyState.
-  ///
-  /// In pt, this message translates to:
-  /// **'Nenhum gasto lançado ainda.'**
-  String get expensesEmptyState;
-
   /// No description provided for @expensesEmptyFilteredRange.
   ///
   /// In pt, this message translates to:
@@ -535,12 +529,6 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Assinaturas cadastradas'**
   String get subscriptionsListTitle;
-
-  /// No description provided for @subscriptionsEmptyState.
-  ///
-  /// In pt, this message translates to:
-  /// **'Nenhuma assinatura cadastrada ainda.'**
-  String get subscriptionsEmptyState;
 
   /// No description provided for @subscriptionChargedOnLabel.
   ///
@@ -685,12 +673,6 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Parcelamentos quitados ({count})'**
   String settledInstallmentPurchasesTitle(int count);
-
-  /// No description provided for @installmentPurchasesEmptyState.
-  ///
-  /// In pt, this message translates to:
-  /// **'Nenhum parcelamento cadastrado ainda.'**
-  String get installmentPurchasesEmptyState;
 
   /// No description provided for @installmentSummaryLabel.
   ///
@@ -950,12 +932,6 @@ abstract class AppLocalizations {
   /// **'Receitas lançadas'**
   String get incomesListTitle;
 
-  /// No description provided for @incomesEmptyState.
-  ///
-  /// In pt, this message translates to:
-  /// **'Nenhuma receita lançada ainda.'**
-  String get incomesEmptyState;
-
   /// No description provided for @incomesEmptyFilteredRange.
   ///
   /// In pt, this message translates to:
@@ -1099,12 +1075,6 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Com meta de valor, isso vira um alvo mensal: a barra reseta todo dia 1, mas o saldo total da caixinha continua acumulando à parte.'**
   String get recurringGoalHint;
-
-  /// No description provided for @categoriesEmptyState.
-  ///
-  /// In pt, this message translates to:
-  /// **'Nenhuma categoria ainda. Crie a primeira acima.'**
-  String get categoriesEmptyState;
 
   /// No description provided for @recurringChip.
   ///
@@ -1741,6 +1711,168 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Quer ver um tutorial de novo? Ele fica aqui.'**
   String get tutorialSettings2Body;
+
+  /// No description provided for @emptyReceitasTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhuma receita ainda'**
+  String get emptyReceitasTitle;
+
+  /// No description provided for @emptyReceitasBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lance seu salário ou qualquer valor que entrou. Ele vai para a conta.'**
+  String get emptyReceitasBody;
+
+  /// No description provided for @emptyReceitasAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Adicionar receita'**
+  String get emptyReceitasAction;
+
+  /// No description provided for @emptyGastosTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhum gasto ainda'**
+  String get emptyGastosTitle;
+
+  /// No description provided for @emptyGastosBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lance o mercado de hoje, uma conta ou um café. Você escolhe de onde sai.'**
+  String get emptyGastosBody;
+
+  /// No description provided for @emptyGastosAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Adicionar gasto'**
+  String get emptyGastosAction;
+
+  /// No description provided for @emptyAssinaturasTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhuma assinatura ainda'**
+  String get emptyAssinaturasTitle;
+
+  /// No description provided for @emptyAssinaturasBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Streaming, academia, aluguel. Cadastre uma vez com o dia da cobrança.'**
+  String get emptyAssinaturasBody;
+
+  /// No description provided for @emptyAssinaturasAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cadastrar assinatura'**
+  String get emptyAssinaturasAction;
+
+  /// No description provided for @emptyParcelamentosTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhum parcelamento ainda'**
+  String get emptyParcelamentosTitle;
+
+  /// No description provided for @emptyParcelamentosBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cadastre a compra uma vez, com o valor total e o número de parcelas.'**
+  String get emptyParcelamentosBody;
+
+  /// No description provided for @emptyParcelamentosAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Cadastrar parcelamento'**
+  String get emptyParcelamentosAction;
+
+  /// No description provided for @emptyCategoriasTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhuma caixinha ainda'**
+  String get emptyCategoriasTitle;
+
+  /// No description provided for @emptyCategoriasBody.
+  ///
+  /// In pt, this message translates to:
+  /// **'Mercado, Viagem, Reserva. Crie a primeira acima.'**
+  String get emptyCategoriasBody;
+
+  /// No description provided for @emptyCategoriasAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Criar caixinha'**
+  String get emptyCategoriasAction;
+
+  /// No description provided for @firstStepsTitle.
+  ///
+  /// In pt, this message translates to:
+  /// **'Primeiros passos'**
+  String get firstStepsTitle;
+
+  /// No description provided for @firstStepsIntro.
+  ///
+  /// In pt, this message translates to:
+  /// **'Três coisas e o Dindin começa a fazer sentido.'**
+  String get firstStepsIntro;
+
+  /// No description provided for @firstStepCreate.
+  ///
+  /// In pt, this message translates to:
+  /// **'Crie uma caixinha'**
+  String get firstStepCreate;
+
+  /// No description provided for @firstStepCreateAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Criar'**
+  String get firstStepCreateAction;
+
+  /// No description provided for @firstStepIncome.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lance uma receita'**
+  String get firstStepIncome;
+
+  /// No description provided for @firstStepIncomeAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lançar'**
+  String get firstStepIncomeAction;
+
+  /// No description provided for @firstStepAllocate.
+  ///
+  /// In pt, this message translates to:
+  /// **'Aloque na caixinha'**
+  String get firstStepAllocate;
+
+  /// No description provided for @firstStepAllocateAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Alocar'**
+  String get firstStepAllocateAction;
+
+  /// No description provided for @firstStepDone.
+  ///
+  /// In pt, this message translates to:
+  /// **'Feito'**
+  String get firstStepDone;
+
+  /// No description provided for @historyEmptyAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lançar receita'**
+  String get historyEmptyAction;
+
+  /// No description provided for @incomesEmptyState.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhuma receita lançada ainda.'**
+  String get incomesEmptyState;
+
+  /// No description provided for @expensesEmptyState.
+  ///
+  /// In pt, this message translates to:
+  /// **'Nenhum gasto lançado ainda.'**
+  String get expensesEmptyState;
 
   /// No description provided for @tutorialAnnouncement.
   ///

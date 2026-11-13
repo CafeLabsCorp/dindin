@@ -166,7 +166,8 @@ void main() {
     await pump(tester, expenses: []);
     await tester.pumpAndSettle();
 
-    expect(find.text('Nenhum gasto lançado ainda.'), findsOneWidget);
+    expect(find.text('Nenhum gasto ainda'), findsOneWidget);
+    expect(find.text('Adicionar gasto'), findsOneWidget);
   });
 
   group('resumo do comprometido do mês', () {

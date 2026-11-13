@@ -42,7 +42,8 @@ void main() {
     await pump(tester, incomes: []);
     await tester.pumpAndSettle();
 
-    expect(find.text('Nenhuma receita lançada ainda.'), findsOneWidget);
+    expect(find.text('Nenhuma receita ainda'), findsOneWidget);
+    expect(find.text('Adicionar receita'), findsOneWidget);
     expect(find.text('Limpar filtro'), findsNothing);
   });
 

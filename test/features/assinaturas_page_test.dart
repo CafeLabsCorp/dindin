@@ -83,7 +83,8 @@ void main() {
     await pump(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Nenhuma assinatura cadastrada ainda.'), findsOneWidget);
+    expect(find.text('Nenhuma assinatura ainda'), findsOneWidget);
+    expect(find.text('Cadastrar assinatura'), findsOneWidget);
   });
 
   testWidgets('assinatura da conta mostra dia de cobrança e origem', (tester) async {

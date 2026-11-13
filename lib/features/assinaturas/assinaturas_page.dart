@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/guided_empty_state.dart';
 import '../../models/tutorial_progress.dart';
 import '../../widgets/tutorial/tutorial.dart';
 import '../../widgets/tutorial/tutorial_host.dart';
@@ -38,6 +39,7 @@ class AssinaturasPage extends ConsumerStatefulWidget {
 class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
   // Elements the onboarding tutorial lights up.
   final _formKey = GlobalKey();
+  final _nameFocus = FocusNode();
   final _sourceKey = GlobalKey();
   final _listKey = GlobalKey();
 
@@ -56,6 +58,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
   void dispose() {
     _nameController.dispose();
     _amountController.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -285,6 +288,7 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                       width: 200.0,
                       child: TextField(
                         controller: _nameController,
+                        focusNode: _nameFocus,
                         enabled: !_submitting,
                         decoration: InputDecoration(
                           labelText: l10n.subscriptionNameLabel,
@@ -369,7 +373,13 @@ class _AssinaturasPageState extends ConsumerState<AssinaturasPage> {
                 subscriptionsAsync.when(
                   data: (subscriptions) {
                     if (subscriptions.isEmpty) {
-                      return EmptyState(l10n.subscriptionsEmptyState);
+                      return GuidedEmptyState(
+                        illustration: const LineIconIllustration(Icons.event_repeat_outlined),
+                        title: l10n.emptyAssinaturasTitle,
+                        message: l10n.emptyAssinaturasBody,
+                        actionLabel: l10n.emptyAssinaturasAction,
+                        onAction: () => scrollToAndFocus(_formKey, _nameFocus),
+                      );
                     }
                     return Column(
                       children: [

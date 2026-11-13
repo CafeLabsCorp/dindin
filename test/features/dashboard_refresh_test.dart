@@ -56,7 +56,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(runs, 1);
 
-    await tester.fling(find.byType(ListView), const Offset(0, 400), 1000);
+    await tester.fling(find.byType(SingleChildScrollView), const Offset(0, 400), 1000);
     await tester.pumpAndSettle();
 
     expect(runs, 2, reason: 'o gesto dispara o mesmo catch-up da abertura do app');

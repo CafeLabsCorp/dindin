@@ -1,7 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../widgets/page_header.dart';
@@ -135,17 +136,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         .toList();
     final canTransfer = categories.length >= 2 && eligibleOrigins.isNotEmpty;
 
+    // "Primeiros passos" progress: a category exists, an income was added, and
+    // something was allocated (plain allocations only, not transfers).
+    final hasIncome = ref.watch(allIncomesProvider).value?.isNotEmpty ?? false;
+    final hasAllocation = ref.watch(allAllocationsProvider).value?.any((a) => a.transferId == null) ?? false;
+
     return TutorialHost(
       page: TutorialPage.dashboard,
       pageName: l10n.dashboardTitle,
       steps: _tutorialSteps,
       child: CatchUpRefresh(
-      child: ListView(
+      // A plain scroll view + Column, not a ListView: a ListView builds only
+      // what is near the viewport, so a card below the fold doesn't exist yet
+      // and the onboarding tutorial couldn't find the element to light up.
+      // This page is short, so building everything costs nothing.
+      child: SingleChildScrollView(
         // Always scrollable, so the gesture works even when the content fits.
         physics: const AlwaysScrollableScrollPhysics(),
-        // The page is short: build every card up front so the tutorial can
-        // always find the one it lights up, even below the fold.
-        scrollCacheExtent: const ScrollCacheExtent.pixels(4000),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
             title: l10n.dashboardTitle,
@@ -209,6 +218,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ],
             ),
           ),
+          if (!(categories.isNotEmpty && hasIncome && hasAllocation)) ...[
+            const SizedBox(height: 16),
+            _FirstStepsCard(
+              created: categories.isNotEmpty,
+              incomeAdded: hasIncome,
+              allocated: hasAllocation,
+              canAllocate: categories.isNotEmpty && summary.accountBalance > 0,
+              onAllocate: () => _showAllocateDialog(context, ref, categories, summary.accountBalance),
+            ),
+          ],
           const SizedBox(height: 16),
           Builder(
             builder: (context) {
@@ -479,7 +498,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 ),
                 const SizedBox(height: 16),
                 if (summary.history.isEmpty)
-                  EmptyState(l10n.historyEmptyState)
+                  EmptyState(
+                    l10n.historyEmptyState,
+                    action: TextButton(
+                      onPressed: () => context.go('/receitas'),
+                      child: Text(l10n.historyEmptyAction),
+                    ),
+                  )
                 else
                   SizedBox(
                     height: 280,
@@ -489,6 +514,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
           ),
         ],
+        ),
       ),
     ),
     );
@@ -944,6 +970,88 @@ class _HistoryChart extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+
+/// "Primeiros passos": the three things that make the app useful, each with a
+/// button to the right place; a finished step is struck through with "Feito".
+/// It disappears once all three are done (`docs/onboarding-design.md` §4).
+class _FirstStepsCard extends StatelessWidget {
+  final bool created;
+  final bool incomeAdded;
+  final bool allocated;
+  final bool canAllocate;
+  final VoidCallback onAllocate;
+
+  const _FirstStepsCard({
+    required this.created,
+    required this.incomeAdded,
+    required this.allocated,
+    required this.canAllocate,
+    required this.onAllocate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tokens = context.tokens;
+    final theme = Theme.of(context);
+
+    Widget step(int number, String label, bool done, String action, VoidCallback? onTap) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              child: Text(
+                '$number.',
+                style: TextStyle(
+                  fontFamily: 'Fraunces',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: done ? tokens.subtle : theme.colorScheme.primary,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: done ? tokens.subtle : null,
+                  decoration: done ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (done)
+              Text(l10n.firstStepDone, style: TextStyle(fontSize: 12, color: tokens.subtle))
+            else
+              TextButton(
+                onPressed: onTap,
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                child: Text(action),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.firstStepsTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(l10n.firstStepsIntro, style: TextStyle(fontSize: 12, color: tokens.muted)),
+          const SizedBox(height: 8),
+          step(1, l10n.firstStepCreate, created, l10n.firstStepCreateAction, () => context.go('/categorias')),
+          step(2, l10n.firstStepIncome, incomeAdded, l10n.firstStepIncomeAction, () => context.go('/receitas')),
+          step(3, l10n.firstStepAllocate, allocated, l10n.firstStepAllocateAction, canAllocate ? onAllocate : null),
+        ],
+      ),
     );
   }
 }

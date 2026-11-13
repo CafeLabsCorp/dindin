@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/guided_empty_state.dart';
 import '../../models/tutorial_progress.dart';
 import '../../widgets/tutorial/tutorial.dart';
 import '../../widgets/tutorial/tutorial_host.dart';
@@ -34,6 +35,7 @@ class ParcelamentosPage extends ConsumerStatefulWidget {
 class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
   // Elements the onboarding tutorial lights up.
   final _formKey = GlobalKey();
+  final _nameFocus = FocusNode();
   final _sourceKey = GlobalKey();
   final _listKey = GlobalKey();
 
@@ -50,6 +52,7 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
   void dispose() {
     _nameController.dispose();
     _totalController.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -266,6 +269,7 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                       width: 200.0,
                       child: TextField(
                         controller: _nameController,
+                        focusNode: _nameFocus,
                         enabled: !_submitting,
                         decoration: InputDecoration(
                           labelText: l10n.installmentNameLabel,
@@ -370,14 +374,26 @@ class _ParcelamentosPageState extends ConsumerState<ParcelamentosPage> {
                 purchasesAsync.when(
                   data: (purchases) {
                     if (purchases.isEmpty) {
-                      return EmptyState(l10n.installmentPurchasesEmptyState);
+                      return GuidedEmptyState(
+                        illustration: const CoinsLadderIllustration(),
+                        title: l10n.emptyParcelamentosTitle,
+                        message: l10n.emptyParcelamentosBody,
+                        actionLabel: l10n.emptyParcelamentosAction,
+                        onAction: () => scrollToAndFocus(_formKey, _nameFocus),
+                      );
                     }
                     final active = [
                       for (final p in purchases)
                         if (!schedule.isSettled(p)) p,
                     ];
                     if (active.isEmpty) {
-                      return EmptyState(l10n.installmentPurchasesEmptyState);
+                      return GuidedEmptyState(
+                        illustration: const CoinsLadderIllustration(),
+                        title: l10n.emptyParcelamentosTitle,
+                        message: l10n.emptyParcelamentosBody,
+                        actionLabel: l10n.emptyParcelamentosAction,
+                        onAction: () => scrollToAndFocus(_formKey, _nameFocus),
+                      );
                     }
                     return Column(
                       children: [

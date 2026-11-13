@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/guided_empty_state.dart';
 import '../../models/tutorial_progress.dart';
 import '../../widgets/tutorial/tutorial.dart';
 import '../../widgets/tutorial/tutorial_host.dart';
@@ -39,6 +40,7 @@ class GastosPage extends ConsumerStatefulWidget {
 class _GastosPageState extends ConsumerState<GastosPage> {
   // Elements the onboarding tutorial lights up.
   final _formKey = GlobalKey();
+  final _amountFocus = FocusNode();
   final _sourceKey = GlobalKey();
   final _listKey = GlobalKey();
 
@@ -56,6 +58,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _amountFocus.dispose();
     super.dispose();
   }
 
@@ -299,6 +302,7 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                       width: 140.0,
                       child: TextField(
                         controller: _amountController,
+                        focusNode: _amountFocus,
                         enabled: !blocked,
                         keyboardType: TextInputType.number,
                         inputFormatters: [MoneyInputFormatter()],
@@ -433,7 +437,15 @@ class _GastosPageState extends ConsumerState<GastosPage> {
                 const SizedBox(height: 12),
                 expensesAsync.when(
                   data: (expenses) {
-                    if (expenses.isEmpty) return EmptyState(l10n.expensesEmptyState);
+                    if (expenses.isEmpty) {
+                      return GuidedEmptyState(
+                        illustration: const LineIconIllustration(Icons.shopping_cart_outlined),
+                        title: l10n.emptyGastosTitle,
+                        message: l10n.emptyGastosBody,
+                        actionLabel: l10n.emptyGastosAction,
+                        onAction: () => scrollToAndFocus(_formKey, _amountFocus),
+                      );
+                    }
                     final filtered = expenses.where((e) => isDateWithinRange(e.date, _filterFrom, _filterTo)).toList();
                     if (filtered.isEmpty) {
                       return EmptyState(

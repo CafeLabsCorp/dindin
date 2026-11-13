@@ -98,6 +98,7 @@ flutter:
 
   assets:
     - assets/logo.svg
+    - assets/illustrations/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
