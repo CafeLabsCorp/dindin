@@ -662,9 +662,9 @@ Doing 3 before 2 leaves balances desynced on day one.
   numbers are rejected".
 - **Allocation/expense edits are restricted** to keep the rules tractable:
   `updateAllocation` keeps the same caixinha, `updateExpense` keeps the same
-  target (caixinha vs account). Re-homing is delete + recreate. These edit
-  paths are not reachable from the current UI (only create/delete are wired),
-  so this is not a user-visible regression today.
+  target (caixinha vs account). Re-homing is delete + recreate. The edit sheet
+  (`edit_transaction_sheet.dart`) reaches these paths for incomes, expenses and
+  plain allocations; a transfer leg is not editable on its own.
 - **`deleteCategory` refuses a caixinha that took part in a transfer.**
   Transfers are reachable from the UI. Deleting a caixinha that holds a
   transfer leg would orphan the paired leg in the other caixinha and, for a

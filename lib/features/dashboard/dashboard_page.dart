@@ -952,10 +952,13 @@ class _HistoryChart extends StatelessWidget {
               ),
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
+                  // From the theme (inverse of the page) instead of a fixed
+                  // white on the library's default dark grey.
+                  getTooltipColor: (_) => Theme.of(context).colorScheme.inverseSurface,
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     return BarTooltipItem(
                       formatCurrency(rod.toY),
-                      const TextStyle(color: Colors.white, fontSize: 12),
+                      TextStyle(color: Theme.of(context).colorScheme.onInverseSurface, fontSize: 12),
                     );
                   },
                 ),

@@ -52,7 +52,9 @@ class PageHeader extends StatelessWidget {
         else
           Semantics(
             button: true,
-            label: menuLabel,
+            // The title first, then what tapping it does: just "Menu" hid the
+            // page's name from screen readers.
+            label: menuLabel == null ? null : '$title, $menuLabel',
             child: Tooltip(
               message: menuLabel ?? '',
               child: InkWell(
