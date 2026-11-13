@@ -791,6 +791,31 @@ class AppLocalizationsPt extends AppLocalizations {
   String get themeDarkOption => 'Escuro';
 
   @override
+  String get tutorialSkip => 'Pular';
+
+  @override
+  String get tutorialNext => 'Próximo';
+
+  @override
+  String get tutorialGotIt => 'Entendi';
+
+  @override
+  String tutorialStepCounter(int current, int total) {
+    return '$current de $total';
+  }
+
+  @override
+  String tutorialAnnouncement(
+    String page,
+    int current,
+    int total,
+    String title,
+    String body,
+  ) {
+    return 'Tutorial de $page, passo $current de $total. $title. $body';
+  }
+
+  @override
   String get languageSystemOption => 'Sistema';
 
   @override

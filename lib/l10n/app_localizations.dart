@@ -1400,6 +1400,42 @@ abstract class AppLocalizations {
   /// **'Escuro'**
   String get themeDarkOption;
 
+  /// No description provided for @tutorialSkip.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pular'**
+  String get tutorialSkip;
+
+  /// No description provided for @tutorialNext.
+  ///
+  /// In pt, this message translates to:
+  /// **'Próximo'**
+  String get tutorialNext;
+
+  /// No description provided for @tutorialGotIt.
+  ///
+  /// In pt, this message translates to:
+  /// **'Entendi'**
+  String get tutorialGotIt;
+
+  /// No description provided for @tutorialStepCounter.
+  ///
+  /// In pt, this message translates to:
+  /// **'{current} de {total}'**
+  String tutorialStepCounter(int current, int total);
+
+  /// No description provided for @tutorialAnnouncement.
+  ///
+  /// In pt, this message translates to:
+  /// **'Tutorial de {page}, passo {current} de {total}. {title}. {body}'**
+  String tutorialAnnouncement(
+    String page,
+    int current,
+    int total,
+    String title,
+    String body,
+  );
+
   /// No description provided for @languageSystemOption.
   ///
   /// In pt, this message translates to:

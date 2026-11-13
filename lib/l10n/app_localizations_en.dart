@@ -793,6 +793,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeDarkOption => 'Dark';
 
   @override
+  String get tutorialSkip => 'Skip';
+
+  @override
+  String get tutorialNext => 'Next';
+
+  @override
+  String get tutorialGotIt => 'Got it';
+
+  @override
+  String tutorialStepCounter(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String tutorialAnnouncement(
+    String page,
+    int current,
+    int total,
+    String title,
+    String body,
+  ) {
+    return '$page tutorial, step $current of $total. $title. $body';
+  }
+
+  @override
   String get languageSystemOption => 'System';
 
   @override

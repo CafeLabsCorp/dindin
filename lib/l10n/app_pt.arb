@@ -329,6 +329,17 @@
   "themeSystemOption": "Sistema",
   "themeLightOption": "Claro",
   "themeDarkOption": "Escuro",
+  "tutorialSkip": "Pular",
+  "tutorialNext": "Próximo",
+  "tutorialGotIt": "Entendi",
+  "tutorialStepCounter": "{current} de {total}",
+  "@tutorialStepCounter": {
+    "placeholders": { "current": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "tutorialAnnouncement": "Tutorial de {page}, passo {current} de {total}. {title}. {body}",
+  "@tutorialAnnouncement": {
+    "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }
+  },
   "languageSystemOption": "Sistema",
 
   "editIncomeTitle": "Editar receita",

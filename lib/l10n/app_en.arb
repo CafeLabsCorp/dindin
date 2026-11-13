@@ -247,6 +247,17 @@
   "themeSystemOption": "System",
   "themeLightOption": "Light",
   "themeDarkOption": "Dark",
+  "tutorialSkip": "Skip",
+  "tutorialNext": "Next",
+  "tutorialGotIt": "Got it",
+  "tutorialStepCounter": "{current} of {total}",
+  "@tutorialStepCounter": {
+    "placeholders": { "current": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "tutorialAnnouncement": "{page} tutorial, step {current} of {total}. {title}. {body}",
+  "@tutorialAnnouncement": {
+    "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }
+  },
   "languageSystemOption": "System",
 
   "editIncomeTitle": "Edit income",
