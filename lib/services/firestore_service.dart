@@ -9,6 +9,7 @@ import '../models/income.dart';
 import '../models/income_source.dart';
 import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
+import '../models/tutorial_progress.dart';
 import 'aggregation_service.dart' as agg;
 import 'backup_validation.dart';
 import 'recurring_schedule.dart' as schedule;
@@ -145,6 +146,11 @@ class FirestoreService {
   /// it would widen what a bug there could corrupt.
   DocumentReference<Map<String, dynamic>> get _settings =>
       _db.doc('users/$uid/meta/settings');
+
+  /// Which onboarding tutorials the user has seen (one entry per page). UI
+  /// state, not money: see the `meta/tutorials` block in `firestore.rules`.
+  DocumentReference<Map<String, dynamic>> get _tutorials =>
+      _db.doc('users/$uid/meta/tutorials');
 
   /// A single caixinha's balance doc, keyed by the category id.
   DocumentReference<Map<String, dynamic>> _balance(String categoryId) =>
@@ -320,6 +326,36 @@ class FirestoreService {
   Future<void> setAnalyticsOptOut(bool value) {
     return _settings.set({'analyticsOptOut': value});
   }
+
+  // -------------------------------------------------------------------------
+  // Onboarding tutorials: which pages' tutorials the user has seen. Shared
+  // between devices through `meta/tutorials`; no money is involved.
+  // -------------------------------------------------------------------------
+  Stream<Map<TutorialPage, TutorialEntry>> watchTutorialProgress() {
+    return _tutorials.snapshots().map((s) => parseTutorialProgress(s.data()));
+  }
+
+  /// Records that [page]'s tutorial ended as [state], at [version] (defaults to
+  /// the page's current version). Merges, so other pages' entries are kept.
+  Future<void> setTutorialProgress(
+    TutorialPage page,
+    TutorialState state, {
+    int? version,
+  }) {
+    final entry = TutorialEntry(
+      state: state,
+      version: version ?? tutorialVersions[page] ?? 1,
+    );
+    return _tutorials.set({page.id: entry.toMap()}, SetOptions(merge: true));
+  }
+
+  /// Forgets [page]'s outcome so its tutorial shows again.
+  Future<void> resetTutorial(TutorialPage page) {
+    return _tutorials.set({page.id: FieldValue.delete()}, SetOptions(merge: true));
+  }
+
+  /// Forgets every outcome ("Rever todos").
+  Future<void> resetAllTutorials() => _tutorials.delete();
 
   Future<AppDb> fetchAll() async {
     final results = await Future.wait([
@@ -1669,6 +1705,7 @@ class FirestoreService {
     final refs = [
       _account,
       _settings,
+      _tutorials,
       ...existingBalances.docs.map((d) => d.reference),
     ];
     for (var i = 0; i < refs.length; i += 400) {

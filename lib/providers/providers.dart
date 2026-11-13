@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../models/allocation.dart';
 import '../models/category.dart';
@@ -10,6 +11,7 @@ import '../models/expense.dart';
 import '../models/income.dart';
 import '../models/installment_purchase.dart';
 import '../models/subscription.dart';
+import '../models/tutorial_progress.dart';
 import '../services/aggregation_service.dart';
 import '../services/analytics_service.dart';
 import '../services/app_update_service.dart';
@@ -63,6 +65,74 @@ final analyticsOptOutProvider = StreamProvider<bool>((ref) {
   if (firestore == null) return const Stream.empty();
   return firestore.watchAnalyticsOptOut();
 });
+
+/// Which onboarding tutorials the signed-in user has seen, streamed from
+/// `meta/tutorials`. `.value` is null while signed out or loading — callers
+/// must treat that as "don't know yet", never as "not seen" (see
+/// [tutorialSeenProvider]), or a tutorial would flash before the real state
+/// arrives.
+final tutorialProgressProvider = StreamProvider<Map<TutorialPage, TutorialEntry>>((ref) {
+  final firestore = ref.watch(firestoreServiceProvider);
+  if (firestore == null) return const Stream.empty();
+  return firestore.watchTutorialProgress();
+});
+
+/// Tutorials finished or skipped during THIS app session. Covers a failed or
+/// not-yet-synced write (offline, or rules not deployed yet): the tutorial
+/// must not come back in the same session just because the profile couldn't
+/// be saved.
+final tutorialSessionSeenProvider = StateProvider<Set<TutorialPage>>((ref) => const {});
+
+/// Whether [page]'s tutorial has been seen: true/false once the saved progress
+/// has loaded, null before that (so nothing is shown yet).
+final tutorialSeenProvider = Provider.family<bool?, TutorialPage>((ref, page) {
+  if (ref.watch(tutorialSessionSeenProvider).contains(page)) return true;
+  final progress = ref.watch(tutorialProgressProvider).value;
+  if (progress == null) return null;
+  return progress[page]?.covers(page) ?? false;
+});
+
+/// Marks [page]'s tutorial as ended: remembered for this session right away,
+/// then saved to the profile. A save failure (offline, rules) only costs the
+/// cross-device memory, never the tutorial's own flow.
+Future<void> markTutorialEnded(WidgetRef ref, TutorialPage page, TutorialState state) async {
+  final session = ref.read(tutorialSessionSeenProvider.notifier);
+  session.state = {...session.state, page};
+  final firestore = ref.read(firestoreServiceProvider);
+  if (firestore == null) return;
+  try {
+    await firestore.setTutorialProgress(page, state);
+  } catch (error, stackTrace) {
+    developer.log(
+      'saving tutorial progress failed',
+      name: 'dindin.tutorials',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
+/// Makes [page]'s tutorial show again ("Rever"): forgets it for this session
+/// and in the profile.
+Future<void> resetTutorial(WidgetRef ref, TutorialPage page) async {
+  final session = ref.read(tutorialSessionSeenProvider.notifier);
+  session.state = {...session.state}..remove(page);
+  try {
+    await ref.read(firestoreServiceProvider)?.resetTutorial(page);
+  } catch (error, stackTrace) {
+    developer.log('resetting tutorial failed', name: 'dindin.tutorials', error: error, stackTrace: stackTrace);
+  }
+}
+
+/// "Rever todos".
+Future<void> resetAllTutorials(WidgetRef ref) async {
+  ref.read(tutorialSessionSeenProvider.notifier).state = const {};
+  try {
+    await ref.read(firestoreServiceProvider)?.resetAllTutorials();
+  } catch (error, stackTrace) {
+    developer.log('resetting tutorials failed', name: 'dindin.tutorials', error: error, stackTrace: stackTrace);
+  }
+}
 
 final categoriesProvider = StreamProvider<List<Category>>((ref) {
   final firestore = ref.watch(firestoreServiceProvider);
