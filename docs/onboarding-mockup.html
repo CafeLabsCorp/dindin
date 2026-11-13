@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dindin · Onboarding (mockup)</title>
+<!-- Mockup estático da proposta em docs/onboarding-design.md. Não é código do app. -->
+<style>
+@font-face { font-family: Fraunces; font-weight: 400; src: url('../assets/fonts/Fraunces-Regular.ttf'); }
+@font-face { font-family: Fraunces; font-weight: 600; src: url('../assets/fonts/Fraunces-SemiBold.ttf'); }
+@font-face { font-family: 'Work Sans'; font-weight: 400; src: url('../assets/fonts/WorkSans-Regular.ttf'); }
+@font-face { font-family: 'Work Sans'; font-weight: 500; src: url('../assets/fonts/WorkSans-Medium.ttf'); }
+@font-face { font-family: 'Work Sans'; font-weight: 600; src: url('../assets/fonts/WorkSans-SemiBold.ttf'); }
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 24px 64px; background: #E9E2D6; font-family: 'Work Sans', sans-serif; color: #211A12; }
+h1 { font-family: Fraunces, serif; font-weight: 600; font-size: 28px; margin: 0 0 4px; }
+h2 { font-family: Fraunces, serif; font-weight: 600; font-size: 20px; margin: 40px 0 4px; }
+.lede { margin: 0 0 16px; color: #5C5346; max-width: 760px; line-height: 1.45; }
+.row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+.cap { font-size: 12px; color: #5C5346; margin-top: 8px; max-width: 360px; line-height: 1.4; }
+
+/* ---------- tokens (docs/DESIGN.md §1) ---------- */
+.light { --bg:#FAF4EA; --surface:#FFFFFF; --elev:#FFFFFF; --ink:#211A12; --muted:#5C5346; --subtle:#746A5D;
+  --border:rgba(33,26,18,.12); --primary:#2E6F4D; --onPrimary:#FFFFFF; --secC:#E1E8D8; --onSecC:#2B3320;
+  --terC:#F7DCCF; --onTerC:#5C2413; --scrim:rgba(33,26,18,.60); --folha:#3A604B; --shadow:0 8px 24px rgba(33,26,18,.18), 0 1px 3px rgba(33,26,18,.12); }
+.dark { --bg:#16130F; --surface:#201C17; --elev:#2A241D; --ink:#F5F1EA; --muted:#C9C2B4; --subtle:#A79C89;
+  --border:rgba(245,241,234,.12); --primary:#7FCB9E; --onPrimary:#0D3320; --secC:#333D26; --onSecC:#DCE6C9;
+  --terC:#4A2417; --onTerC:#F7CDBB; --scrim:rgba(22,19,15,.72); --folha:#7FCB9E; --shadow:0 8px 24px rgba(0,0,0,.45); }
+
+/* ---------- phone ---------- */
+.phone { width: 360px; height: 740px; border-radius: 28px; overflow: hidden; position: relative;
+  background: var(--bg); color: var(--ink); box-shadow: 0 0 0 8px #2b2620, 0 18px 40px rgba(0,0,0,.25); }
+.phone.narrow { width: 320px; }
+.status { height: 28px; }
+.page { padding: 8px 16px 16px; }
+.title { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 8px;
+  font-family: Fraunces, serif; font-weight: 600; font-size: 22px; line-height: 28px; }
+.chev { width: 26px; height: 26px; color: var(--subtle); }
+.chip-chev { width: 30px; height: 30px; border-radius: 50%; background: var(--secC); color: var(--onSecC);
+  display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; }
+.sub { margin: 4px 0 0 6px; color: var(--muted); font-size: 14px; line-height: 20px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06); margin-top: 16px; }
+.lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.big { font-family: Fraunces, serif; font-weight: 600; font-size: 24px; line-height: 32px; }
+.cap2 { font-size: 12px; color: var(--subtle); }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 20px;
+  border-radius: 999px; font-weight: 600; font-size: 14px; border: 0; font-family: inherit; }
+.btn.filled { background: var(--primary); color: var(--onPrimary); }
+.btn.tonal { background: var(--secC); color: var(--onSecC); }
+.btn.coral { background: var(--terC); color: var(--onTerC); }
+.btn.text { background: transparent; color: var(--primary); padding: 0 12px; }
+.btn.textmuted { background: transparent; color: var(--muted); padding: 0 12px; }
+.btn.outline { background: transparent; color: var(--primary); border: 1px solid var(--subtle); }
+.btn.block { width: 100%; }
+.flex { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.field { border: 1px solid var(--border); background: var(--bg); border-radius: 12px; height: 52px;
+  padding: 6px 12px; font-size: 14px; margin-top: 12px; }
+.field small { display: block; font-size: 11px; color: var(--subtle); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+/* ---------- Direção A: Lanterna ---------- */
+.spot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 2px var(--primary), 0 0 0 9999px var(--scrim); pointer-events: none; }
+.bal { position: absolute; background: var(--elev); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: var(--shadow); padding: 16px 16px 8px; }
+.bal .arrow { position: absolute; width: 16px; height: 16px; background: var(--elev); transform: rotate(45deg);
+  border-left: 1px solid var(--border); border-top: 1px solid var(--border); }
+.bal .arrow.up { top: -8.5px; }
+.bal .arrow.down { bottom: -8.5px; transform: rotate(225deg); }
+.bal .head { display: flex; align-items: baseline; gap: 8px; }
+.bal .num { font-family: Fraunces, serif; font-weight: 600; font-size: 22px; line-height: 26px; color: var(--primary); }
+.bal .t { font-family: Fraunces, serif; font-weight: 600; font-size: 18px; line-height: 24px; }
+.bal p { margin: 6px 0 4px; font-size: 15px; line-height: 22px; color: var(--muted); }
+.bal .foot { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
+.bal .count { font-size: 12px; font-weight: 600; color: var(--subtle); }
+.bal .acts { display: flex; gap: 4px; margin-left: auto; }
+.bal .btn { height: 48px; }
+
+/* ---------- Direção B: Etiqueta ---------- */
+.ring { position: absolute; border-radius: 999px; box-shadow: 0 0 0 3px var(--primary), 0 0 0 9px rgba(46,111,77,.18); pointer-events: none; }
+.tag { position: absolute; background: #F3EADB; color: #211A12; border-radius: 6px 14px 14px 6px; padding: 12px 14px 10px 26px;
+  box-shadow: 0 6px 16px rgba(33,26,18,.16); font-size: 14px; line-height: 20px; }
+.tag::before { content: ""; position: absolute; left: 9px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+  background: #FAF4EA; box-shadow: inset 0 0 0 1.5px #3A604B; }
+.tag b { font-family: Fraunces, serif; font-weight: 600; font-size: 16px; display: block; }
+.string { position: absolute; border-left: 1.5px dashed #3A604B; }
+
+/* ---------- empty states ---------- */
+.empty { text-align: center; padding: 8px 4px 4px; }
+.empty .ill { display: flex; justify-content: center; align-items: flex-end; gap: 6px; height: 72px; margin-bottom: 12px; }
+.empty h4 { font-family: Fraunces, serif; font-weight: 600; font-size: 17px; margin: 0 0 4px; }
+.empty p { margin: 0 auto 14px; font-size: 14px; line-height: 20px; color: var(--muted); max-width: 260px; }
+.steps { list-style: none; padding: 0; margin: 8px 0 0; }
+.steps li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); min-height: 56px; }
+.steps li:first-child { border-top: 0; }
+.steps .n { font-family: Fraunces, serif; font-weight: 600; font-size: 22px; color: var(--primary); width: 26px; }
+.steps .done .n { color: var(--subtle); }
+.steps .done .s { text-decoration: line-through; color: var(--subtle); }
+.steps .s { flex: 1; font-size: 14px; line-height: 20px; }
+.steps .s small { display: block; color: var(--subtle); font-size: 12px; }
+.prog { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; margin: 8px 0 4px; }
+.prog i { display: block; height: 100%; background: var(--primary); }
+.trow { display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid var(--border); }
+.trow .ic { width: 22px; color: var(--muted); }
+.trow .nm { flex: 1; font-size: 14px; }
+.trow .st { font-size: 12px; color: var(--subtle); }
+.trow .st.ok { color: var(--primary); font-weight: 600; }
+.menu-sheet { position: absolute; left: 0; right: 0; top: 0; background: var(--surface); border-radius: 0 0 20px 20px; padding: 36px 0 8px; }
+.mi { display: flex; align-items: center; gap: 16px; padding: 8px 20px; min-height: 56px; }
+.mi.sel { background: var(--secC); color: var(--onSecC); border-radius: 0 999px 999px 0; margin-right: 16px; }
+.mi .tx { font-size: 15px; }
+.mi .tx small { display: block; font-size: 12px; color: var(--subtle); }
+.mi.sel .tx small { color: var(--onSecC); opacity: .8; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="moeda" viewBox="0 0 120 120">
+      <circle cx="62" cy="63" r="52" fill="#A8660A"/><circle cx="60" cy="60" r="52" fill="#E8B04A"/>
+      <circle cx="60" cy="60" r="41" fill="none" stroke="#A8660A" stroke-width="3"/>
+      <text x="60" y="78" text-anchor="middle" font-family="Fraunces" font-weight="600" font-size="52" fill="#A8660A">D</text>
+    </symbol>
+    <symbol id="selo" viewBox="0 0 120 120">
+      <path d="M60 6c9 0 12 6 20 8s15-1 20 6 1 13 4 20 10 11 9 20-8 11-9 19-1 14-7 19-13 2-20 6-11 10-17 10-11-6-19-9-14 0-19-6-1-13-6-19-10-11-10-20 7-13 9-20-1-14 5-20 13-3 20-6S51 6 60 6z" fill="#C1502E"/>
+      <circle cx="60" cy="61" r="34" fill="#D0653F"/>
+      <text x="60" y="80" text-anchor="middle" font-family="Fraunces" font-weight="600" font-size="50" fill="#7A2E15">D</text>
+    </symbol>
+    <symbol id="ramo-curvo" viewBox="0 0 240 340">
+      <path d="M40 330Q150 250 178 92" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+      <path d="M65.2 309.7C79.5 338.6 115.7 332.7 131.5 325.0C120.7 311.2 90.7 289.9 65.2 309.7ZM89.9 285.1C111.4 259.6 92.2 225.0 79.2 211.9C70.5 228.1 61.9 266.8 89.9 285.1ZM114.9 253.5C138.8 274.3 171.8 256.6 184.3 244.4C169.0 235.9 132.6 227.2 114.9 253.5ZM134.9 220.9C150.0 194.5 127.6 166.1 113.9 156.2C108.7 172.1 107.2 208.4 134.9 220.9ZM152.8 182.5C176.9 193.5 198.6 171.3 205.6 158.5C191.4 155.3 160.3 157.1 152.8 182.5ZM165.3 146.4C175.2 123.6 154.0 103.8 141.9 97.7C139.1 111.0 141.3 139.9 165.3 146.4ZM178.0 92.0C199.5 78.6 194.2 48.8 188.1 36.2C177.9 45.9 162.6 71.9 178.0 92.0Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="ramo-alto" viewBox="0 0 160 340">
+      <path d="M70 330Q80 190 112 78" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+      <path d="M72.2 302.3C73.5 269.3 37.7 254.9 19.7 253.1C22.7 270.9 39.4 305.8 72.2 302.3ZM74.9 275.1C107.7 283.2 131.5 250.4 138.0 232.8C119.3 232.1 79.9 241.7 74.9 275.1ZM80.1 232.8C84.3 201.0 51.0 182.0 33.7 177.7C35.0 195.5 48.0 231.6 80.1 232.8ZM84.7 202.1C115.9 209.3 138.0 177.8 143.9 161.0C126.1 160.7 88.9 170.2 84.7 202.1ZM91.3 164.7C98.7 137.0 71.4 116.6 56.6 111.0C55.7 126.8 63.1 160.1 91.3 164.7ZM97.4 135.8C124.1 141.3 142.9 114.2 147.9 99.9C132.7 99.9 101.0 108.7 97.4 135.8ZM105.2 103.0C114.6 81.9 94.9 63.6 83.7 57.9C81.0 70.2 83.0 97.0 105.2 103.0ZM112.0 78.0C133.1 67.6 130.9 39.7 126.4 27.5C116.1 35.5 99.5 58.1 112.0 78.0Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="carrinho" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h6l5 22h20l5-15H13"/><circle cx="19" cy="38" r="3"/><circle cx="33" cy="38" r="3"/></g></symbol>
+    <symbol id="calendario" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="10" width="34" height="30" rx="5"/><path d="M7 19h34M16 6v8M32 6v8"/><path d="M20 30a5 5 0 1 0 5-5h-2m0 0l2-2m-2 2l2 2"/></g></symbol>
+  </defs>
+</svg>
+
+<h1>Dindin · onboarding</h1>
+<p class="lede">Mockup estático que acompanha <code>docs/onboarding-design.md</code>. Telas a 360 px (e uma a 320 px), tokens do <code>docs/DESIGN.md</code>, Fraunces + Work Sans do app. Não é código do app.</p>
+
+<!-- ===================================================== -->
+<h2>Direção A · "Lanterna" (recomendada), claro e escuro</h2>
+<p class="lede">Dashboard, passo 1 de 4: o nome da página é o menu. Tela escurecida com recorte no elemento real, anel verde cofre, balão em cartão de passo ("1." em Fraunces verde).</p>
+<div class="row">
+  <div>
+    <div class="phone light">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Dashboard <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="sub">Visão geral da conta e do mês atual.</div>
+        <div class="card"><div class="lbl">Saldo total</div><div class="big">R$ 0,00</div></div>
+        <div class="card flex"><div><div class="lbl">Conta</div><div class="big">R$ 0,00</div><div class="cap2">Dinheiro recebido e ainda não alocado.</div></div><span class="btn tonal">Alocar</span></div>
+        <div class="card"><div class="flex"><b style="font-size:14px">Caixinhas</b><span class="btn coral">Transferir</span></div></div>
+      </div>
+      <div class="spot" style="left:16px; top:34px; width:160px; height:42px;"></div>
+      <div class="bal" style="left:16px; top:92px; width:300px;">
+        <span class="arrow up" style="left:70px"></span>
+        <div class="head"><span class="num">1.</span><span class="t">Aqui você troca de tela</span></div>
+        <p>Toque no nome da página para abrir o menu com Receitas, Gastos e as outras telas.</p>
+        <div class="foot"><span class="count">1 de 4</span><div class="acts"><span class="btn textmuted">Pular</span><span class="btn filled">Próximo</span></div></div>
+      </div>
+    </div>
+    <div class="cap">Claro: scrim tinta #211A12 a 60%, balão surfaceElevated #FFFFFF, anel primary #2E6F4D.</div>
+  </div>
+  <div>
+    <div class="phone dark">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Dashboard <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="sub">Visão geral da conta e do mês atual.</div>
+        <div class="card"><div class="lbl">Saldo total</div><div class="big">R$ 0,00</div></div>
+        <div class="card flex"><div><div class="lbl">Conta</div><div class="big">R$ 0,00</div><div class="cap2">Dinheiro recebido e ainda não alocado.</div></div><span class="btn tonal">Alocar</span></div>
+        <div class="card"><div class="flex"><b style="font-size:14px">Caixinhas</b><span class="btn coral">Transferir</span></div></div>
+      </div>
+      <div class="spot" style="left:12px; top:214px; width:336px; height:118px; border-radius:18px;"></div>
+      <div class="bal" style="left:16px; top:348px; width:328px;">
+        <span class="arrow up" style="left:150px"></span>
+        <div class="head"><span class="num">2.</span><span class="t">O dinheiro entra na conta</span></div>
+        <p>Cada receita que você lança cai aqui. Ela ainda não está em nenhuma caixinha.</p>
+        <div class="foot"><span class="count">2 de 4</span><div class="acts"><span class="btn textmuted">Pular</span><span class="btn filled">Próximo</span></div></div>
+      </div>
+    </div>
+    <div class="cap">Escuro: scrim papel #16130F a 72% (quase não escurece; quem destaca é o anel #7FCB9E), balão #2A241D com borda 12%.</div>
+  </div>
+  <div>
+    <div class="phone light narrow" style="height:640px">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Receitas <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="sub">Lance o quanto entrou e de onde veio.</div>
+        <div class="card" style="padding:16px">
+          <div class="field"><small>Data</small>12/11/2026</div>
+          <div class="field"><small>Valor</small>0,00</div>
+          <div class="field"><small>Origem</small>Salário</div>
+          <div style="margin-top:14px"><span class="btn filled block">Lançar receita</span></div>
+        </div>
+      </div>
+      <div class="spot" style="left:28px; top:332px; width:264px; height:44px; border-radius:999px;"></div>
+      <div class="bal" style="left:12px; right:12px; bottom:12px; font-size:1.3em; padding:18px 16px 10px;">
+        <div class="head"><span class="num" style="font-size:28px">2.</span><span class="t" style="font-size:23px; line-height:30px">É só lançar</span></div>
+        <p style="font-size:19px; line-height:28px">O valor cai na sua conta. Para separar em caixinhas, use Alocar no Dashboard.</p>
+        <div class="foot"><span class="count" style="font-size:15px">2 de 3</span><div class="acts"><span class="btn textmuted" style="font-size:17px">Pular</span><span class="btn filled" style="font-size:17px">Próximo</span></div></div>
+      </div>
+    </div>
+    <div class="cap">320 px + fonte x1.3: balão e alvo não cabem empilhados, então o balão encaixa no rodapé, sem seta; o anel continua no alvo.</div>
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<h2>Direção B · "Etiqueta" (comparação)</h2>
+<p class="lede">Sem escurecer. O elemento ganha um anel com halo e uma etiqueta de papelaria presa por um fio. A tela continua usável: tocar no elemento destacado faz a ação de verdade e avança o passo.</p>
+<div class="row">
+  <div>
+    <div class="phone light">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Receitas <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="sub">Lance o quanto entrou e de onde veio.</div>
+        <div class="card">
+          <div class="field"><small>Data</small>12/11/2026</div>
+          <div class="field"><small>Valor</small>1.500,00</div>
+          <div class="field"><small>Origem</small>Salário</div>
+          <div style="margin-top:16px"><span class="btn filled block">Lançar receita</span></div>
+        </div>
+        <div class="card"><b style="font-size:14px">Receitas lançadas</b></div>
+      </div>
+      <div class="ring" style="left:37px; top:352px; width:286px; height:40px;"></div>
+      <div class="string" style="left:180px; top:406px; height:34px;"></div>
+      <div class="tag" style="left:40px; top:440px; width:280px;">
+        <b>Toque em Lançar receita</b>O valor cai na sua conta.<div style="font-size:12px; color:#5C5346; margin-top:6px; display:flex; justify-content:space-between"><span>2 de 3</span><span style="color:#2E6F4D; font-weight:600">Pular</span></div>
+      </div>
+    </div>
+    <div class="cap">A etiqueta usa a cor envelope (#F3EADB, clara nos dois temas, como no manual) e o furo com contorno folha.</div>
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<h2>Estados vazios (um motivo por página)</h2>
+<div class="row">
+  <div>
+    <div class="phone light" style="height:520px">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Dashboard <span class="chip-chev"><svg width="22" height="22"><use href="#chev"/></svg></span></span>
+        <div class="sub">Visão geral da conta e do mês atual.</div>
+        <div class="card">
+          <div class="big" style="font-size:20px">Primeiros passos</div>
+          <div class="cap2" style="font-size:13px">Três coisas e o Dindin começa a fazer sentido.</div>
+          <ul class="steps">
+            <li class="done"><span class="n">1.</span><span class="s">Crie uma caixinha<small>Em Categorias</small></span><span class="btn text">Feito</span></li>
+            <li><span class="n">2.</span><span class="s">Lance uma receita<small>O que entrou este mês</small></span><span class="btn tonal">Lançar</span></li>
+            <li><span class="n">3.</span><span class="s">Aloque na caixinha<small>Separe parte da conta</small></span><span class="btn text" style="color:var(--subtle)">Depois</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Dashboard: cartão de passo do manual (número em Fraunces verde), sem ilustração. Também mostra o chevron em chip tonal da seção 6.</div>
+  </div>
+  <div>
+    <div class="phone dark" style="height:520px">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Receitas <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="card"><div class="field"><small>Valor</small>0,00</div><div style="margin-top:12px"><span class="btn filled block">Lançar receita</span></div></div>
+        <div class="card">
+          <b style="font-size:14px">Receitas lançadas</b>
+          <div class="empty">
+            <div class="ill"><svg width="56" height="56"><use href="#moeda"/></svg></div>
+            <h4>Nenhuma receita ainda</h4>
+            <p>Lance seu salário ou qualquer valor que entrou. Ele vai para a conta.</p>
+            <span class="btn filled">Adicionar receita</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Receitas: uma moeda. O botão sobe até o formulário e foca o campo Valor.</div>
+  </div>
+  <div>
+    <div class="phone light" style="height:740px">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Parcelamentos <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="card">
+          <b style="font-size:14px">Parcelamentos cadastrados</b>
+          <div class="empty">
+            <div class="ill"><svg width="30" height="30"><use href="#moeda"/></svg><svg width="40" height="40"><use href="#moeda"/></svg><svg width="52" height="52"><use href="#moeda"/></svg></div>
+            <h4>Nenhum parcelamento ainda</h4>
+            <p>Cadastre a compra uma vez, com o valor total e o número de parcelas.</p>
+            <span class="btn filled">Adicionar parcelamento</span>
+          </div>
+        </div>
+        <div class="card">
+          <b style="font-size:14px">Categorias</b>
+          <div class="empty" style="position:relative">
+            <div class="ill" style="justify-content:space-between; color:var(--folha)"><svg width="34" height="72" style="transform:scaleX(-1)"><use href="#ramo-alto"/></svg><span></span><svg width="34" height="72"><use href="#ramo-alto"/></svg></div>
+            <h4>Nenhuma caixinha ainda</h4>
+            <p>Mercado, Viagem, Reserva. Crie a primeira acima.</p>
+            <span class="btn filled">Criar caixinha</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Parcelamentos: três moedas em escada (o limite do manual). Categorias: par de folhinhas nas laterais.</div>
+  </div>
+  <div>
+    <div class="phone dark" style="height:740px">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Gastos <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="card">
+          <b style="font-size:14px">Gastos lançados</b>
+          <div class="empty">
+            <div class="ill" style="color:var(--folha)"><svg width="52" height="52"><use href="#carrinho"/></svg></div>
+            <h4>Nenhum gasto ainda</h4>
+            <p>Lance o mercado de hoje, uma conta ou um café. Você escolhe de onde sai.</p>
+            <span class="btn filled">Adicionar gasto</span>
+          </div>
+        </div>
+        <div class="card">
+          <b style="font-size:14px">Assinaturas cadastradas</b>
+          <div class="empty">
+            <div class="ill" style="color:var(--folha)"><svg width="52" height="52"><use href="#calendario"/></svg></div>
+            <h4>Nenhuma assinatura ainda</h4>
+            <p>Streaming, academia, aluguel. Cadastre uma vez com o dia da cobrança.</p>
+            <span class="btn filled">Adicionar assinatura</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Gastos: ícone de linha carrinho. Assinaturas: ícone de linha calendário com volta (ícone novo, precisa de aval).</div>
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<h2>Ajustes · Tutoriais, e o menu com descrição</h2>
+<div class="row">
+  <div>
+    <div class="phone light" style="height:600px">
+      <div class="status"></div>
+      <div class="page">
+        <span class="title">Ajustes <svg class="chev"><use href="#chev"/></svg></span>
+        <div class="card">
+          <div class="flex"><b style="font-size:14px">Tutoriais</b><span class="cap2">5 de 7 vistos</span></div>
+          <div class="prog"><i style="width:71%"></i></div>
+          <div style="margin-top:10px">
+            <div class="trow"><span class="nm">Dashboard</span><span class="st ok">Visto</span><span class="btn text">Rever</span></div>
+            <div class="trow"><span class="nm">Receitas</span><span class="st ok">Visto</span><span class="btn text">Rever</span></div>
+            <div class="trow"><span class="nm">Gastos</span><span class="st">Pulado</span><span class="btn text">Rever</span></div>
+            <div class="trow"><span class="nm">Assinaturas</span><span class="st">Ainda não</span><span class="btn text">Ver</span></div>
+            <div class="trow"><span class="nm">Parcelamentos</span><span class="st">Ainda não</span><span class="btn text">Ver</span></div>
+            <div class="trow"><span class="nm">Categorias</span><span class="st ok">Visto</span><span class="btn text">Rever</span></div>
+            <div class="trow"><span class="nm">Ajustes</span><span class="st ok">Visto</span><span class="btn text">Rever</span></div>
+          </div>
+          <div style="margin-top:12px"><span class="btn outline">Rever todos</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Progresso: barra com a semântica de meta (encher é bom). Pulado conta como visto, mas aparece escrito.</div>
+  </div>
+  <div>
+    <div class="phone dark" style="height:600px">
+      <div class="status"></div>
+      <div class="page">
+        <div class="card">
+          <div class="flex"><span style="display:flex; align-items:center; gap:10px"><svg width="32" height="32"><use href="#selo"/></svg><b style="font-size:14px">Tutoriais</b></span><span class="cap2">7 de 7 vistos</span></div>
+          <div class="prog"><i style="width:100%"></i></div>
+          <div class="cap2" style="margin-top:8px">Você já viu todos. Pode rever qualquer um.</div>
+          <div style="margin-top:12px"><span class="btn outline">Rever todos</span></div>
+        </div>
+      </div>
+      <div class="menu-sheet" style="top:250px; border-radius:20px">
+        <div class="mi sel"><span class="tx">Dashboard<small>Saldo, conta e caixinhas</small></span></div>
+        <div class="mi"><span class="tx">Receitas<small>O que entrou</small></span></div>
+        <div class="mi"><span class="tx">Gastos<small>O que saiu</small></span></div>
+        <div class="mi"><span class="tx">Assinaturas<small>Gastos que se repetem</small></span></div>
+      </div>
+    </div>
+    <div class="cap">Com os 7 vistos, o selo com D aparece no cartão (o único ponto terracota). Abaixo, recorte do menu com uma linha de descrição por tela.</div>
+  </div>
+</div>
+
+</body>
+</html>
