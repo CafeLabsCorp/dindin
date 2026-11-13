@@ -1,8 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
 import 'package:dindin/utils/format.dart';
 
 void main() {
+  group('formatDate follows the app language', () {
+    setUpAll(() => initializeDateFormatting('pt_BR'));
+    tearDown(() => Intl.defaultLocale = null);
+
+    test('Portuguese (and the default): dd/MM/yyyy', () {
+      expect(formatDate('2026-11-12'), '12/11/2026');
+      Intl.defaultLocale = 'pt';
+      expect(formatDate('2026-11-12'), '12/11/2026');
+    });
+
+    test('English: month first', () {
+      Intl.defaultLocale = 'en';
+      expect(formatDate('2026-11-12'), '11/12/2026');
+    });
+  });
+
   group('formatAmountInput / parseAmountInput (masked amount fields)', () {
     test('formatAmountInput groups thousands the way MoneyInputFormatter displays them', () {
       expect(formatAmountInput(80), '80,00');

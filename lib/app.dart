@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -101,6 +102,12 @@ class _DindinAppState extends ConsumerState<DindinApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
+      // Dates typed in code (`formatDate`) follow the language the app is
+      // showing, not a fixed one.
+      builder: (context, child) {
+        Intl.defaultLocale = Localizations.localeOf(context).languageCode;
+        return child ?? const SizedBox.shrink();
+      },
       routerConfig: _router,
     );
   }

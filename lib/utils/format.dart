@@ -30,8 +30,12 @@ String isoDateFrom(DateTime date) {
   return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
+/// A date in the language the app is showing (`Intl.defaultLocale`, set by
+/// `app.dart`): dd/MM/yyyy in Portuguese (the default), the English order
+/// otherwise.
 String formatDate(String iso) {
   final date = DateTime.parse(iso);
+  if (Intl.defaultLocale == 'en') return DateFormat.yMd('en').format(date);
   return DateFormat('dd/MM/yyyy', 'pt_BR').format(date);
 }
 
@@ -50,8 +54,9 @@ String formatAmountInput(num value) {
 /// Parses text produced by a [MoneyInputFormatter]-masked field (grouped
 /// thousands, comma decimals) back into a value — strips the thousands-
 /// separator dots before swapping the decimal comma for a dot, so
-/// `double.tryParse` can read it. Also reads a plain unmasked "1234,56" or
-/// "1234.56" fine, since neither has a stray dot for the strip to disturb.
+/// `double.tryParse` can read it. Also reads a plain unmasked "1234,56". Not
+/// for a dot-decimal "1234.56": every dot is taken as a thousands separator, so
+/// that reads as 123456 (the fields are always masked, so it never arrives).
 double? parseAmountInput(String text) {
   final normalized = text.trim().replaceAll('.', '').replaceAll(',', '.');
   return double.tryParse(normalized);
