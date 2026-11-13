@@ -1856,12 +1856,6 @@ abstract class AppLocalizations {
   /// **'Feito'**
   String get firstStepDone;
 
-  /// No description provided for @historyEmptyAction.
-  ///
-  /// In pt, this message translates to:
-  /// **'Lançar receita'**
-  String get historyEmptyAction;
-
   /// No description provided for @incomesEmptyState.
   ///
   /// In pt, this message translates to:
@@ -1873,6 +1867,66 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Nenhum gasto lançado ainda.'**
   String get expensesEmptyState;
+
+  /// No description provided for @navDashboardDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Saldo, conta e caixinhas'**
+  String get navDashboardDescription;
+
+  /// No description provided for @navReceitasDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'O que entrou'**
+  String get navReceitasDescription;
+
+  /// No description provided for @navGastosDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'O que saiu'**
+  String get navGastosDescription;
+
+  /// No description provided for @navAssinaturasDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Gastos que se repetem'**
+  String get navAssinaturasDescription;
+
+  /// No description provided for @navParcelamentosDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Compras em parcelas'**
+  String get navParcelamentosDescription;
+
+  /// No description provided for @navCategoriasDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Suas caixinhas'**
+  String get navCategoriasDescription;
+
+  /// No description provided for @navAjustesDescription.
+  ///
+  /// In pt, this message translates to:
+  /// **'Conta, tema e backup'**
+  String get navAjustesDescription;
+
+  /// No description provided for @dashboardQuickIncome.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lançar receita'**
+  String get dashboardQuickIncome;
+
+  /// No description provided for @dashboardQuickExpense.
+  ///
+  /// In pt, this message translates to:
+  /// **'Lançar gasto'**
+  String get dashboardQuickExpense;
+
+  /// No description provided for @historyEmptyAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ir para Receitas'**
+  String get historyEmptyAction;
 
   /// No description provided for @tutorialAnnouncement.
   ///

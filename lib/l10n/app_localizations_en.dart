@@ -1053,13 +1053,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get firstStepDone => 'Done';
 
   @override
-  String get historyEmptyAction => 'Add income';
-
-  @override
   String get incomesEmptyState => 'No income logged yet.';
 
   @override
   String get expensesEmptyState => 'No expenses logged yet.';
+
+  @override
+  String get navDashboardDescription => 'Balance, account and envelopes';
+
+  @override
+  String get navReceitasDescription => 'What came in';
+
+  @override
+  String get navGastosDescription => 'What went out';
+
+  @override
+  String get navAssinaturasDescription => 'Recurring expenses';
+
+  @override
+  String get navParcelamentosDescription => 'Purchases in installments';
+
+  @override
+  String get navCategoriasDescription => 'Your envelopes';
+
+  @override
+  String get navAjustesDescription => 'Account, theme and backup';
+
+  @override
+  String get dashboardQuickIncome => 'Add income';
+
+  @override
+  String get dashboardQuickExpense => 'Add expense';
+
+  @override
+  String get historyEmptyAction => 'Go to Income';
 
   @override
   String tutorialAnnouncement(

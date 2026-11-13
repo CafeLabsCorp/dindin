@@ -1051,13 +1051,40 @@ class AppLocalizationsPt extends AppLocalizations {
   String get firstStepDone => 'Feito';
 
   @override
-  String get historyEmptyAction => 'Lançar receita';
-
-  @override
   String get incomesEmptyState => 'Nenhuma receita lançada ainda.';
 
   @override
   String get expensesEmptyState => 'Nenhum gasto lançado ainda.';
+
+  @override
+  String get navDashboardDescription => 'Saldo, conta e caixinhas';
+
+  @override
+  String get navReceitasDescription => 'O que entrou';
+
+  @override
+  String get navGastosDescription => 'O que saiu';
+
+  @override
+  String get navAssinaturasDescription => 'Gastos que se repetem';
+
+  @override
+  String get navParcelamentosDescription => 'Compras em parcelas';
+
+  @override
+  String get navCategoriasDescription => 'Suas caixinhas';
+
+  @override
+  String get navAjustesDescription => 'Conta, tema e backup';
+
+  @override
+  String get dashboardQuickIncome => 'Lançar receita';
+
+  @override
+  String get dashboardQuickExpense => 'Lançar gasto';
+
+  @override
+  String get historyEmptyAction => 'Ir para Receitas';
 
   @override
   String tutorialAnnouncement(

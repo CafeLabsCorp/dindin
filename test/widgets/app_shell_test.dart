@@ -364,6 +364,25 @@ void main() {
     });
   });
 
+  testWidgets('o menu mostra uma linha de descrição embaixo de cada tela', (tester) async {
+    await pump(tester);
+
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+
+    for (final line in [
+      'Saldo, conta e caixinhas',
+      'O que entrou',
+      'O que saiu',
+      'Gastos que se repetem',
+      'Compras em parcelas',
+      'Suas caixinhas',
+      'Conta, tema e backup',
+    ]) {
+      expect(find.text(line), findsOneWidget, reason: line);
+    }
+  });
+
   group('voltar do segundo plano em outro dia', () {
     // The catch-up is overridden with a counter so we can see whether the
     // provider was re-run; todayProvider is pinned to a chosen day.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../providers/focus_request.dart';
 import '../../widgets/guided_empty_state.dart';
 import '../../models/tutorial_progress.dart';
 import '../../widgets/tutorial/tutorial.dart';
@@ -46,6 +47,33 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
 
   DateTime? _filterFrom;
   DateTime? _filterTo;
+
+  /// Puts the cursor in the amount field when another page asked for it (the
+  /// Dashboard's quick buttons). The page may still be off-screen right after
+  /// the navigation, so it waits, briefly, until it is the visible one.
+  void _focusAmountWhenVisible() {
+    var tries = 0;
+    void attempt() {
+      if (!mounted) return;
+      if (TickerMode.valuesOf(context).enabled) {
+        ref.read(focusRequestProvider.notifier).state = null;
+        scrollToAndFocus(_formKey, _amountFocus);
+      } else if (++tries < 30) {
+        Future<void>.delayed(const Duration(milliseconds: 100), attempt);
+      }
+    }
+
+    attempt();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // The request may have been made before this page was ever built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ref.read(focusRequestProvider) == FocusRequest.incomeAmount) _focusAmountWhenVisible();
+    });
+  }
 
   @override
   void dispose() {
@@ -171,6 +199,9 @@ class _ReceitasPageState extends ConsumerState<ReceitasPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    ref.listen<FocusRequest?>(focusRequestProvider, (_, next) {
+      if (next == FocusRequest.incomeAmount) _focusAmountWhenVisible();
+    });
     final incomesAsync = ref.watch(incomesProvider);
     final filterActive = _filterFrom != null || _filterTo != null;
 

@@ -181,12 +181,12 @@ void main() {
       expect(find.text('Primeiros passos'), findsNothing);
     });
 
-    testWidgets('histórico vazio tem o botão "Lançar receita" que abre Receitas', (tester) async {
+    testWidgets('histórico vazio tem o botão "Ir para Receitas"', (tester) async {
       await pumpPage(tester, const DashboardPage()); // conta nova: sem receita, o histórico está vazio
-      await tester.ensureVisible(find.text('Lançar receita'));
+      await tester.ensureVisible(find.text('Ir para Receitas'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Lançar receita'));
+      await tester.tap(find.text('Ir para Receitas'));
       await tester.pumpAndSettle();
 
       expect(location, '/receitas');

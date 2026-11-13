@@ -11,6 +11,7 @@ import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../models/tutorial_progress.dart';
+import '../../providers/focus_request.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../../theme/theme.dart';
@@ -167,6 +168,33 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           StatTile(
             label: l10n.totalBalanceLabel,
             value: formatCurrency(summary.total),
+          ),
+          const SizedBox(height: 12),
+          // The complaint that started the onboarding work was "I couldn't find
+          // where to add an income or expense", and this is where everyone
+          // lands. Each button opens that page with the cursor in the amount.
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: () {
+                    ref.read(focusRequestProvider.notifier).state = FocusRequest.incomeAmount;
+                    context.go('/receitas');
+                  },
+                  child: Text(l10n.dashboardQuickIncome),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: () {
+                    ref.read(focusRequestProvider.notifier).state = FocusRequest.expenseAmount;
+                    context.go('/gastos');
+                  },
+                  child: Text(l10n.dashboardQuickExpense),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           AppCard(

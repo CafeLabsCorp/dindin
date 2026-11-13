@@ -10,8 +10,8 @@ import '../providers/providers.dart';
 import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import '../theme/theme.dart';
 import '../utils/format.dart';
+import 'menu_chevron.dart';
 
 /// Every top-level destination, in the SAME order as the branches in
 /// `app.dart` — the index is what `goBranch` takes, so the two lists are one
@@ -20,14 +20,14 @@ import '../utils/format.dart';
 /// On narrow screens all of them live in one menu behind the logo; on wide
 /// screens they're the side rail. Either way it's this one list — no subset
 /// is treated specially.
-List<({IconData icon, IconData selectedIcon, String label})> _destinations(AppLocalizations l10n) => [
-  (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: l10n.navDashboard),
-  (icon: Icons.arrow_downward, selectedIcon: Icons.arrow_downward, label: l10n.navReceitas),
-  (icon: Icons.arrow_upward, selectedIcon: Icons.arrow_upward, label: l10n.navGastos),
-  (icon: Icons.autorenew, selectedIcon: Icons.autorenew, label: l10n.navAssinaturas),
-  (icon: Icons.credit_card_outlined, selectedIcon: Icons.credit_card, label: l10n.navParcelamentos),
-  (icon: Icons.category_outlined, selectedIcon: Icons.category, label: l10n.navCategorias),
-  (icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: l10n.navAjustes),
+List<({IconData icon, IconData selectedIcon, String label, String description})> _destinations(AppLocalizations l10n) => [
+  (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: l10n.navDashboard, description: l10n.navDashboardDescription),
+  (icon: Icons.arrow_downward, selectedIcon: Icons.arrow_downward, label: l10n.navReceitas, description: l10n.navReceitasDescription),
+  (icon: Icons.arrow_upward, selectedIcon: Icons.arrow_upward, label: l10n.navGastos, description: l10n.navGastosDescription),
+  (icon: Icons.autorenew, selectedIcon: Icons.autorenew, label: l10n.navAssinaturas, description: l10n.navAssinaturasDescription),
+  (icon: Icons.credit_card_outlined, selectedIcon: Icons.credit_card, label: l10n.navParcelamentos, description: l10n.navParcelamentosDescription),
+  (icon: Icons.category_outlined, selectedIcon: Icons.category, label: l10n.navCategorias, description: l10n.navCategoriasDescription),
+  (icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: l10n.navAjustes, description: l10n.navAjustesDescription),
 ];
 
 /// App-wide nav: a single menu behind the logo on narrow (mobile) screens, a
@@ -392,7 +392,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
   /// reachable by a screen reader. A list is all three for free.
   void _openMenu(
     BuildContext context,
-    List<({IconData icon, IconData selectedIcon, String label})> destinations,
+    List<({IconData icon, IconData selectedIcon, String label, String description})> destinations,
   ) {
     showGeneralDialog<void>(
       context: context,
@@ -432,6 +432,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
                             : destinations[i].icon,
                       ),
                       title: Text(destinations[i].label),
+                      subtitle: Text(destinations[i].description),
                       selected: navigationShell.currentIndex == i,
                       onTap: () {
                         Navigator.pop(dialogContext);
@@ -553,7 +554,7 @@ class _StickyTitle extends StatelessWidget {
                         Badge(
                           isLabelVisible: updateAvailable,
                           smallSize: 8,
-                          child: Icon(Icons.expand_more, size: 24, color: context.tokens.subtle),
+                          child: const MenuChevronChip(size: 28),
                         ),
                       ],
                     ),

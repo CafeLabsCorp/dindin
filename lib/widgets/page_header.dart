@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'menu_chevron.dart';
 import 'app_shell.dart' show AppNavigation;
 
 /// The title + subtitle every screen opens with — and, on narrow screens, the
@@ -62,7 +63,7 @@ class PageHeader extends StatelessWidget {
                   // Negative-looking inset: the tap target extends past the
                   // text so it's comfortably tappable, while the text itself
                   // still lines up with the content below it.
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -73,7 +74,7 @@ class PageHeader extends StatelessWidget {
                       Badge(
                         isLabelVisible: AppNavigation.of(context)?.updateAvailable ?? false,
                         smallSize: 8,
-                        child: Icon(Icons.expand_more, size: 26, color: context.tokens.subtle),
+                        child: const MenuChevronChip(),
                       ),
                     ],
                   ),
