@@ -405,7 +405,7 @@ class FirestoreService {
       id: doc.id,
       name: name,
       recurring: recurring,
-      createdAt: DateTime.now().toIso8601String(),
+      createdAt: _now().toIso8601String(),
       monthlyBudget: monthlyBudget,
       kind: kind,
       goalAmount: goalAmount,
@@ -414,7 +414,7 @@ class FirestoreService {
     final batch = _db.batch();
     batch.set(doc, category.toMap());
     batch.set(_balance(doc.id), {'balance': 0.0});
-    await batch.commit();
+    await ackOrQueue(batch.commit());
     return category;
   }
 
@@ -472,7 +472,7 @@ class FirestoreService {
         );
       }
     }
-    await _categories.doc(id).set(updated.toMap());
+    await ackOrQueue(_categories.doc(id).set(updated.toMap()));
   }
 
   /// Deletes the category and cascades to allocations/expenses that reference
@@ -486,6 +486,22 @@ class FirestoreService {
   /// in the other caixinha would be orphaned and the account balance would
   /// drift away from the ledger. The user has to undo the transfer first
   /// (`deleteAllocation` on either leg removes both).
+  /// How long a plain (non-transaction) write may wait for the server before
+  /// the screen moves on. Offline, Firestore keeps the write in its local queue
+  /// and sends it later, but the returned future only completes on the server's
+  /// ack: awaited as is, the save button would spin until the connection is
+  /// back. Transactions fail at once offline, so only plain writes need this.
+  static const writeAckWait = Duration(seconds: 4);
+
+  /// Waits for [write] up to [wait]; past that the write is treated as queued
+  /// (it still goes out when the connection returns). A real failure inside the
+  /// window, such as a rules denial, is still thrown.
+  static Future<void> ackOrQueue(Future<void> write, {Duration wait = writeAckWait}) =>
+      write.timeout(wait, onTimeout: () {});
+
+  /// 500 writes per commit, minus the three fixed ones of the cascade.
+  static const maxCascadeDocs = 495;
+
   Future<void> deleteCategory(String id) async {
     final allocs = await _allocations.where('categoryId', isEqualTo: id).get();
     final exps = await _expenses.where('categoryId', isEqualTo: id).get();
@@ -495,6 +511,12 @@ class FirestoreService {
         'cannot delete a caixinha that took part in a transfer; undo the '
         'transfer first',
       );
+    }
+    // The cascade is one transaction (the rules check it as one commit) and a
+    // commit holds at most 500 writes: the caixinha, its balance, the account
+    // and every document below. Refuse up front instead of failing halfway.
+    if (allocs.docs.length + exps.docs.length > maxCascadeDocs) {
+      throw StateError('too many records to remove at once; remove some first');
     }
     // No transfer legs left, so every allocation is a plain one and the whole
     // sum goes back to the account.
@@ -1035,10 +1057,10 @@ class FirestoreService {
       // catch-up bills it (otherwise a subscription never backdates).
       createdAt: chargeThisMonth
           ? DateTime(_now().year, _now().month).toIso8601String()
-          : DateTime.now().toIso8601String(),
+          : _now().toIso8601String(),
       categoryId: categoryId,
     );
-    await doc.set(subscription.toMap());
+    await ackOrQueue(doc.set(subscription.toMap()));
     return subscription;
   }
 
@@ -1088,7 +1110,7 @@ class FirestoreService {
   }
 
   Future<void> deleteSubscription(String id) async {
-    await _subscriptions.doc(id).delete();
+    await ackOrQueue(_subscriptions.doc(id).delete());
   }
 
   /// Flips [Subscription.autoChargeEnabled] — the switch on the Assinaturas
@@ -1096,7 +1118,7 @@ class FirestoreService {
   /// [updateSubscription] uses) since this carries no money invariant to
   /// protect and nothing else on the doc can conflict with it.
   Future<void> setSubscriptionAutoCharge(String id, bool enabled) async {
-    await _subscriptions.doc(id).update({'autoChargeEnabled': enabled});
+    await ackOrQueue(_subscriptions.doc(id).update({'autoChargeEnabled': enabled}));
   }
 
   /// Catches up every subscription's missed due dates since it was last
@@ -1310,15 +1332,15 @@ class FirestoreService {
       installments: installments,
       purchaseDate: purchaseDate,
       firstChargeDate: firstChargeDate,
-      createdAt: DateTime.now().toIso8601String(),
+      createdAt: _now().toIso8601String(),
       categoryId: categoryId,
     );
-    await doc.set(purchase.toMap());
+    await ackOrQueue(doc.set(purchase.toMap()));
     return purchase;
   }
 
   Future<void> deleteInstallmentPurchase(String id) async {
-    await _installmentPurchases.doc(id).delete();
+    await ackOrQueue(_installmentPurchases.doc(id).delete());
   }
 
   /// Moves the day of the month the REMAINING installments fall due, or

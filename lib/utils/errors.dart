@@ -30,6 +30,9 @@ String friendlyErrorMessage(AppLocalizations l10n, Object error) {
   if (message.contains('took part in a transfer')) {
     return l10n.errorCategoryHasTransfer;
   }
+  if (message.contains('too many records')) {
+    return l10n.errorCategoryTooBig;
+  }
   if (message.contains('settle the debt')) {
     return l10n.errorSettleDebt;
   }

@@ -383,6 +383,7 @@
   "errorUnsupportedEdit": "This change isn't supported — remove it and log it again.",
   "errorSettleDebt": "Settle this envelope's debt (balance back to zero) before converting it into a savings box or removing it.",
   "errorCategoryHasTransfer": "This envelope took part in a transfer. Undo the transfer first, then remove it.",
+  "errorCategoryTooBig": "This envelope has too many records to remove at once. Delete some of its entries first and try again.",
   "errorExceedsBalance": "This amount exceeds the available balance.",
   "errorGenericSave": "Couldn't save. Please try again.",
 
@@ -416,6 +417,8 @@
   "emailVerifyPromptTitle": "Confirm your email",
   "emailVerifyPromptLater": "Not now",
   "updateAvailableMessage": "A new version of Dindin is available.",
+  "updateReadyMessage": "Update ready. Restart to use the new version.",
+  "updateRestartAction": "Restart",
   "updateAction": "Update",
   "removedExpense": "Expense removed.",
   "removedIncome": "Income removed.",

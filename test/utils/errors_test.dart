@@ -43,6 +43,13 @@ void main() {
       );
     });
 
+    test('maps the cascade size guard to its own pt-BR message', () {
+      expect(
+        friendlyErrorMessage(l10n, StateError('too many records to remove at once; remove some first')),
+        l10n.errorCategoryTooBig,
+      );
+    });
+
     test('maps the transfer delete guard to its own pt-BR message', () {
       final error = StateError(
         'cannot delete a caixinha that took part in a transfer; undo the transfer first',

@@ -1216,6 +1216,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Essa caixinha participou de uma transferência. Desfaça a transferência primeiro e depois remova a caixinha.';
 
   @override
+  String get errorCategoryTooBig =>
+      'Essa caixinha tem registros demais para remover de uma vez. Apague alguns lançamentos dela primeiro e tente de novo.';
+
+  @override
   String get errorExceedsBalance => 'Esse valor ultrapassa o saldo disponível.';
 
   @override
@@ -1311,6 +1315,13 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get updateAvailableMessage =>
       'Tem uma versão nova do Dindin disponível.';
+
+  @override
+  String get updateReadyMessage =>
+      'Atualização pronta. Reinicie para usar a versão nova.';
+
+  @override
+  String get updateRestartAction => 'Reiniciar';
 
   @override
   String get updateAction => 'Atualizar';

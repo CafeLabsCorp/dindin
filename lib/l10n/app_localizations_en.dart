@@ -1219,6 +1219,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This envelope took part in a transfer. Undo the transfer first, then remove it.';
 
   @override
+  String get errorCategoryTooBig =>
+      'This envelope has too many records to remove at once. Delete some of its entries first and try again.';
+
+  @override
   String get errorExceedsBalance =>
       'This amount exceeds the available balance.';
 
@@ -1314,6 +1318,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateAvailableMessage => 'A new version of Dindin is available.';
+
+  @override
+  String get updateReadyMessage =>
+      'Update ready. Restart to use the new version.';
+
+  @override
+  String get updateRestartAction => 'Restart';
 
   @override
   String get updateAction => 'Update';

@@ -1,3 +1,4 @@
+import 'dart:async';
 // Regression tests for the client-side money invariants in FirestoreService:
 // can't spend more than a caixinha's balance, can't allocate more than the
 // account balance, nothing goes negative, edits/deletes adjust balances by
@@ -1569,7 +1570,40 @@ void main() {
     });
   });
 
+  group('ackOrQueue (writes that stay pending offline)', () {
+    test('a write that never gets the server ack is treated as queued after the wait', () async {
+      final neverAcked = Completer<void>().future;
+      await FirestoreService.ackOrQueue(neverAcked, wait: const Duration(milliseconds: 20));
+    });
+
+    test('a write acked in time just completes', () async {
+      await FirestoreService.ackOrQueue(Future<void>.value(), wait: const Duration(seconds: 5));
+    });
+
+    test('a real failure inside the window is still thrown', () async {
+      await expectLater(
+        FirestoreService.ackOrQueue(Future<void>.error(StateError('permission-denied')), wait: const Duration(seconds: 5)),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
   group('deleteCategory cascade', () {
+    test('refuses, touching nothing, when the cascade would pass the 500-write commit limit', () async {
+      await svc.createIncome(date: '2026-01-01', amount: 100000, source: IncomeSource.freela);
+      final cat = await svc.createCategory(name: 'Lazer', recurring: false);
+      await svc.createAllocation(categoryId: cat.id, amount: 90000, date: '2026-01-02');
+      for (var i = 0; i < FirestoreService.maxCascadeDocs; i++) {
+        await svc.createExpense(date: '2026-01-03', amount: 1, categoryId: cat.id);
+      }
+      // 1 allocation + 495 expenses = 496 > 495.
+      await expectLater(
+        () => svc.deleteCategory(cat.id),
+        throwsA(isA<StateError>().having((e) => e.message, 'message', contains('too many records'))),
+      );
+      expect((await fake.doc('users/u1/categories/${cat.id}').get()).exists, isTrue);
+    });
+
     test('deletes the category, its balance doc, and its ledger rows, restoring plain-allocation money to the account', () async {
       await svc.createIncome(date: '2026-01-01', amount: 500, source: IncomeSource.freela);
       final cat = await svc.createCategory(name: 'Lazer', recurring: false);

@@ -2126,6 +2126,12 @@ abstract class AppLocalizations {
   /// **'Essa caixinha participou de uma transferência. Desfaça a transferência primeiro e depois remova a caixinha.'**
   String get errorCategoryHasTransfer;
 
+  /// No description provided for @errorCategoryTooBig.
+  ///
+  /// In pt, this message translates to:
+  /// **'Essa caixinha tem registros demais para remover de uma vez. Apague alguns lançamentos dela primeiro e tente de novo.'**
+  String get errorCategoryTooBig;
+
   /// No description provided for @errorExceedsBalance.
   ///
   /// In pt, this message translates to:
@@ -2305,6 +2311,18 @@ abstract class AppLocalizations {
   /// In pt, this message translates to:
   /// **'Tem uma versão nova do Dindin disponível.'**
   String get updateAvailableMessage;
+
+  /// No description provided for @updateReadyMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Atualização pronta. Reinicie para usar a versão nova.'**
+  String get updateReadyMessage;
+
+  /// No description provided for @updateRestartAction.
+  ///
+  /// In pt, this message translates to:
+  /// **'Reiniciar'**
+  String get updateRestartAction;
 
   /// No description provided for @updateAction.
   ///

@@ -495,6 +495,7 @@
   "errorUnsupportedEdit": "Essa alteração não é suportada — remova e lance de novo.",
   "errorSettleDebt": "Quite a dívida dessa caixinha (saldo de volta a zero) antes de convertê-la em cofrinho ou removê-la.",
   "errorCategoryHasTransfer": "Essa caixinha participou de uma transferência. Desfaça a transferência primeiro e depois remova a caixinha.",
+  "errorCategoryTooBig": "Essa caixinha tem registros demais para remover de uma vez. Apague alguns lançamentos dela primeiro e tente de novo.",
   "errorExceedsBalance": "Esse valor ultrapassa o saldo disponível.",
   "errorGenericSave": "Não foi possível salvar. Tente novamente.",
 
@@ -528,6 +529,8 @@
   "emailVerifyPromptTitle": "Confirme seu e-mail",
   "emailVerifyPromptLater": "Agora não",
   "updateAvailableMessage": "Tem uma versão nova do Dindin disponível.",
+  "updateReadyMessage": "Atualização pronta. Reinicie para usar a versão nova.",
+  "updateRestartAction": "Reiniciar",
   "updateAction": "Atualizar",
   "removedExpense": "Gasto removido.",
   "removedIncome": "Receita removida.",
