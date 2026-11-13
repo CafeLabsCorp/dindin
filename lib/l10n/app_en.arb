@@ -293,6 +293,26 @@
   "tutorialCategorias2Body": "Save is for reaching a goal. Spend is for a monthly limit.",
   "tutorialCategorias3Title": "Your envelopes",
   "tutorialCategorias3Body": "Tap one to change its name, goal or limit.",
+  "tutorialsSectionLabel": "Tutorials",
+  "tutorialStatusSeen": "Seen",
+  "tutorialStatusSkipped": "Skipped",
+  "tutorialStatusNotYet": "Not yet",
+  "tutorialActionReview": "Review",
+  "tutorialActionView": "View",
+  "tutorialReviewAll": "Review all",
+  "tutorialsResetMessage": "Tutorials will show again when you open each page.",
+  "tutorialsProgress": "{seen} of {total} seen",
+  "@tutorialsProgress": {
+    "placeholders": { "seen": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "tutorialRowSemantics": "{name}, {status}, {action} button",
+  "@tutorialRowSemantics": {
+    "placeholders": { "name": { "type": "String" }, "status": { "type": "String" }, "action": { "type": "String" } }
+  },
+  "tutorialSettings1Title": "Keep a copy",
+  "tutorialSettings1Body": "Export a backup of your data whenever you want.",
+  "tutorialSettings2Title": "See tips again",
+  "tutorialSettings2Body": "Want to see a tutorial again? It's here.",
   "tutorialAnnouncement": "{page} tutorial, step {current} of {total}. {title}. {body}",
   "@tutorialAnnouncement": {
     "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }

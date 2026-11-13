@@ -1658,6 +1658,90 @@ abstract class AppLocalizations {
   /// **'Toque numa para mudar o nome, a meta ou o limite.'**
   String get tutorialCategorias3Body;
 
+  /// No description provided for @tutorialsSectionLabel.
+  ///
+  /// In pt, this message translates to:
+  /// **'Tutoriais'**
+  String get tutorialsSectionLabel;
+
+  /// No description provided for @tutorialStatusSeen.
+  ///
+  /// In pt, this message translates to:
+  /// **'Visto'**
+  String get tutorialStatusSeen;
+
+  /// No description provided for @tutorialStatusSkipped.
+  ///
+  /// In pt, this message translates to:
+  /// **'Pulado'**
+  String get tutorialStatusSkipped;
+
+  /// No description provided for @tutorialStatusNotYet.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ainda não'**
+  String get tutorialStatusNotYet;
+
+  /// No description provided for @tutorialActionReview.
+  ///
+  /// In pt, this message translates to:
+  /// **'Rever'**
+  String get tutorialActionReview;
+
+  /// No description provided for @tutorialActionView.
+  ///
+  /// In pt, this message translates to:
+  /// **'Ver'**
+  String get tutorialActionView;
+
+  /// No description provided for @tutorialReviewAll.
+  ///
+  /// In pt, this message translates to:
+  /// **'Rever todos'**
+  String get tutorialReviewAll;
+
+  /// No description provided for @tutorialsResetMessage.
+  ///
+  /// In pt, this message translates to:
+  /// **'Os tutoriais vão aparecer de novo quando você abrir cada página.'**
+  String get tutorialsResetMessage;
+
+  /// No description provided for @tutorialsProgress.
+  ///
+  /// In pt, this message translates to:
+  /// **'{seen} de {total} vistos'**
+  String tutorialsProgress(int seen, int total);
+
+  /// No description provided for @tutorialRowSemantics.
+  ///
+  /// In pt, this message translates to:
+  /// **'{name}, {status}, botão {action}'**
+  String tutorialRowSemantics(String name, String status, String action);
+
+  /// No description provided for @tutorialSettings1Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Guarde uma cópia'**
+  String get tutorialSettings1Title;
+
+  /// No description provided for @tutorialSettings1Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Exporte um backup dos seus dados quando quiser.'**
+  String get tutorialSettings1Body;
+
+  /// No description provided for @tutorialSettings2Title.
+  ///
+  /// In pt, this message translates to:
+  /// **'Rever explicações'**
+  String get tutorialSettings2Title;
+
+  /// No description provided for @tutorialSettings2Body.
+  ///
+  /// In pt, this message translates to:
+  /// **'Quer ver um tutorial de novo? Ele fica aqui.'**
+  String get tutorialSettings2Body;
+
   /// No description provided for @tutorialAnnouncement.
   ///
   /// In pt, this message translates to:

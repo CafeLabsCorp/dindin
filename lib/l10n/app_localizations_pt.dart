@@ -941,6 +941,55 @@ class AppLocalizationsPt extends AppLocalizations {
       'Toque numa para mudar o nome, a meta ou o limite.';
 
   @override
+  String get tutorialsSectionLabel => 'Tutoriais';
+
+  @override
+  String get tutorialStatusSeen => 'Visto';
+
+  @override
+  String get tutorialStatusSkipped => 'Pulado';
+
+  @override
+  String get tutorialStatusNotYet => 'Ainda não';
+
+  @override
+  String get tutorialActionReview => 'Rever';
+
+  @override
+  String get tutorialActionView => 'Ver';
+
+  @override
+  String get tutorialReviewAll => 'Rever todos';
+
+  @override
+  String get tutorialsResetMessage =>
+      'Os tutoriais vão aparecer de novo quando você abrir cada página.';
+
+  @override
+  String tutorialsProgress(int seen, int total) {
+    return '$seen de $total vistos';
+  }
+
+  @override
+  String tutorialRowSemantics(String name, String status, String action) {
+    return '$name, $status, botão $action';
+  }
+
+  @override
+  String get tutorialSettings1Title => 'Guarde uma cópia';
+
+  @override
+  String get tutorialSettings1Body =>
+      'Exporte um backup dos seus dados quando quiser.';
+
+  @override
+  String get tutorialSettings2Title => 'Rever explicações';
+
+  @override
+  String get tutorialSettings2Body =>
+      'Quer ver um tutorial de novo? Ele fica aqui.';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

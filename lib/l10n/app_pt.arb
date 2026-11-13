@@ -375,6 +375,26 @@
   "tutorialCategorias2Body": "Guardar é para juntar até uma meta. Gastar é para ter um limite por mês.",
   "tutorialCategorias3Title": "Suas caixinhas",
   "tutorialCategorias3Body": "Toque numa para mudar o nome, a meta ou o limite.",
+  "tutorialsSectionLabel": "Tutoriais",
+  "tutorialStatusSeen": "Visto",
+  "tutorialStatusSkipped": "Pulado",
+  "tutorialStatusNotYet": "Ainda não",
+  "tutorialActionReview": "Rever",
+  "tutorialActionView": "Ver",
+  "tutorialReviewAll": "Rever todos",
+  "tutorialsResetMessage": "Os tutoriais vão aparecer de novo quando você abrir cada página.",
+  "tutorialsProgress": "{seen} de {total} vistos",
+  "@tutorialsProgress": {
+    "placeholders": { "seen": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "tutorialRowSemantics": "{name}, {status}, botão {action}",
+  "@tutorialRowSemantics": {
+    "placeholders": { "name": { "type": "String" }, "status": { "type": "String" }, "action": { "type": "String" } }
+  },
+  "tutorialSettings1Title": "Guarde uma cópia",
+  "tutorialSettings1Body": "Exporte um backup dos seus dados quando quiser.",
+  "tutorialSettings2Title": "Rever explicações",
+  "tutorialSettings2Body": "Quer ver um tutorial de novo? Ele fica aqui.",
   "tutorialAnnouncement": "Tutorial de {page}, passo {current} de {total}. {title}. {body}",
   "@tutorialAnnouncement": {
     "placeholders": { "page": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" }, "title": { "type": "String" }, "body": { "type": "String" } }

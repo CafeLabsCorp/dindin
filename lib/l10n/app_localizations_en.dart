@@ -944,6 +944,55 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap one to change its name, goal or limit.';
 
   @override
+  String get tutorialsSectionLabel => 'Tutorials';
+
+  @override
+  String get tutorialStatusSeen => 'Seen';
+
+  @override
+  String get tutorialStatusSkipped => 'Skipped';
+
+  @override
+  String get tutorialStatusNotYet => 'Not yet';
+
+  @override
+  String get tutorialActionReview => 'Review';
+
+  @override
+  String get tutorialActionView => 'View';
+
+  @override
+  String get tutorialReviewAll => 'Review all';
+
+  @override
+  String get tutorialsResetMessage =>
+      'Tutorials will show again when you open each page.';
+
+  @override
+  String tutorialsProgress(int seen, int total) {
+    return '$seen of $total seen';
+  }
+
+  @override
+  String tutorialRowSemantics(String name, String status, String action) {
+    return '$name, $status, $action button';
+  }
+
+  @override
+  String get tutorialSettings1Title => 'Keep a copy';
+
+  @override
+  String get tutorialSettings1Body =>
+      'Export a backup of your data whenever you want.';
+
+  @override
+  String get tutorialSettings2Title => 'See tips again';
+
+  @override
+  String get tutorialSettings2Body =>
+      'Want to see a tutorial again? It\'s here.';
+
+  @override
   String tutorialAnnouncement(
     String page,
     int current,

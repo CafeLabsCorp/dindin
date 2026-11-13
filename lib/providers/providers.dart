@@ -124,6 +124,24 @@ Future<void> resetTutorial(WidgetRef ref, TutorialPage page) async {
   }
 }
 
+/// Puts back what "Rever todos" cleared ("Desfazer"): the outcomes as they were,
+/// for this session and in the profile.
+Future<void> restoreTutorials(WidgetRef ref, Map<TutorialPage, TutorialEntry> previous) async {
+  ref.read(tutorialSessionSeenProvider.notifier).state = {
+    for (final entry in previous.entries)
+      if (entry.value.covers(entry.key)) entry.key,
+  };
+  final firestore = ref.read(firestoreServiceProvider);
+  if (firestore == null) return;
+  for (final entry in previous.entries) {
+    try {
+      await firestore.setTutorialProgress(entry.key, entry.value.state, version: entry.value.version);
+    } catch (error, stackTrace) {
+      developer.log('restoring tutorial failed', name: 'dindin.tutorials', error: error, stackTrace: stackTrace);
+    }
+  }
+}
+
 /// "Rever todos".
 Future<void> resetAllTutorials(WidgetRef ref) async {
   ref.read(tutorialSessionSeenProvider.notifier).state = const {};

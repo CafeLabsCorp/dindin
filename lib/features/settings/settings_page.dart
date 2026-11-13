@@ -12,7 +12,11 @@ import '../../providers/theme_provider.dart';
 import '../../providers/providers.dart';
 import '../../theme/theme.dart';
 import '../../utils/errors.dart';
+import '../../models/tutorial_progress.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/tutorial/tutorial.dart';
+import '../../widgets/tutorial/tutorial_host.dart';
+import 'tutorials_card.dart';
 
 /// dindin-landing's legal pages — no locale prefix needed, its middleware
 /// redirects `/privacidade`/`/termos` to the visitor's locale
@@ -34,6 +38,29 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBindingObserver {
+  // Elements the onboarding tutorial lights up.
+  final _backupCardKey = GlobalKey();
+  final _tutorialsCardKey = GlobalKey();
+
+  /// This page's tutorial (docs/onboarding-design.md §3).
+  List<TutorialStep> _tutorialSteps(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      TutorialStep(
+        target: _backupCardKey,
+        title: l10n.tutorialSettings1Title,
+        body: l10n.tutorialSettings1Body,
+        radius: 16,
+      ),
+      TutorialStep(
+        target: _tutorialsCardKey,
+        title: l10n.tutorialSettings2Title,
+        body: l10n.tutorialSettings2Body,
+        radius: 16,
+      ),
+    ];
+  }
+
   bool _busy = false;
   String? _message;
 
@@ -278,7 +305,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
     final l10n = AppLocalizations.of(context)!;
     final user = ref.watch(authStateProvider).value;
 
-    return ListView(
+    return TutorialHost(
+      page: TutorialPage.ajustes,
+      pageName: l10n.settingsTitle,
+      steps: _tutorialSteps,
+      child: ListView(
       children: [
         PageHeader(
           title: l10n.settingsTitle,
@@ -355,7 +386,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
           ),
         ),
         const SizedBox(height: 16),
+        KeyedSubtree(key: _tutorialsCardKey, child: const TutorialsCard()),
+        const SizedBox(height: 16),
         AppCard(
+          key: _backupCardKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -502,6 +536,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
           ),
         ),
       ],
+    ),
     );
   }
 }
