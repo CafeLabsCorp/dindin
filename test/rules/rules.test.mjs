@@ -84,6 +84,7 @@ async function seed(fn) {
 
 const accountDoc = (db, uid) => doc(db, `users/${uid}/meta/account`);
 const settingsDoc = (db, uid) => doc(db, `users/${uid}/meta/settings`);
+const tutorialsDoc = (db, uid) => doc(db, `users/${uid}/meta/tutorials`);
 const balDoc = (db, uid, catId) => doc(db, `users/${uid}/balances/${catId}`);
 const catDoc = (db, uid, id) => doc(db, `users/${uid}/categories/${id}`);
 const incomeDoc = (db, uid, id) => doc(db, `users/${uid}/incomes/${id}`);
@@ -2072,6 +2073,63 @@ describe('meta/settings (Analytics opt-out)', () => {
     const db = aliceDb();
     await setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true });
     await assertSucceeds(deleteDoc(settingsDoc(db, 'alice')));
+  });
+});
+
+// -----------------------------------------------------------------------
+// 16b. meta/tutorials — which onboarding tutorials the user has seen
+// -----------------------------------------------------------------------
+
+describe('meta/tutorials (onboarding progress)', () => {
+  test('the owner can record, merge and read tutorial progress', async () => {
+    const db = aliceDb();
+    await assertSucceeds(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: 1 } }));
+    // The app writes with merge: the resulting doc is what the rules validate.
+    await assertSucceeds(
+      setDoc(tutorialsDoc(db, 'alice'), { gastos: { state: 'skipped', v: 1 } }, { merge: true }),
+    );
+    const snap = await getDoc(tutorialsDoc(db, 'alice'));
+    assert.deepEqual(snap.data(), {
+      dashboard: { state: 'done', v: 1 },
+      gastos: { state: 'skipped', v: 1 },
+    });
+  });
+
+  test('state must be done or skipped, and v a positive int', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'maybe', v: 1 } }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: 0 } }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: 1.5 } }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: '1' } }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done' } }));
+  });
+
+  test('only the seven known pages are accepted, and no extra fields', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { outraPagina: { state: 'done', v: 1 } }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: 1, extra: 1 } }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { dashboard: 'done' }));
+    await assertFails(setDoc(tutorialsDoc(db, 'alice'), { balance: 999 }));
+  });
+
+  test('a tutorials write cannot smuggle into account or settings, and vice versa', async () => {
+    const db = aliceDb();
+    await assertFails(setDoc(accountDoc(db, 'alice'), { balance: 1, dashboard: { state: 'done', v: 1 } }));
+    await assertFails(setDoc(settingsDoc(db, 'alice'), { analyticsOptOut: true, dashboard: { state: 'done', v: 1 } }));
+  });
+
+  test('another user can never read or write it', async () => {
+    const db = aliceDb();
+    await setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: 1 } });
+    const mallory = bobDb();
+    await assertFails(getDoc(tutorialsDoc(mallory, 'alice')));
+    await assertFails(setDoc(tutorialsDoc(mallory, 'alice'), { dashboard: { state: 'skipped', v: 1 } }));
+  });
+
+  test('the owner can delete it (reset all, and full account deletion)', async () => {
+    const db = aliceDb();
+    await setDoc(tutorialsDoc(db, 'alice'), { dashboard: { state: 'done', v: 1 } });
+    await assertSucceeds(deleteDoc(tutorialsDoc(db, 'alice')));
   });
 });
 

@@ -292,6 +292,29 @@ service cloud.firestore {
     // `account`'s validator — which anchors the money-integrity model — stays
     // exactly as narrow as before; a bug in the unrelated `settings` shape
     // can't widen what it accepts.
+    // meta/tutorials: which onboarding tutorials the user has seen, one entry
+    // per page: { state: 'done' | 'skipped', v: <tutorial version> }. UI state,
+    // not money: no balance touches it and nothing reads it but the tutorial
+    // engine. Kept as its own doc (not a field of `settings`) so that doc's
+    // validator stays as narrow as it is. Page ids are a closed list.
+    function validTutorialEntry(e) {
+      return e is map
+          && e.keys().hasOnly(['state', 'v'])
+          && e.state in ['done', 'skipped']
+          && e.v is int && e.v >= 1 && e.v <= 1000;
+    }
+    function validTutorials(d) {
+      return d.keys().hasOnly(['dashboard', 'receitas', 'gastos', 'assinaturas',
+                               'parcelamentos', 'categorias', 'ajustes'])
+          && (!('dashboard' in d.keys()) || validTutorialEntry(d.dashboard))
+          && (!('receitas' in d.keys()) || validTutorialEntry(d.receitas))
+          && (!('gastos' in d.keys()) || validTutorialEntry(d.gastos))
+          && (!('assinaturas' in d.keys()) || validTutorialEntry(d.assinaturas))
+          && (!('parcelamentos' in d.keys()) || validTutorialEntry(d.parcelamentos))
+          && (!('categorias' in d.keys()) || validTutorialEntry(d.categorias))
+          && (!('ajustes' in d.keys()) || validTutorialEntry(d.ajustes));
+    }
+
     match /users/{uid}/meta/{docId} {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid) && (
@@ -302,6 +325,7 @@ service cloud.firestore {
         || (docId == 'settings'
           && request.resource.data.keys().hasOnly(['analyticsOptOut'])
           && request.resource.data.analyticsOptOut is bool)
+        || (docId == 'tutorials' && validTutorials(request.resource.data))
       );
       allow delete: if isOwner(uid); // needed for a full restore reset / account deletion
     }
