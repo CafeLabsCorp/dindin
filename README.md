@@ -12,9 +12,28 @@ optional savings goal) — and money can be transferred between envelopes. A
 spending envelope can optionally allow a negative balance (a "debt" that the
 next allocation automatically settles).
 
-Cross-platform Flutter (Web, Android, Windows target) with Firebase as the
-backend. UI defaults to Portuguese, with English available (Settings →
-Language, or following the device's locale).
+Cross-platform Flutter (Web and Android) with Firebase as the backend. UI
+defaults to Portuguese, with English available (Ajustes → Idioma, or following
+the device's locale). The theme follows the system by default and can be forced
+to light or dark in Ajustes → Tema. Windows desktop was dropped as a
+target on 2026-08-30 (no App Check provider for it, never packaged) and the
+`windows/` folder was removed on 2026-11-16.
+
+**Status (2026-11-16):** version **1.2.1+7**. The web app is live at
+`app.dindin.cafelabs.net` (also https://dindin-cafelabs.web.app). On Android the
+app is in production on Google Play, Brazil only
+([listing](https://play.google.com/store/apps/details?id=com.cafelabs.dindin)):
+1.2.0 is the latest version confirmed live, and 1.2.1 was sent to Play on
+2026-11-16 and is awaiting review. Published versions and the release flow:
+`docs/DEPLOY.md`. Legal pages (public, hosted by the `dindin-landing` site, not
+in `docs/`): privacy policy https://dindin.cafelabs.net/privacidade; terms of use
+(`/termos`) and account deletion (`/excluir-conta`) on the same host. The source
+text of the first two is in `legal/`.
+
+**What is not verified:** the onboarding tutorials, the theme selector, the
+opening animation and the in-app update indicator were validated in widget tests
+and emulators/renders only, not on a real device. The full list is in
+`docs/PENDENCIAS.md`.
 
 ## Stack
 
@@ -26,7 +45,11 @@ Language, or following the device's locale).
 | Charts | `fl_chart` |
 | Dates/currency | `intl` (`pt_BR` / BRL) |
 | i18n | `flutter_localizations` + ARB (PT template, EN) |
-| Backend | Firebase (Auth + Firestore), project `dindin-cafelabs` |
+| Local preferences | `shared_preferences` (language, theme) |
+| Illustrations | `flutter_svg` (`assets/illustrations/`, `assets/logo.svg`) |
+| Backend | Firebase (Auth + Firestore), project `dindin-cafelabs`, Spark (free) plan |
+| Abuse/analytics | Firebase App Check (Play Integrity on Android; sending tokens, not enforced) and Firebase Analytics (opt-out in Ajustes) |
+| Updates | Google Play in-app update (`in_app_update`, Android from Play only) |
 
 ## Structure (overview)
 
@@ -35,12 +58,21 @@ lib/
   main.dart / app.dart   # bootstrap, theme, routes (go_router)
   theme/                 # "Warm Envelope" visual identity — see docs/DESIGN.md
   l10n/                   # ARB (app_pt.arb template, app_en.arb)
-  models/                # Category, Income, Allocation, Expense
-  providers/             # Riverpod providers (includes localeProvider)
-  services/              # auth, Firestore CRUD, aggregations, import/export
-  features/              # one folder per screen (dashboard, income, expenses, categories, settings, auth)
-  widgets/                # shared components
+  models/                # Category, Income, Allocation, Expense, Subscription,
+                         # InstallmentPurchase, tutorial progress
+  providers/             # Riverpod providers (data streams, locale, theme, tutorials)
+  services/              # auth, Firestore CRUD, aggregations, recurring-charge
+                         # schedule, import/export, analytics, Play in-app update
+  features/              # one folder per screen (dashboard, receitas, gastos,
+                         # assinaturas, parcelamentos, categorias, settings, auth)
+  widgets/                # shared components; widgets/tutorial/ = onboarding engine;
+                         # splash_gate.dart = opening animation
+assets/                  # fonts, logo, illustrations (SVG)
 functions/               # Cloud Functions — INACTIVE, see functions/README.md
+scripts/                 # deploy.sh, release_android.sh, backfill/sweep scripts (Node)
+test/                    # Flutter tests + test/rules (Firestore rules harness)
+docs/                    # architecture, backend, deploy, design, Play Console, open items
+legal/                   # source text of the privacy policy and terms (published on the site)
 ```
 
 Per-file breakdown, the data flow (Riverpod → aggregation → UI), and the
@@ -51,7 +83,6 @@ full Firestore schema are in `docs/ARQUITETURA.md`.
 ```bash
 flutter pub get
 flutter run -d chrome      # Web
-flutter run -d windows     # Windows desktop
 flutter run                # Android (connected emulator/device)
 ```
 
@@ -60,6 +91,9 @@ flutter run                # Android (connected emulator/device)
 The app talks only to its own Firebase project (`dindin-cafelabs`) — there's
 no separate backend to point at and no `.env` file.
 
+- Flutter version: CI pins Flutter `3.44.4` (stable channel,
+  `.github/workflows/ci.yml`); the Dart SDK constraint in `pubspec.yaml` is
+  `^3.12.2`. Use the same Flutter to avoid surprises.
 - `lib/firebase_options.dart` and `android/app/google-services.json` —
   Firebase Web/Android app config (API key, project id, app id), generated by
   `flutterfire configure`. Both are **committed on purpose**: this is
@@ -72,6 +106,16 @@ no separate backend to point at and no `.env` file.
 - Google Sign-In on Android/Windows additionally needs the app's SHA-1
   registered in the Firebase console (a one-time console step, not a local
   file) — see `docs/ARQUITETURA.md`, "Login diverges between Web and native".
+- `android/key.properties` (not in the repo; template
+  `android/key.properties.example`) points to the Play **upload keystore**, which
+  must live outside the repo. Only needed to build a signed `.aab` with
+  `scripts/release_android.sh`; without it a release build falls back to the
+  debug key (fine for CI, rejected by Play). See `docs/DEPLOY.md`.
+- Firebase App Check: Android release builds ask for a Play Integrity token and
+  debug builds use the debug provider (its token must be registered once in the
+  Firebase Console, App Check → Apps → debug tokens). Web has no App Check yet
+  (`_recaptchaV3SiteKey` in `lib/main.dart` is a placeholder). See
+  `docs/BACKEND.md`, "App Check".
 - The admin-only scripts (`scripts/backfill_balances.mjs`,
   `scripts/deploy.sh`) need their own Google Cloud credentials (`gcloud auth
   application-default login`, or a service-account key via
@@ -85,9 +129,13 @@ flutter pub get
 flutter test
 ```
 
-Covers `test/features` (widget tests per screen), `test/services` (incl. the
-pure money math in `aggregation_service_test.dart`), `test/models`,
-`test/utils`, and `test/widgets`. No extra setup beyond `flutter pub get`.
+715 tests pass as of 2026-11-16. Covers `test/features` (widget tests per
+screen, the onboarding tutorials, empty states, and `layout_sweep_test.dart`,
+which renders every screen at 320-900 px, text scale x1.3, in pt and en),
+`test/services` (incl. the pure money math in `aggregation_service_test.dart`),
+`test/providers`, `test/models`, `test/utils`, and `test/widgets`. No extra
+setup beyond `flutter pub get`. Nothing here runs on a real device or exercises
+the real Play in-app update.
 
 The Firestore Security Rules — the `getAfter()`/genesis-teardown paths in
 particular — can't be exercised from `flutter test`; they're a separate Node
@@ -101,14 +149,16 @@ firebase emulators:start --only firestore
 cd test/rules && npm install && npm test
 ```
 
-`npm test` there runs both `rules.test.mjs` (the rules themselves) and
-`backfill.test.mjs` (which spawns `scripts/backfill_balances.mjs` as a real
+`npm test` there runs both `rules.test.mjs` (the rules themselves; 128 tests) and
+`backfill.test.mjs` (9 tests; it spawns `scripts/backfill_balances.mjs` as a real
 subprocess, so it needs its own `cd scripts && npm install` done once too).
 CI (`.github/workflows/ci.yml`) runs the same two files against an
 auto-managed emulator on every push to `main`, if you'd rather see the exact
 invocation than run two terminals locally.
 
 ## Build and deploy
+
+Web (Firebase Hosting) and Android (Google Play) ship separately.
 
 For a UI-only change (not touching `firestore.rules`, indexes, or the
 balances schema), the usual manual flow still applies:
@@ -126,7 +176,14 @@ required order. See `docs/DEPLOY.md` (rollback and details) and
 CI (`.github/workflows/ci.yml`) runs `flutter analyze`, `flutter test`, and
 the rules tests on the emulator on every push to `main` — it does not deploy.
 
-Web deployed at https://dindin-cafelabs.web.app.
+Web deployed at https://dindin-cafelabs.web.app (and `app.dindin.cafelabs.net`).
+
+**Android release:** `scripts/release_android.sh` bumps `versionCode`, runs
+analyze + tests, builds a signed `.aab` and checks the signature is not the debug
+key; the Play Console upload is manual; releases are tagged `vX.Y.Z`. Rules/schema
+changes always go through `scripts/deploy.sh` first. Details, the list of
+published versions and rollback limits (there is no rollback on Play):
+`docs/DEPLOY.md`.
 
 ## Backup/restore
 
@@ -143,3 +200,14 @@ data between accounts/environments.
 - `docs/DEPLOY.md` — CI, deploy, and rollback.
 - `docs/BACKEND.md` — money integrity model (denormalized balances,
   Firestore Security Rules).
+- `docs/PLAY_CONSOLE.md` — Play Console status (declarations done and pending),
+  store listing, Google Sign-In OAuth setup.
+- `docs/onboarding-design.md` — design rationale and what was built for the
+  onboarding tutorials (Portuguese only).
+- `docs/PENDENCIAS.md` — open items, accepted risks, dependencies, and what is
+  not verified yet.
+- `docs/PROGRESSO.md` — where the work stands.
+- `docs/play-store-assets/README.md` — which store graphics exist (the PNGs are
+  not versioned).
+- `CLAUDE.md` — short pointer for AI coding agents; everything substantive lives
+  in the files above.
