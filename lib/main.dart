@@ -11,6 +11,7 @@ import 'app.dart';
 import 'firebase_options.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
+import 'widgets/splash_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,7 @@ void main() async {
         localeProvider.overrideWith((ref) => savedLocale),
         themeModeProvider.overrideWith((ref) => savedThemeMode),
       ],
-      child: const DindinApp(),
+      child: const SplashGate(child: DindinApp()),
     ),
   );
 }
