@@ -1074,7 +1074,7 @@ class _FirstStepsCard extends StatelessWidget {
           Text(l10n.firstStepsIntro, style: TextStyle(fontSize: 12, color: tokens.muted)),
           const SizedBox(height: 8),
           step(1, l10n.firstStepCreate, created, l10n.firstStepCreateAction, () => context.go('/categorias')),
-          step(2, l10n.firstStepIncome, incomeAdded, l10n.firstStepIncomeAction, () => context.go('/receitas')),
+          step(2, l10n.firstStepIncome, incomeAdded, l10n.firstStepIncomeAction, () => showQuickEntrySheet(context, income: true)),
           step(3, l10n.firstStepAllocate, allocated, l10n.firstStepAllocateAction, canAllocate ? onAllocate : null),
         ],
       ),

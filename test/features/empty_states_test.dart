@@ -147,7 +147,7 @@ void main() {
       expect(allocate.onPressed, isNull);
     });
 
-    testWidgets('"Criar" abre Categorias e "Lançar" abre Receitas', (tester) async {
+    testWidgets('"Criar" abre Categorias e "Lançar" abre o popup de receita', (tester) async {
       await pumpPage(tester, const DashboardPage());
       await tester.tap(find.widgetWithText(TextButton, 'Criar'));
       await tester.pumpAndSettle();
@@ -156,7 +156,8 @@ void main() {
       await pumpPage(tester, const DashboardPage());
       await tester.tap(find.widgetWithText(TextButton, 'Lançar'));
       await tester.pumpAndSettle();
-      expect(location, '/receitas');
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(location, '/', reason: 'não sai do Dashboard');
     });
 
     testWidgets('passo feito vira "Feito" riscado; com a caixinha criada só falta receita e alocar', (tester) async {
