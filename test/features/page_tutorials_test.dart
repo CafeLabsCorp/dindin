@@ -25,6 +25,7 @@ import 'package:dindin/providers/providers.dart';
 import 'package:dindin/services/firestore_service.dart';
 import 'package:dindin/theme/theme.dart';
 import 'package:dindin/widgets/app_shell.dart' show AppNavigation;
+import 'package:dindin/widgets/nav_menu_state.dart';
 
 class _MockFirestoreService extends Mock implements FirestoreService {}
 
@@ -164,4 +165,16 @@ void main() {
       verifyNever(() => firestore.setTutorialProgress(any(), any()));
     });
   }
+
+  testWidgets('com o menu de páginas aberto o tutorial espera; ao fechar, começa', (tester) async {
+    addTearDown(() => navMenuOpen.value = false);
+    navMenuOpen.value = true;
+    await pumpPage(tester, const ReceitasPage());
+    await settle(tester);
+    expect(find.text('Lance o que entrou'), findsNothing);
+
+    navMenuOpen.value = false;
+    await settle(tester);
+    expect(find.text('Lance o que entrou'), findsOneWidget);
+  });
 }

@@ -12,6 +12,7 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../utils/format.dart';
 import 'menu_chevron.dart';
+import 'nav_menu_state.dart';
 
 /// Every top-level destination, in the SAME order as the branches in
 /// `app.dart` — the index is what `goBranch` takes, so the two lists are one
@@ -405,6 +406,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     BuildContext context,
     List<({IconData icon, IconData selectedIcon, String label, String description})> destinations,
   ) {
+    navMenuOpen.value = true;
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -467,7 +469,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
         ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
         child: child,
       ),
-    );
+    ).whenComplete(() => navMenuOpen.value = false);
   }
 }
 

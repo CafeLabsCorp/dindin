@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/tutorial_progress.dart';
 import '../../providers/providers.dart';
+import '../nav_menu_state.dart';
 import 'tutorial.dart';
 
 /// Starts [page]'s tutorial the first time the page is on screen and ready,
@@ -50,7 +51,21 @@ class _TutorialHostState extends ConsumerState<TutorialHost> {
   int _attempts = 0;
 
   @override
+  void initState() {
+    super.initState();
+    navMenuOpen.addListener(_onMenuChanged);
+  }
+
+  // The menu closing is the calm moment: try again from scratch.
+  void _onMenuChanged() {
+    if (navMenuOpen.value || _started || !mounted) return;
+    _attempts = 0;
+    _schedule(_settle);
+  }
+
+  @override
   void dispose() {
+    navMenuOpen.removeListener(_onMenuChanged);
     _timer?.cancel();
     super.dispose();
   }
@@ -63,6 +78,7 @@ class _TutorialHostState extends ConsumerState<TutorialHost> {
   bool get _calm {
     if (!TickerMode.valuesOf(context).enabled) return false; // another tab is showing
     if (ModalRoute.of(context)?.isCurrent == false) return false; // a dialog is on top
+    if (navMenuOpen.value) return false; // the page menu is open (root dialog)
     if (MediaQuery.viewInsetsOf(context).bottom > 0) return false; // keyboard open
     return true;
   }
