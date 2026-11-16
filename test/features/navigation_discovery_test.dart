@@ -17,7 +17,6 @@ import 'package:dindin/models/expense.dart';
 import 'package:dindin/models/income.dart';
 import 'package:dindin/models/installment_purchase.dart';
 import 'package:dindin/models/subscription.dart';
-import 'package:dindin/providers/focus_request.dart';
 import 'package:dindin/providers/providers.dart';
 import 'package:dindin/services/firestore_service.dart';
 import 'package:dindin/theme/theme.dart';
@@ -28,8 +27,6 @@ void main() {
   setUpAll(() async {
     await initializeDateFormatting('pt_BR');
   });
-
-  late ProviderContainer container;
 
   Future<void> pumpApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(400, 900);
@@ -62,7 +59,6 @@ void main() {
         ],
         child: Consumer(
           builder: (context, ref, _) {
-            container = ProviderScope.containerOf(context);
             return MaterialApp.router(
               routerConfig: router,
               theme: AppTheme.light(),
@@ -77,9 +73,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  String? focusedFieldLabel(WidgetTester tester) {
-    final focused = tester.widgetList<TextField>(find.byType(TextField)).where((f) => f.focusNode?.hasFocus ?? false);
-    return focused.isEmpty ? null : focused.first.decoration?.labelText;
+  bool amountHasFocus(WidgetTester tester) {
+    final editable = find.descendant(of: find.widgetWithText(TextField, 'Valor'), matching: find.byType(EditableText));
+    return tester.widget<EditableText>(editable).focusNode.hasFocus;
   }
 
   testWidgets('o Dashboard tem "Lançar receita" e "Lançar gasto" logo abaixo do saldo', (tester) async {
@@ -89,26 +85,26 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Lançar gasto'), findsOneWidget);
   });
 
-  testWidgets('"Lançar receita" abre Receitas com o cursor no Valor', (tester) async {
+  testWidgets('"Lançar receita" abre o formulário ali mesmo, com o cursor no Valor', (tester) async {
     await pumpApp(tester);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Lançar receita'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Receitas lançadas'), findsOneWidget);
-    expect(focusedFieldLabel(tester), 'Valor');
-    expect(container.read(focusRequestProvider), isNull, reason: 'o pedido é consumido');
+    expect(find.text('Receitas lançadas'), findsNothing, reason: 'não sai do Dashboard');
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(amountHasFocus(tester), isTrue);
   });
 
-  testWidgets('"Lançar gasto" abre Gastos com o cursor no Valor', (tester) async {
+  testWidgets('"Lançar gasto" abre o formulário ali mesmo, com o cursor no Valor', (tester) async {
     await pumpApp(tester);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Lançar gasto'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Gastos lançados'), findsOneWidget);
-    expect(focusedFieldLabel(tester), 'Valor');
-    expect(container.read(focusRequestProvider), isNull);
+    expect(find.text('Gastos lançados'), findsNothing, reason: 'não sai do Dashboard');
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(amountHasFocus(tester), isTrue);
   });
 
   testWidgets('o título do menu tem o chip do chevron e área de toque de pelo menos 48 dp', (tester) async {

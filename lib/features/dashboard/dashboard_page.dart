@@ -11,7 +11,6 @@ import '../../widgets/tutorial/tutorial_host.dart';
 import '../../widgets/app_shell.dart';
 import '../../models/category.dart';
 import '../../models/tutorial_progress.dart';
-import '../../providers/focus_request.dart';
 import '../../providers/providers.dart';
 import '../../theme/colors.dart';
 import '../../theme/theme.dart';
@@ -19,6 +18,7 @@ import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../utils/money_input_formatter.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/quick_entry_sheet.dart';
 import '../../widgets/caixinha_budget_bar.dart';
 import '../../widgets/caixinha_color_dot.dart';
 import '../../widgets/stat_tile.dart';
@@ -172,25 +172,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           const SizedBox(height: 12),
           // The complaint that started the onboarding work was "I couldn't find
           // where to add an income or expense", and this is where everyone
-          // lands. Each button opens that page with the cursor in the amount.
+          // lands. Each button opens the entry form right here (a sheet, or a
+          // dialog on wide screens) with the cursor in the amount.
           Row(
             children: [
               Expanded(
                 child: FilledButton.tonal(
-                  onPressed: () {
-                    ref.read(focusRequestProvider.notifier).state = FocusRequest.incomeAmount;
-                    context.go('/receitas');
-                  },
+                  onPressed: () => showQuickEntrySheet(context, income: true),
                   child: Text(l10n.dashboardQuickIncome),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.tonal(
-                  onPressed: () {
-                    ref.read(focusRequestProvider.notifier).state = FocusRequest.expenseAmount;
-                    context.go('/gastos');
-                  },
+                  onPressed: () => showQuickEntrySheet(context, income: false),
                   child: Text(l10n.dashboardQuickExpense),
                 ),
               ),
