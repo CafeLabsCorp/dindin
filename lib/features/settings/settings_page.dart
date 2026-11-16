@@ -353,9 +353,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
                 // lines on narrow screens; the filled segment already marks it.
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: null, label: Text(l10n.languageSystemOption)),
-                  const ButtonSegment(value: Locale('pt'), label: Text('Português')),
-                  const ButtonSegment(value: Locale('en'), label: Text('English')),
+                  ButtonSegment(value: null, label: _segmentLabel(l10n.languageSystemOption)),
+                  ButtonSegment(value: const Locale('pt'), label: _segmentLabel('Português')),
+                  ButtonSegment(value: const Locale('en'), label: _segmentLabel('English')),
                 ],
                 selected: {ref.watch(localeProvider)},
                 onSelectionChanged: (set) => setLocalePreference(ref, set.first),
@@ -375,9 +375,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
               SegmentedButton<ThemeMode>(
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: ThemeMode.system, label: Text(l10n.themeSystemOption)),
-                  ButtonSegment(value: ThemeMode.light, label: Text(l10n.themeLightOption)),
-                  ButtonSegment(value: ThemeMode.dark, label: Text(l10n.themeDarkOption)),
+                  ButtonSegment(value: ThemeMode.system, label: _segmentLabel(l10n.themeSystemOption)),
+                  ButtonSegment(value: ThemeMode.light, label: _segmentLabel(l10n.themeLightOption)),
+                  ButtonSegment(value: ThemeMode.dark, label: _segmentLabel(l10n.themeDarkOption)),
                 ],
                 selected: {ref.watch(themeModeProvider)},
                 onSelectionChanged: (set) => setThemePreference(ref, set.first),
@@ -540,3 +540,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> with WidgetsBinding
     );
   }
 }
+
+/// A segment label that stays on one line: on a narrow screen it shrinks a
+/// little instead of breaking a word in two ("Sist-ema").
+Widget _segmentLabel(String text) => FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(text, maxLines: 1, softWrap: false),
+);

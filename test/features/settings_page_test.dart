@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -102,6 +103,20 @@ void main() {
     await tester.scrollUntilVisible(finder, 300);
     await tester.pumpAndSettle();
   }
+
+  testWidgets('os rótulos dos seletores de tema e idioma ficam numa linha só em tela estreita', (tester) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpPage(tester, startLocale: const Locale('pt'));
+
+    for (final label in ['Sistema', 'Claro', 'Escuro', 'Português', 'English']) {
+      final box = tester.renderObject<RenderParagraph>(find.text(label).first);
+      expect(box.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: label.length)).length, 1, reason: label);
+    }
+  });
 
   testWidgets('renderiza a seção de idioma e o rótulo "Sair" em pt quando o locale é pt', (tester) async {
     await pumpPage(tester, startLocale: const Locale('pt'));
