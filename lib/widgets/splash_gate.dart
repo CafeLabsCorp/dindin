@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,8 +8,9 @@ import '../providers/theme_provider.dart';
 import '../theme/colors.dart';
 
 /// Plays the opening animation on top of [child] (the whole app, already
-/// building underneath), then removes itself: the money bag rises limp, coins
-/// drop into it, it fills out and the app shows through.
+/// building underneath), then removes itself: the money bag sits at its normal
+/// size, coins fall into it from above the screen and each one makes it shake a
+/// little; then it comes forward and the app shows through.
 ///
 /// Not shown when the system asks for reduced motion. Lives in `main()`, above
 /// `DindinApp`, so widget tests of the app never see it.
@@ -15,8 +18,8 @@ class SplashGate extends ConsumerStatefulWidget {
   final Widget child;
   const SplashGate({super.key, required this.child});
 
-  /// Total length of the animation (the last tenth is the fade into the app).
-  static const duration = Duration(milliseconds: 2000);
+  /// Total length of the animation (the last ~20% is the way into the app).
+  static const duration = Duration(milliseconds: 1500);
 
   @override
   ConsumerState<SplashGate> createState() => _SplashGateState();
@@ -79,29 +82,58 @@ class _SplashOverlay extends StatelessWidget {
   final Color background;
   const _SplashOverlay({required this.animation, required this.background});
 
-  static const _coinStarts = [0.20, 0.30, 0.40];
-  static const _coinOffsets = [-0.035, 0.04, 0.0]; // x, in bag-sizes
-  static const _fallSpan = 0.24;
+  static const _totalMs = 1500.0;
+  // Each coin: when it starts to fall, how long the fall takes (ms), its x
+  // offset (in bag-sizes) and a little tilt (radians) so they don't look cloned.
+  static const _coinStartMs = [120.0, 320.0, 520.0];
+  static const _fallMs = 300.0;
+  static const _coinX = [-0.04, 0.045, 0.0];
+  static const _coinTilt = [-0.25, 0.3, -0.15];
+  // How hard each landing shakes the bag (the last one a bit more).
+  static const _hit = [0.8, 1.0, 1.3];
+  static const _exitStartMs = 1180.0;
+
+  /// A damped shake that starts at 0, swings and dies out: the bag's reaction
+  /// to a coin landing. [since] is the time since the landing, in ms.
+  static double _shake(double since) {
+    if (since <= 0) return 0;
+    final x = since / 1000;
+    return math.exp(-x * 9) * math.sin(x * 34);
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, _) {
-        final t = animation.value;
-        double phase(double from, double to, [Curve curve = Curves.linear]) =>
-            curve.transform(((t - from) / (to - from)).clamp(0.0, 1.0));
+        final ms = animation.value * _totalMs;
+        final exit = Curves.easeInCubic.transform(((ms - _exitStartMs) / (_totalMs - _exitStartMs)).clamp(0.0, 1.0));
 
-        final rise = phase(0.0, 0.30, Curves.easeOutCubic);
-        final inflate = phase(0.62, 0.88, Curves.easeOutBack);
-        final fadeOut = phase(0.90, 1.0, Curves.easeIn);
+        // Uniform, small deformations only: the bag keeps its shape.
+        var squash = 0.0; // + = pressed down
+        var sway = 0.0; // rotation, radians
+        for (var i = 0; i < _coinStartMs.length; i++) {
+          final j = _shake(ms - (_coinStartMs[i] + _fallMs));
+          squash += _hit[i] * j;
+          sway += _hit[i] * j * (i.isEven ? 1 : -1);
+        }
+        final sy = 1 - 0.045 * squash;
+        final sx = 1 + 0.03 * squash;
+        final angle = 0.022 * sway;
+        // On the way out it comes toward you while the screen opens.
+        final zoom = 1 + 0.14 * exit;
 
         return LayoutBuilder(
           builder: (context, box) {
             final s = (box.biggest.shortestSide * 0.75).clamp(180.0, 400.0);
             final coin = s * 0.17;
+            // Where the top edge of the screen is, in the bag box's own
+            // coordinates: coins start just above it, so they come from
+            // outside the screen instead of appearing.
+            final screenTop = -(box.maxHeight - s) / 2 - coin;
+            final landY = s * 0.30; // hidden behind the bag's mouth by then
             return Opacity(
-              opacity: 1 - fadeOut,
+              opacity: 1 - exit,
               child: ColoredBox(
                 color: background,
                 child: Center(
@@ -113,32 +145,35 @@ class _SplashOverlay extends StatelessWidget {
                       children: [
                         // Coins first: they drop out of sight behind the bag's
                         // mouth, so they read as falling inside.
-                        for (var i = 0; i < _coinStarts.length; i++)
+                        for (var i = 0; i < _coinStartMs.length; i++)
                           () {
-                            final fall = phase(_coinStarts[i], _coinStarts[i] + _fallSpan, Curves.easeIn);
+                            final f = ((ms - _coinStartMs[i]) / _fallMs).clamp(0.0, 1.0);
+                            final fall = Curves.easeInQuad.transform(f);
+                            final y = screenTop + (landY - screenTop) * fall;
                             return Positioned(
-                              left: s * (0.5 + _coinOffsets[i]) - coin / 2,
-                              top: s * (-0.40 + 0.72 * fall) - coin / 2 + s * 0.12 * (1 - rise),
-                              child: Opacity(
-                                opacity: fall > 0 && fall < 1 ? 1 : 0,
-                                child: SvgPicture.asset('assets/illustrations/dindin-moeda.svg', width: coin, height: coin),
+                              left: s * (0.5 + _coinX[i]) - coin / 2,
+                              top: y - coin / 2,
+                              child: Visibility(
+                                visible: f > 0 && f < 1,
+                                child: Transform.rotate(
+                                  angle: _coinTilt[i] * (1 - f),
+                                  child: SvgPicture.asset(
+                                    'assets/illustrations/dindin-moeda.svg',
+                                    width: coin,
+                                    height: coin,
+                                  ),
+                                ),
                               ),
                             );
                           }(),
-                        Opacity(
-                          opacity: rise,
-                          child: Transform.translate(
-                            offset: Offset(0, s * 0.18 * (1 - rise)),
-                            child: Transform(
-                              alignment: Alignment.bottomCenter,
-                              // Limp (shorter and a bit wider) until it fills.
-                              transform: Matrix4.diagonal3Values(
-                                1.07 - 0.07 * inflate,
-                                0.78 + 0.22 * inflate,
-                                1,
-                              ),
-                              child: SvgPicture.asset('assets/logo.svg', width: s, height: s),
-                            ),
+                        Transform.scale(
+                          scale: zoom,
+                          child: Transform(
+                            alignment: Alignment.bottomCenter,
+                            transform: Matrix4.identity()
+                              ..rotateZ(angle)
+                              ..scaleByDouble(sx, sy, 1, 1),
+                            child: SvgPicture.asset('assets/logo.svg', width: s, height: s),
                           ),
                         ),
                       ],
