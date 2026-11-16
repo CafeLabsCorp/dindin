@@ -74,10 +74,6 @@ Gravidade: `bloqueia lançamento`, `importante`, `menor`.
   _origem:_ board, 2026-09-23. _gravidade:_ menor.
 - [ ] **Sem projeto Firebase separado de dev/prod** (só `dindin-cafelabs`).
   _origem:_ board. _gravidade:_ menor.
-- [ ] **Comentários desatualizados em `lib/`** (não editados, passada só de docs):
-  o comentário de App Check em `lib/main.dart` diz que o app ainda não está no Play
-  Console; `lib/widgets/app_shell.dart` cita um `FLUTTER_MIGRATION.md` que não
-  existe mais. _origem:_ docs, 2026-11-16. _gravidade:_ menor.
 
 ## Riscos aceitos
 
@@ -135,5 +131,3 @@ apagada; não há UI dedicada de erro de stream planejada.
   lançar → Produção → histórico de versões); o histórico dos `versionCode`s 1-2
   (desconhecido, só registro); se a grafia do `<title>` de `web/index.html` foi
   resolvida.
-- `docs/ARQUITETURA.pt-br.md`: se o comentário `FLUTTER_MIGRATION.md` em
-  `lib/widgets/app_shell.dart` deve ser removido ou mantido como histórico.

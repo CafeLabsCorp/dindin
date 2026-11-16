@@ -747,20 +747,6 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   de remover com explicação. As rules (`catDebtFree`, `convertsSpendToSave`)
   seguem como a garantia que não dá pra contornar.
 
-- **O comentário de App Check em `lib/main.dart` está desatualizado.** Diz que o
-  app "NOT in the Play Console yet"; o app está publicado. O comportamento não
-  mudou (Play Integrity em release, provider de debug em debug, web pulada até
-  existir uma chave reCAPTCHA v3). Correção só de comentário, deixada pra quem
-  mexer em `lib/` da próxima vez.
-
-- **`lib/widgets/app_shell.dart` cita `FLUTTER_MIGRATION.md` num comentário**
-  ("per §4 of FLUTTER_MIGRATION.md") — esse arquivo não existe mais no repo
-  (a migração do Next.js foi concluída e seus docs removidos, ver histórico
-  de `git log` em torno de `d774ffb`/`135d006`). TODO: confirmar se esse
-  comentário deveria ser atualizado/removido do código, ou se foi deixado
-  como referência histórica intencional — não é algo que este documento
-  decide sozinho.
-
 ## Testes
 
 `flutter test` roda 715 testes (todos passando em 2026-11-16, quando isto foi

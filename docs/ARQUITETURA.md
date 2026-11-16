@@ -753,19 +753,6 @@ which is exactly how the older docs already behaved.
   the remove button with an explanation. The server rules (`catDebtFree`,
   `convertsSpendToSave`) remain the non-bypassable guarantee.
 
-- **`lib/main.dart`'s App Check comment is out of date.** It says the app "is
-  NOT in the Play Console yet"; the app is published. Behavior is unchanged
-  (Play Integrity in release, debug provider in debug, web skipped until a
-  reCAPTCHA v3 key exists). Comment-only fix, left for whoever next touches
-  `lib/`.
-
-- **`lib/widgets/app_shell.dart` cites `FLUTTER_MIGRATION.md` in a comment**
-  ("see §4 of FLUTTER_MIGRATION.md") — that file no longer exists in the repo
-  (the Next.js migration was completed and its docs removed, see the `git
-  log` history around `d774ffb`/`135d006`). TODO: confirmar whether that
-  comment should be updated/removed from the code, or was left intentionally
-  as historical reference — not something this document decides on its own.
-
 ## Tests
 
 `flutter test` runs 715 tests (all passing on 2026-11-16 when this was

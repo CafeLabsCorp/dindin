@@ -39,10 +39,6 @@ developer needs to know. Other docs link here instead of repeating items.
 - [ ] **A stream error looks like "still loading"** in the UI (no dedicated
   error state; none is planned, maintainer 2026-11-16). See `docs/BACKEND.md`, integration surface. _origem:_ docs,
   2026-11-16. _gravidade:_ menor.
-- [ ] **Stale comments in `lib/`** (comment-only, not changed by the docs pass):
-  `lib/main.dart` says the app is "NOT in the Play Console yet" (line 42);
-  `lib/widgets/app_shell.dart` cites a `FLUTTER_MIGRATION.md` that no longer
-  exists (line 36). _origem:_ docs, 2026-11-16. _gravidade:_ menor.
 - [ ] **Inconsistent spelling:** Android label and Play title use "Dindin",
   `web/index.html`'s `<title>` is still `dindin`. _origem:_ docs, 2026-11-16.
   _gravidade:_ menor.
@@ -94,5 +90,3 @@ deleted; no dedicated stream-error UI is planned.
   maintainer doesn't remember; check Play Console → Test and release →
   Production → release history); the exact history of `versionCode` 1-2 (unknown,
   only a record).
-- `docs/ARQUITETURA.md`: whether the `FLUTTER_MIGRATION.md` comment in
-  `app_shell.dart` should be removed.
