@@ -39,10 +39,10 @@ void main() async {
 ///  - Android: Play Integrity in release builds, the debug provider under
 ///    `kDebugMode` (prints a token that has to be registered once in
 ///    Firebase Console -> App Check -> Apps -> (debug tokens) for local/CI
-///    builds to keep working). The app is NOT in the Play Console yet (see
-///    the Forge board) — a Play Integrity token won't verify until it is —
-///    but activating now means production builds are already sending
-///    tokens the day the app IS published, with nothing left to ship then.
+///    builds to keep working). The app is published on Google Play, so
+///    production builds send Play Integrity tokens that verify; what is still
+///    pending is the console side (watch the App Check metrics, then decide on
+///    Enforce).
 ///  - Web: reCAPTCHA v3, gated on [_recaptchaV3SiteKey] actually being set.
 ///    It ISN'T yet: that key only exists after registering the web app in
 ///    Firebase Console -> App Check -> Apps, a manual console step nobody

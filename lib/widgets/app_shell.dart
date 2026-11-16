@@ -33,7 +33,7 @@ List<({IconData icon, IconData selectedIcon, String label, String description})>
 
 /// App-wide nav: a single menu behind the logo on narrow (mobile) screens, a
 /// side rail on wide (web/desktop) screens. The 720px breakpoint is the same
-/// one the responsive forms use — see §4 of FLUTTER_MIGRATION.md.
+/// one the responsive forms use (`showAdaptiveFormSheet`).
 class AppShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
