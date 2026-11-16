@@ -6,6 +6,50 @@ própria ficha no Play Console, e a configuração OAuth no Google Cloud da
 qual o login com Google depende. Escrito em setembro de 2026 depois de
 várias rodadas de tentativa e erro pra acertar as duas coisas.
 
+## Situação do console hoje (2026-11-16)
+
+Nada disto pode ser lido do repositório; vem das confirmações e prints do
+mantenedor registrados no board do projeto e não foi reverificado no console para
+este documento. Onde dá pra conferir no código, isso está dito.
+
+**Feito:**
+- App publicado na faixa de produção, **só Brasil** (LGPD, Firestore em São Paulo,
+  documentos legais brasileiros; ampliar depois é reversível). O teste fechado
+  obrigatório rodou desde 2026-09-25; o acesso à produção foi concedido em
+  2026-10-10; a 1.1.0 entrou no ar em 2026-10-30. Versões e fluxo: `docs/DEPLOY.pt-br.md`.
+- **Política de privacidade linkada** no console: a ficha pública mostra
+  `https://dindin.cafelabs.net/privacidade` (conferido em 2026-11-16, e o filtro
+  "Tarefas da política" do console não apontava pendência). O texto-fonte é
+  `legal/politica-de-privacidade.md`; as outras páginas públicas são `/termos` e
+  `/excluir-conta` no mesmo host (existem como rotas na `dindin-landing`; o
+  mantenedor confirmou em 2026-11-16 que as três respondem em produção).
+- **Formulário de Segurança dos Dados** preenchido e confirmado em 2026-10-30,
+  incluindo a coleta declarada pela decisão de analytics (IDs de dispositivo,
+  atividade no app, local aproximado, compartilhado com o Google). Classificação
+  de conteúdo, declaração de recursos financeiros e público-alvo também
+  confirmados. Texto e gráficos da ficha: ver abaixo e
+  `docs/play-store-assets/README.md`.
+- **Play Integrity API:** todas as respostas de veredito estão ativadas no console
+  (confirmado por print, não custa nada). No código, `lib/main.dart` ativa o
+  Firebase App Check com `AndroidPlayIntegrityProvider` em builds de release, então
+  os builds de produção já enviam tokens.
+
+**Ainda pendente no console (nada aqui é mudança de código):**
+- **Declaração de status de comerciante, prazo 2027-02-01.** Aviso do Google na
+  página inicial do console ("Ação necessária"); sem declarar, o perfil de
+  desenvolvedor e seus apps são removidos da Play no mundo todo. É da conta de
+  desenvolvedor (hoje conta pessoal), não só do Dindin. A escolha (comerciante ou
+  não) e os dados públicos do perfil são do mantenedor; consultar o advogado se
+  houver dúvida. Ainda não declarado em 2026-11-16.
+- **O "Enforce" do App Check não está ligado** no Firestore/Authentication, e o
+  projeto do Google Cloud vinculado ao Play Integrity ainda precisa ser
+  confirmado. Ligar o Enforce também barra o cliente web (sem App Check na web,
+  decisão de 2026-09-21), então decidir isso antes. Detalhes em
+  `docs/BACKEND.pt-br.md`, "App Check".
+- O aviso de "versão de teste interno" que a Play mostrava na conta depois da
+  lista de testadores ser removida foi marcado como corrigido em 2026-10-30; sem
+  ação.
+
 ## Saindo do status "Rascunho"
 
 Um app novo no Play Console fica em Rascunho até todo item de "Termine de
@@ -42,12 +86,15 @@ publicada:
 - **Informações financeiras** (transações, saldos, categorias de orçamento
   — o dado principal do app) — coletado, obrigatório, não compartilhado,
   criptografado em trânsito.
-- **Local aproximado** — só se/quando alguma funcionalidade realmente ler
-  isso; caso contrário declarar "não coletado." Conferir contra o código
-  atual antes de responder, esse formulário é uma superfície de
-  compliance, não um chute.
+- **Local aproximado** — originalmente "só se alguma funcionalidade ler isso".
+  Como foi preenchido, o formulário o declara por causa do Firebase Analytics
+  (ver a seção de situação acima). Reconferir contra o código e a Política de
+  Privacidade sempre que eventos ou SDKs de analytics mudarem; esse formulário é
+  uma superfície de compliance, não um chute.
 - **Interações no app / identificadores de dispositivo** — vêm do Firebase
-  Analytics (os 4 eventos mínimos da rodada de segurança do `mobile`) e do
+  Analytics (hoje 4 eventos, nenhum com conteúdo financeiro: `account_created`,
+  `caixinha_created`, `first_expense_logged`, `export_used`, ver
+  `lib/services/analytics_service.dart`) e do
   Firebase App Check (Play Integrity). Ambos com opt-out em Ajustes →
   Privacidade.
 

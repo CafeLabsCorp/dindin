@@ -9,6 +9,11 @@ Play Console listing itself (Data Safety, store assets, testing tracks) and
 Google Sign-In's OAuth configuration/troubleshooting, see
 `docs/PLAY_CONSOLE.md`.
 
+Status at the time of writing (2026-11-16): version **1.2.1+7** was sent to
+Google Play on 2026-11-16 and is awaiting Google's review; **1.2.0+6 is the
+latest version confirmed approved and live**. See "Current release flow and
+published versions" below.
+
 Two distribution channels ship from this one repository, and they behave
 nothing alike:
 
@@ -21,6 +26,64 @@ nothing alike:
 
 Because of that third row, the Android section is worth reading in full before
 the first upload rather than during it.
+
+## Current release flow and published versions
+
+This is the flow actually used for every release since 1.1.0. The long
+"Upload runbook (first release)" further down is the one-time setup and is kept
+as history and reference.
+
+**Flow for one Android release:**
+
+1. **Work on `main`** and decide what ships. The maintainer decides when;
+   nothing is cut without his explicit go-ahead.
+2. **If the release touches `firestore.rules`, indexes or the balances schema,
+   deploy those first with `scripts/deploy.sh`** (backup → backfill → verify →
+   rules), never with a bare `firebase deploy`. Reason: rules affect web and
+   Android at once and cannot be rolled back with the app (see "Rollback on Play").
+   Only the maintainer runs it (it needs his Google Cloud credentials).
+   1.2.0 needed it (new `meta/tutorials` rule, `accountDeletionLog`; deployed
+   by the maintainer on 2026-11-13, before the upload); 1.2.1 had no rules
+   change, so no `deploy.sh`.
+3. **Run `scripts/release_android.sh [--version X.Y.Z]`.** In order: (1) signing
+   preflight (`android/key.properties` present, keystore outside the repo,
+   passwords non-empty); (2) bumps `pubspec.yaml`'s `versionCode` by 1 (and sets
+   `versionName` with `--version`); (3) `flutter pub get`, `flutter analyze`,
+   `flutter test`; (4) `flutter build appbundle --release`; (5) reads the signer
+   certificate back out of the bundle and aborts if it is the Android debug key.
+   Output: `build/app/outputs/bundle/release/app-release.aab`. It does not
+   commit, tag, push or upload.
+4. **Commit the `pubspec.yaml` bump and tag `vX.Y.Z`**, pushing both
+   (tags `v1.1.1`, `v1.1.2`, `v1.2.0`, `v1.2.1` exist; the script does not create
+   them, it is a manual convention. 1.1.0 predates it and has no tag, only commit
+   `dd90c0f`).
+5. **Keep the signed `.aab`.** The script leaves it at the path above; the
+   maintainer keeps a copy as `~/Downloads/dindin-<versionName>+<versionCode>.aab`
+   (a personal habit; nothing in the repo enforces the name or the location, and
+   `build/` is not versioned).
+6. **Upload manually in Play Console** (Dindin → Test and release → Production →
+   Create new release; distribution is **Brazil only** for now). The upload is
+   manual on purpose, see "Why the Play upload is manual". TODO: confirmar whether
+   each release used a staged rollout (the maintainer doesn't remember; it can be read in Play Console → Test and release → Production → release history) (the doc recommends it, the board doesn't
+   record the percentage used).
+7. **After Google approves**, the maintainer confirms and the version is recorded
+   below. Approval can take minutes to days.
+
+**Published versions** (dates from git tags/commits and the maintainer's
+confirmations; Play Console itself was not consulted for this document):
+
+| Version | Date | What it carried |
+|---|---|---|
+| 1.1.0+3 (commit `dd90c0f`, no tag) | sent 2026-10-15, approved and live 2026-10-30 | Launch update: usability fixes, clearer automatic charges, settled installments section, Play in-app update notice, pull-to-refresh catch-up |
+| 1.1.1+4 (`v1.1.1`) | 2026-11-10 | Fixed "update available" indicator (badge + menu item), re-checked on resume |
+| 1.1.2+5 (`v1.1.2`) | sent and approved 2026-11-11 | Fixes from the `mobile` review: block deleting a caixinha with transfers, edit arithmetic equal to the rules, local-time month, recent login before account deletion; dark store art |
+| 1.2.0+6 (`v1.2.0`) | generated 2026-11-13, approved 2026-11-16 | Onboarding (7 tutorials, guided empty states, first-steps card, discoverable navigation), theme selector, rest of the `mobile` review (495-record cascade limit, offline `ackOrQueue`, day-change refresh, resilient catch-ups, in-app update restarts only on tap) |
+| 1.2.1+7 (`v1.2.1`) | sent 2026-11-16, **awaiting review** | Tutorial no longer overlaps the page menu, quick-entry popup from the Dashboard, theme selector label fix, opening animation |
+
+`versionCode`s 1-2 were used before 1.1.0 (testing tracks); the
+exact history of those two uploads is unknown (the maintainer doesn't remember;
+it only matters as a record, since Play never reuses a `versionCode`). The web app (`scripts/deploy.sh` / Firebase
+Hosting) is versioned by the same `versionName` but is released independently.
 
 ## CI (`.github/workflows/ci.yml`)
 
@@ -36,8 +99,8 @@ expensive one, ~10 min per run.)
 - **`rules`** — spins up the Firestore emulator (`firebase-tools
   emulators:exec`) and runs `npm test` in `test/rules/`, which is
   `rules.test.mjs` (Security Rules — Phase-2 money-integrity, including the
-  `getAfter()`/null-teardown paths that can't be exercised from Dart; dozens
-  of cases across 8 `describe` blocks) **and** `backfill.test.mjs`
+  `getAfter()`/null-teardown paths that can't be exercised from Dart; 128 tests
+  across 19 `describe` blocks, counted in the file on 2026-11-16) **and** `backfill.test.mjs`
   (`scripts/backfill_balances.mjs`'s legitimate-debt-vs-corruption
   classification, run as a real subprocess against the same emulator), both
   in one pass. Uses the emulator only — never touches production, needs no
@@ -255,9 +318,11 @@ Play uploads, not product releases. Do not switch to a date-based code
 (`20260827`): it caps you at one upload per day and burns the integer space
 irreversibly.
 
-**First Play release: `1.0.0+1`.** Nothing has ever been uploaded, so code 1 is
-still free. `scripts/release_android.sh` bumps the code for you; CI checks the
-line still parses as `<major>.<minor>.<patch>+<code>`.
+**Current state:** `1.2.1+7`. The next upload needs a `versionCode` of at least
+8. `scripts/release_android.sh` bumps the code for you; CI checks the line still
+parses as `<major>.<minor>.<patch>+<code>`. (The first Play release was planned
+as `1.0.0+1`; the published history is in "Current release flow and published
+versions".)
 
 ### Build the App Bundle
 
@@ -330,10 +395,14 @@ symbol upload is automated. If you do turn it on, the command is
 the path is outside the repo, versioned per build, and must be backed up with
 the same discipline as the keystore.
 
-### Upload runbook (first release)
+### Upload runbook (first release — historical)
 
-Steps 1 and 2 are gated on Google and are the long pole — start them before
-anything else.
+This is the one-time setup that was followed for the first release (the app was
+created in September 2026 and reached production on 2026-10-30). It stays as a
+reference for rebuilding the setup or onboarding a second maintainer. For a
+routine release use "Current release flow" above.
+
+Steps 1 and 2 were gated on Google and were the long pole.
 
 1. **Identity verification.** The developer account is an individual account
    (Felipe Portes Antunes, opened 2026-08-25). Until Google finishes verifying
@@ -593,6 +662,13 @@ per-install or per-download cost, ever. Nothing to monitor financially.
   platform-side incidents.
 
 ## Settle before the first Play upload (some of it is permanent)
+
+> Historical checklist. The app has been published since 2026-10-30, so the
+> permanent items (package name `com.cafelabs.dindin`, upload/App Signing
+> fingerprints) are now fixed facts, and the privacy policy is published at
+> https://dindin.cafelabs.net/privacidade. Kept for what each item means. Re-checked
+> on 2026-11-16: `android:label` is `Dindin` and `web/index.html`'s `<title>` is
+> still `dindin` (the inconsistency noted below remains open).
 
 - **Package name `com.cafelabs.dindin`** — permanent. It cannot be changed
   after publication, and it cannot be reused even if you delete the app entry

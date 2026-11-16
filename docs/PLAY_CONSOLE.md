@@ -6,6 +6,48 @@ Console listing itself, and the Google Cloud OAuth configuration Google
 Sign-In depends on. Written up in September 2026 after both took several
 rounds of trial and error to get right.
 
+## Console status today (2026-11-16)
+
+None of this can be read from the repository; it comes from the maintainer's
+confirmations and screenshots recorded on the project board, and was not
+re-verified in the console for this document. Where it can be cross-checked in
+the code, that is said.
+
+**Done:**
+- App published on the production track, **Brazil only** (LGPD, Firestore in
+  São Paulo, Brazilian legal documents; widening later is reversible). Required
+  closed test ran from 2026-09-25; production access was granted on 2026-10-10;
+  1.1.0 went live on 2026-10-30. Versions and flow: `docs/DEPLOY.md`.
+- **Privacy policy linked** in the console: the public listing shows
+  `https://dindin.cafelabs.net/privacidade` (checked 2026-11-16, and the console's
+  "policy tasks" filter showed nothing pending). The source text is
+  `legal/politica-de-privacidade.md`; the other public pages are `/termos` and
+  `/excluir-conta` on the same host (they exist as routes in `dindin-landing`;
+  the maintainer confirmed on 2026-11-16 that all three resolve in production).
+- **Data Safety form** filled and confirmed on 2026-10-30, including the
+  collection declared by the Analytics decision (device IDs, app activity,
+  approximate location, shared with Google). Content rating, financial-features
+  declaration and target audience also confirmed. Store listing text and
+  graphics: see below and `docs/play-store-assets/README.md`.
+- **Play Integrity API:** all verdict responses are enabled in the console
+  (confirmed from a screenshot, costs nothing). In the code, `lib/main.dart`
+  activates Firebase App Check with `AndroidPlayIntegrityProvider` in release
+  builds, so production builds already send tokens.
+
+**Still pending in the console (nothing here is a code change):**
+- **Trader (comerciante) status declaration, deadline 2027-02-01.** Google
+  banner on the console home ("Ação necessária"); without it the developer
+  profile and its apps are removed from Play worldwide. It belongs to the
+  developer account (currently an individual account), not only to Dindin. The
+  choice (trader or not) and the public profile data are the maintainer's; ask the
+  lawyer if in doubt. Not yet declared as of 2026-11-16.
+- **App Check "Enforce" is not on** for Firestore/Authentication, and the linked
+  Google Cloud project for Play Integrity still has to be confirmed. Turning
+  Enforce on also blocks the web client (no web App Check, decision 2026-09-21),
+  so decide that first. Details in `docs/BACKEND.md`, "App Check".
+- The "internal test version" notice that Play showed on the account after the
+  tester list was removed was marked fixed on 2026-10-30; no action.
+
 ## Leaving "Rascunho" (Draft) status
 
 A new Play Console app stays in Draft until every item in "Termine de
@@ -38,11 +80,14 @@ Policy:
 - **User IDs** (Firebase Auth UID, email) — collected, required, not shared.
 - **Financial info** (transactions, balances, budget categories — the core
   app data) — collected, required, not shared, encrypted in transit.
-- **Approximate location** — only if/when a feature actually reads it;
-  otherwise declare "not collected." Check against current code before
-  answering, this form is a compliance surface, not a guess.
-- **App interactions / device identifiers** — from Firebase Analytics (the
-  4-event minimal instrumentation from the `mobile` security round) and
+- **Approximate location** — originally "only if a feature reads it". As
+  filed, the form declares it because of Firebase Analytics (see the status
+  section above). Re-check against the code and the Privacy Policy whenever
+  analytics events or SDKs change; this form is a compliance surface, not a
+  guess.
+- **App interactions / device identifiers** — from Firebase Analytics (4 events
+  today, none with financial content: `account_created`, `caixinha_created`,
+  `first_expense_logged`, `export_used`, see `lib/services/analytics_service.dart`) and
   Firebase App Check (Play Integrity). Both opt-out-able from Ajustes →
   Privacidade.
 
