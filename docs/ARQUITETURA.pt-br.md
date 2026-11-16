@@ -5,31 +5,55 @@
 Como o Dindin funciona por dentro. Para o que o app é e como rodar localmente,
 ver `README.md`; para a modelagem de integridade de dinheiro (Firestore rules,
 saldos denormalizados) ver `docs/BACKEND.pt-br.md`; para a identidade visual ver
-`docs/DESIGN.pt-br.md`.
+`docs/DESIGN.pt-br.md`; para pendências e o que ainda não foi verificado em
+aparelho real ver `docs/PENDENCIAS.pt-br.md`.
+
+Descreve a versão **1.2.1+7** (enviada à Google Play em 2026-11-16, aguardando
+análise no momento da escrita). Tudo abaixo foi conferido no código e na suíte
+de testes (715 testes Flutter passam; o harness das rules tem 128 + 9 testes,
+ver "Testes"). O que só foi exercitado em teste ou emulador, nunca em aparelho
+real, está marcado como tal.
 
 ## Camadas
 
 ```
 lib/
-  main.dart            bootstrap: Firebase.initializeApp, intl pt_BR, runApp
-  app.dart              MaterialApp.router: tema (light/dark) + go_router
+  main.dart            bootstrap: Firebase.initializeApp, App Check, intl pt_BR,
+                       carrega idioma e tema salvos, runApp(SplashGate(DindinApp))
+  app.dart              MaterialApp.router: tema (claro/escuro, themeMode vindo
+                        do themeModeProvider) + go_router (7 ramos do shell)
   theme/                identidade visual ("Envelope caloroso", ver docs/DESIGN.pt-br.md)
-    colors.dart         AppPalette — tokens de cor hardcoded (light/dark)
+    colors.dart         AppPalette — tokens de cor fixos (claro/escuro)
     theme.dart          ColorScheme + TextTheme + AppTokens (ThemeExtension)
-  models/               classes de dado puras (sem lógica de Firestore)
+  models/               classes de dados simples (sem lógica de Firestore); também
+                        tutorial_progress.dart (TutorialPage/State/Entry + versões)
   services/
-    auth_service.dart          login email/senha + Google (web e nativo divergem)
-    firestore_service.dart     CRUD + integridade de dinheiro (transactions)
+    auth_service.dart          login e-mail/senha + Google (Web e nativo divergem),
+                               exclusão de conta, hasRecentLogin
+    firestore_service.dart     CRUD + integridade de dinheiro (transações), catch-ups,
+                               restore/apagar tudo, progresso dos tutoriais
     aggregation_service.dart   funções puras: saldos, resumos mensais
     recurring_schedule.dart    funções puras: quais cobranças de assinatura/
-                               parcelamento estão vencidas (usado pelo
-                               catch-up e pela tela, pra não divergirem)
-    import_export_service.dart backup/restore em JSON
-  providers/providers.dart     providers Riverpod, ligam services -> UI
+                               parcelamento estão vencidas (usadas pelo catch-up
+                               e pela tela, pra os dois nunca divergirem)
+    import_export_service.dart backup/restore JSON (+ backup_validation.dart,
+                               restore_chunking.dart)
+    analytics_service.dart     wrapper do Firebase Analytics (opt-out, sem dado financeiro)
+    app_update_service.dart    atualização in-app (flexible) da Google Play
+  providers/
+    providers.dart       providers Riverpod, ligam services -> UI (inclui os
+                         providers do progresso dos tutoriais e o todayProvider)
+    locale_provider.dart / theme_provider.dart   escolha de idioma e de tema,
+                         persistidas em shared_preferences
   features/<nome>/<nome>_page.dart   uma pasta por tela
-                       (assinaturas/ e parcelamentos/ são destinos de topo,
-                        ver a decisão de navegação abaixo)
-  widgets/              componentes compartilhados entre telas
+                       (assinaturas/ e parcelamentos/ são destinos de topo —
+                        ver a decisão de navegação abaixo;
+                        settings/ também guarda tutorials_card.dart)
+  widgets/              componentes compartilhados: app_shell.dart (navegação),
+                        splash_gate.dart (animação de abertura),
+                        quick_entry_sheet.dart, guided_empty_state.dart,
+                        nav_menu_state.dart, menu_chevron.dart,
+                        catch_up_refresh.dart, tutorial/ (motor do onboarding)
 ```
 
 ## Fluxo de dados / gerenciamento de estado
@@ -37,15 +61,20 @@ lib/
 Riverpod (`flutter_riverpod`) é a única fonte de estado — não há um segundo
 mecanismo (nem `setState` global, nem um store separado). O caminho dos dados:
 
-1. `FirestoreService` expõe um `Stream` por coleção (`watchCategories`,
-   `watchIncomes`, `watchAllocations`, `watchExpenses`), cada um um
-   `snapshots()` do Firestore mapeado para o model Dart correspondente.
+1. `FirestoreService` expõe streams por coleção. As três coleções do ledger
+   têm dois sabores: **com janela** (`watchIncomes`, `watchAllocations`,
+   `watchExpenses`: ordenadas por `date` decrescente, `.limit(2000)`,
+   alimentam as listas de Receitas/Gastos/Parcelamentos) e **completos**
+   (`watchAllIncomes`, `watchAllAllocations`, `watchAllExpenses`: sem limite,
+   alimentam só o resumo do Dashboard). Categorias, assinaturas e parcelamentos
+   têm teto de 500 docs. Cada um é um `snapshots()` do Firestore mapeado para
+   o model Dart correspondente.
 2. `providers.dart` embrulha cada stream num `StreamProvider`
-   (`categoriesProvider`, `incomesProvider`, etc.), condicionado a
-   `firestoreServiceProvider` (que é `null` enquanto deslogado —
-   `authStateProvider` decide isso).
-3. `summaryProvider` (um `Provider` comum, não um stream) combina os quatro
-   streams num `AppDb` e chama `aggregation_service.buildSummary(db)` —
+   (`categoriesProvider`, `incomesProvider`, `allIncomesProvider`, etc.),
+   condicionado a `firestoreServiceProvider` (que é `null` enquanto deslogado
+   — `authStateProvider` decide isso).
+3. `summaryProvider` (um `Provider` comum, não um stream) combina categorias +
+   os três streams **completos** do ledger num `AppDb` e chama `aggregation_service.buildSummary(db)` —
    funções **puras** (sem I/O, fáceis de testar isoladamente; ver
    `test/services/aggregation_service_test.dart`) que calculam saldo da
    conta, saldo por caixinha, resumo do mês corrente e histórico mensal.
@@ -53,7 +82,11 @@ mecanismo (nem `setState` global, nem um store separado). O caminho dos dados:
    `ref.watch(categoriesProvider)` etc. — nunca leem o Firestore diretamente.
 
 Ou seja: **Firestore stream → provider → agregação pura → UI**, sempre nessa
-direção. Isso é o equivalente ao antigo endpoint `/api/summary` de uma versão
+direção. O saldo do Dashboard, portanto, é **re-somado do ledger inteiro a cada
+mudança**, não lido dos docs de saldo denormalizados (esses existem só para as
+rules, ver `docs/BACKEND.pt-br.md`, "O saldo do Dashboard re-soma o ledger"):
+correto por construção, ao custo de ler todo o histórico da conta a cada
+sessão. Isso é o equivalente ao antigo endpoint `/api/summary` de uma versão
 Next.js anterior do app (removida do repo — commits `d774ffb`/`135d006`);
 `aggregation_service.dart` e vários models ainda citam esse histórico em
 comentários ("mirrors X in the Next.js app's..."), mantidos porque explicam
@@ -62,11 +95,12 @@ exista em algum lugar do repo.
 
 ## Rastros ponta a ponta
 
-Duas operações, rastreadas por toda camada que atravessam, nomeando os
+Três operações, rastreadas por toda camada que atravessam, nomeando os
 arquivos e funções reais em cada salto. Escolhidas porque disparam de formas
 genuinamente diferentes — uma a partir de um toque explícito, outra só de
-abrir o app — mas convergem no mesmíssimo mecanismo de leitura/atualização
-assim que a escrita acontece, o que vale a pena ver escrito uma vez em vez de
+abrir o app, e outra da primeira visita a uma página (Rastro C, que só lê e
+escreve estado de interface) — mas as duas primeiras convergem no mesmíssimo
+mecanismo de leitura/atualização assim que a escrita acontece, o que vale a pena ver escrito uma vez em vez de
 presumido como generalizável.
 
 ### Rastro A — criar um gasto (de caixinha), escrita iniciada pelo usuário
@@ -106,8 +140,8 @@ presumido como generalizável.
    (ou `meta/account`) nos quais `FirestoreService.watchExpenses()` (e os
    streams de categories/allocations/incomes já abertos) estão inscritos. O
    `StreamProvider` `expensesProvider` de `providers.dart` reemite.
-8. **Agregação.** `summaryProvider` (`providers.dart`), observando os
-   quatro streams do ledger, recombina em um `AppDb` e chama
+8. **Agregação.** `summaryProvider` (`providers.dart`), observando as
+   categorias e os três streams completos (sem janela) do ledger, recombina em um `AppDb` e chama
    `aggregation_service.buildSummary(db)` — pura, sem I/O — pra recalcular
    o saldo da conta, o saldo da caixinha e o resumo do mês corrente.
 9. **A UI atualiza.** Tanto `GastosPage` (o gasto agora na lista, o saldo
@@ -176,6 +210,70 @@ partir de qualquer tela em que isso aconteça.
    genuinamente não cabe" usando esse estado de erro (ver
    `docs/BACKEND.pt-br.md`, "Cobrança pendente é mostrada, não escondida").
 
+### Rastro C — primeira visita a uma página: o tutorial do onboarding
+
+Um terceiro tipo de início: ninguém toca em nada e o usuário não escreve nada,
+mas um documento do Firestore é lido e, depois, escrito. Rastreado para o
+Dashboard em tela estreita (a única página com o passo "guiado pela ação").
+
+1. **A página está pronta.** `DashboardPage.build`
+   (`lib/features/dashboard/dashboard_page.dart`) mostra um spinner até
+   `summaryProvider` e `categoriesProvider` terem dados e então embrulha o
+   conteúdo em `TutorialHost(page: TutorialPage.dashboard, steps: _tutorialSteps, ...)`
+   (`lib/widgets/tutorial/tutorial_host.dart`). O host só é construído depois
+   que os dados chegam, então o tutorial nunca começa sobre um spinner ou erro.
+2. **Já foi visto?** `TutorialHost.build` observa
+   `tutorialSeenProvider(page)` (`providers.dart`). Esse provider é `null`
+   até `tutorialProgressProvider` carregar (um `StreamProvider` sobre
+   `FirestoreService.watchTutorialProgress()`, ou seja, os snapshots de
+   `users/{uid}/meta/tutorials`, lidos por `parseTutorialProgress`); `true` se
+   a página está em `tutorialSessionSeenProvider` (o que terminou NESTA sessão)
+   ou se a versão salva cobre `tutorialVersions[page]` (`TutorialEntry.covers`);
+   `false` caso contrário. `null` significa "ainda não sei" e não inicia nada —
+   senão o tutorial piscaria antes de o estado salvo chegar.
+3. **Esperar um momento calmo.** Com `false`, o host agenda `_tryStart` após
+   400 ms. `_calm` exige: esta aba é a visível (`TickerMode`), nenhum diálogo ou
+   sheet por cima (`ModalRoute.isCurrent`), o menu de páginas fechado
+   (`navMenuOpen`, um `ValueNotifier` ligado por `AppShell._openMenu`, porque
+   esse menu é um diálogo no navigator RAIZ e a rota da própria página não o
+   enxerga) e o teclado fechado. Se não estiver calmo: tenta de novo a cada
+   600 ms, no máximo 30 vezes, e desiste em silêncio. Quando o menu fecha, o
+   listener do host recomeça as tentativas do zero.
+4. **Mostrar.** `showTutorial` (`tutorial.dart`) empurra uma `PopupRoute` no
+   navigator raiz. `_TutorialScreen` acha o widget de cada passo pela
+   `GlobalKey` (`TutorialStep.target`), rola até ele, pinta o véu com recorte e
+   o balão (abaixo, acima, ou no rodapé sem seta) e mede de novo em rotação/
+   redimensionamento/teclado. O passo 1 do Dashboard mira o título da página
+   (estreita) ou a barra lateral (larga, via `AppNavigation.railKey`); em tela
+   estreita seu `onTargetTap` é o `openMenu` de verdade, então tocar no título
+   iluminado abre o menu real e encerra o tutorial como concluído.
+5. **Desfecho.** Próximo/Concluir → `TutorialResult.done`; Pular, Esc ou o
+   voltar do sistema → `skipped`; um alvo que não está montado (lista
+   construída sob demanda, bem abaixo da dobra) → `unavailable`.
+6. **Gravar.** `done`/`skipped` chamam `markTutorialEnded` (`providers.dart`),
+   que primeiro põe a página em `tutorialSessionSeenProvider` (pra ela não voltar
+   nesta sessão mesmo se a escrita falhar) e depois
+   `FirestoreService.setTutorialProgress` faz
+   `meta/tutorials.set({pagina: {state, v}}, merge: true)`. `unavailable` não
+   grava nada, então tenta de novo na próxima abertura. Escrita que falha só vai
+   pro log (`dindin.tutorials`).
+7. **Validação do servidor.** A rule `meta/{docId}` de `firestore.rules` só
+   aceita `tutorials` por `validTutorials`: lista fechada dos sete ids de página,
+   cada um `{state: 'done'|'skipped', v: int 1..1000}` — ver `docs/BACKEND.pt-br.md`.
+8. **Os outros leitores reagem.** O listener de `meta/tutorials` emite nos outros
+   aparelhos e em Ajustes, então `tutorialSeenProvider` vira `true` lá sem
+   nenhuma chamada extra.
+9. **Rever.** Ajustes → Tutoriais (`lib/features/settings/tutorials_card.dart`)
+   lê os mesmos providers. "Rever" chama `resetTutorial` (tira a página do
+   conjunto da sessão e grava `FieldValue.delete()` naquela chave) e
+   `context.go(rota)`; o host da página vê `seen == false` e roda a partir do
+   passo 2. "Rever todos" chama `resetAllTutorials` (`meta/tutorials.delete()`),
+   com um snackbar "Desfazer" que chama `restoreTutorials` (regrava cada
+   entrada anterior, com a versão original).
+
+Situação da verificação: tudo isso é coberto por widget tests e por 6 testes das
+rules no emulador; **não foi visto em aparelho real** (ver `docs/PENDENCIAS.pt-br.md`).
+
 ## Modelo de dados (Firestore)
 
 Particionado por usuário sob `users/{uid}`:
@@ -214,6 +312,9 @@ users/{uid}
     lastChargedDate: string?   # data ISO da última cobrança já virada gasto
                                 # por catchUpSubscriptions
     categoryId: string?        # caixinha de onde a cobrança sai; ausente = conta
+    autoChargeEnabled: bool?   # só gravado quando false; ausente = true. Com false,
+                                # o catch-up pula e a cobrança é lançada à mão
+                                # ("Cobrar agora", chargeSubscriptionNow)
 
   installmentPurchases/{purchaseId}
     name: string, totalAmount: number, installments: int (2-36)
@@ -225,10 +326,24 @@ users/{uid}
     categoryId: string?        # caixinha de onde as parcelas saem; ausente = conta
     amortizedAmount: number?   # pago adiantado, além das parcelas agendadas;
                                 # ausente = 0. Encurta o PRAZO, não a parcela
+    dueDayOverride: int?       # dia (1-31) em que as parcelas RESTANTES vencem;
+                                # ausente = o dia de firstChargeDate
 
   meta/account            { balance: number }   # saldo geral da conta (derivado)
   balances/{categoryId}   { balance: number }   # saldo de cada caixinha (derivado)
+  meta/settings           { analyticsOptOut: bool }   # Ajustes -> Privacidade
+  meta/tutorials          { <pagina>: { state: 'done'|'skipped', v: int } }
+                          # <pagina> em dashboard|receitas|gastos|assinaturas|
+                          # parcelamentos|categorias|ajustes. Estado de UI, não dinheiro
+
+accountDeletionLog/{autoId}   # coleção de TOPO, fora de users/{uid}; só create
+  { deletedAt: serverTimestamp, origin: 'self-service'|'admin-sweep' }
 ```
+
+`Income` e `Expense` também têm um `createdAt` opcional (timestamp ISO), usado
+só pra desempatar linhas da mesma `date` (`_sortByDateThenCreatedAt`).
+`meta/settings` e `meta/tutorials` também não entram no backup JSON (são estado
+do app por conta) e `deleteAllUserData` apaga os dois junto com os docs de saldo.
 
 `meta/account` e `balances/{categoryId}` são um **cache derivado**, não fonte
 de verdade: não fazem parte do backup JSON e são recalculados a partir do
@@ -464,6 +579,135 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   do projeto Firebase) — depende do SHA-1 do app Android estar registrado no
   Firebase. Ver `lib/services/auth_service.dart`.
 
+- **O onboarding é um motor pequeno mais hosts por página, não um pacote.**
+  `lib/widgets/tutorial/tutorial.dart` (`showTutorial`, `TutorialStep`,
+  `TutorialResult`) desenha um passo por vez sobre a tela real: véu com recorte,
+  anel e balão no formato do cartão de passo do manual de marca; movimento
+  reduzido e anúncio para leitor de tela ficam na própria rota.
+  `tutorial_host.dart` decide QUANDO começar (ver Rastro C). Sete páginas têm
+  tutorial (Dashboard 4 passos, Ajustes 2, as outras cinco 3 cada). O progresso
+  fica em `meta/tutorials`, então acompanha a conta entre aparelhos; cada página
+  tem um número de versão (`tutorialVersions` em
+  `lib/models/tutorial_progress.dart`) — subir o número reexibe só aquele
+  tutorial para quem salvou uma versão menor. Os ids de página são uma lista
+  fechada que precisa bater com `validTutorials` em `firestore.rules`. Limite
+  conhecido: o alvo de um passo precisa estar montado; um widget numa lista
+  construída sob demanda, bem abaixo da dobra, encerra o tutorial como
+  `unavailable` (não gravado). O racional do desenho e as alternativas
+  rejeitadas (direção "Etiqueta") estão em `docs/onboarding-design.md`.
+
+- **Estados vazios e o cartão "Primeiros passos" do Dashboard ensinam a próxima
+  ação.** `GuidedEmptyState` (`lib/widgets/guided_empty_state.dart`: ilustração,
+  título, texto, um botão com verbo) substitui o texto vazio simples em
+  Receitas, Gastos, Assinaturas, Parcelamentos e Categorias; lista vazia só por
+  causa do filtro de datas continua com o texto simples e "Limpar filtro". O
+  `_FirstStepsCard` do Dashboard (criar caixinha, lançar receita, alocar) some
+  quando os três são verdade (`categories.isNotEmpty && hasIncome &&
+  hasAllocation`; transferência não conta como alocação). Ajustes → Tutoriais
+  mostra o selo de cera terracota (`assets/illustrations/dindin-selo.svg`) e
+  recolhe a lista quando os sete foram vistos.
+
+- **A navegação ficou descobrível sem mudar de forma.** O chevron do título é um
+  círculo tonal (`MenuChevronChip`, área de toque de 48 dp), cada linha do menu
+  tem uma descrição de uma linha (strings `navXxxDescription`) e o Dashboard tem
+  os botões "Lançar receita"/"Lançar gasto". Eles abrem `showQuickEntrySheet`
+  (`lib/widgets/quick_entry_sheet.dart`): o mesmo formulário de Receitas/Gastos
+  numa folha (diálogo em tela larga), salvando pelo mesmo
+  `createIncome`/`createExpense` (vale o Rastro A) e fechando sem sair do
+  Dashboard. O mecanismo anterior ("abrir a página com o cursor em Valor",
+  `focus_request`) foi removido.
+
+- **Tema: Sistema / Claro / Escuro, escolhido em Ajustes.** `themeModeProvider`
+  (`lib/providers/theme_provider.dart`) tem o mesmo formato do `localeProvider`:
+  `main()` carrega o valor salvo (`shared_preferences`, chave `themeMode`) antes
+  do `runApp` e sobrescreve o provider, `app.dart` passa para
+  `MaterialApp.themeMode`, Ajustes grava com `setThemePreference` ("Sistema"
+  apaga a chave). Falha de armazenamento só custa a persistência. O fundo escuro
+  oficial é `#16130F` (`AppPalette.darkBackground`), cartões `#201C17`; os tokens
+  estão em `lib/theme/colors.dart` e descritos em `docs/DESIGN.pt-br.md`. O tema
+  fica guardado no aparelho, não no Firestore.
+
+- **Animação de abertura (`SplashGate`, `lib/widgets/splash_gate.dart`).**
+  Envolve o `DindinApp` no `main()` (então widget tests do app nunca a veem).
+  Por 1,5 s um overlay toca por cima do app, que já está montando por baixo: o
+  saco da logo no tamanho normal, três moedas caem e o balançam, depois ele se
+  aproxima do espectador enquanto some. O fundo segue o tema escolhido (em
+  "Sistema", o brilho do aparelho, lido de `platformDispatcher`); pulada por
+  inteiro quando o sistema pede movimento reduzido. Absorve toques e fica fora
+  do leitor de tela. Limite: antes do primeiro quadro do Flutter a janela
+  nativa ainda é branca/preta, então pode haver um flash. Verificada em testes
+  (715 passam) e por revisão de vídeo; **não em aparelho real**.
+
+- **Escritas que não precisam de transação não esperam o servidor offline
+  (`FirestoreService.ackOrQueue`).** O future de uma escrita comum do Firestore
+  só completa no ack do servidor, então offline o botão de salvar ficaria
+  girando até a conexão voltar. `ackOrQueue` espera até 4 s (`writeAckWait`) e
+  depois trata a escrita como enfileirada (o Firestore a mantém na fila local e
+  envia na volta). Falha real dentro da janela (negação das rules) ainda é
+  lançada; depois dela não dá mais pra reportar. Usado por `createCategory`,
+  `updateCategory`, `createSubscription`, `deleteSubscription`,
+  `setSubscriptionAutoCharge`, `createInstallmentPurchase` e
+  `deleteInstallmentPurchase`. Transações (escritas de dinheiro) não mudaram:
+  falham na hora offline.
+
+- **`deleteCategory` recusa três situações antes de tocar em qualquer coisa.**
+  Caixinha que participou de transferência (a perna pareada ficaria órfã e
+  `meta/account` subiria acima do ledger); saldo negativo (a dívida precisa ser
+  quitada antes, espelha `catDebtFree`); e cascata maior que 495 registros
+  (`FirestoreService.maxCascadeDocs`: uma transação comporta no máximo 500
+  escritas e não dá pra fatiar porque as rules a leem como um commit só). A
+  tela de Categorias também desabilita o botão de remover de antemão nas duas
+  primeiras, com explicação.
+
+- **Excluir a conta confere login recente ANTES de apagar os dados.**
+  `SettingsPage` chama `AuthService.hasRecentLogin()` (lê o `auth_time` do ID
+  token, margem de 4 minutos sob a janela de ~5 min do Firebase) primeiro; sessão
+  antiga mostra "saia e entre de novo" e nada é apagado. Antes, os dados do
+  Firestore eram apagados primeiro e o `user.delete()` falhava depois, deixando
+  uma conta viva e vazia. Depois da checagem: `deleteAllUserData()` (docs de
+  saldo + settings + tutorials + uma entrada anônima de `accountDeletionLog` no
+  primeiro commit, depois o ledger) e por último `AuthService.deleteAccount()`.
+
+- **Edições somam o delta num passo só, como as rules.** `updateIncome`,
+  `updateAllocation` e `updateExpense` calculam `saldo + (novo - velho)`, nunca
+  `(saldo - velho) + novo`: as rules comparam com `==` exato e as duas formas
+  diferem no último bit para certos valores, o que causava
+  `permission-denied` ocasional numa edição legítima (confirmado no emulador;
+  9 testes das rules fixam a paridade).
+
+- **"Este mês" é o mês local do aparelho.** `currentMonthKey()`
+  (`aggregation_service.dart`) usa hora local, o mesmo relógio das datas do
+  ledger; em UTC o Dashboard virava pro mês seguinte, vazio, às 21h do último
+  dia no Brasil. O parâmetro `now` é injetável nos testes.
+
+- **Voltar do segundo plano reavalia "hoje".** O `AppShell` observa o ciclo de
+  vida do app; no `resumed` ele rechecka a Play por atualização e, se o dia do
+  calendário mudou desde que `todayProvider` foi lido, invalida
+  `todayProvider` e `recurringChargesCatchUpProvider` (no máximo uma vez por
+  dia), pra um app deixado aberto por dias ainda lançar as cobranças vencidas e
+  mostrar a contagem certa de "pendentes". Puxar pra atualizar
+  (`CatchUpRefresh`) roda o catch-up sob demanda.
+
+- **Os catch-ups não deixam um documento ruim bloquear o resto.** Cada
+  assinatura é tentada dentro do próprio `try`; o
+  `recurringChargesCatchUpProvider` roda o catch-up de parcelamentos mesmo se o
+  de assinaturas falhou e relança o primeiro erro no fim, pra o provider ainda
+  terminar como `AsyncError` (a tela de Gastos continua distinguindo "nunca
+  terminou" de "não coube no saldo"). Assinatura com `autoChargeEnabled == false`
+  é pulada pelo catch-up e só lançada por "Cobrar agora".
+
+- **A atualização in-app da Play nunca reinicia o app sozinha.**
+  `AppUpdateService` (`lib/services/app_update_service.dart`) faz uma
+  atualização flexible: `startUpdate` só resolve true quando a Play informa
+  `downloaded`; então `AppShell._startUpdate` mostra um snackbar com "Reiniciar"
+  e `restartToInstall` só roda nesse toque (a pessoa pode estar no meio de um
+  lançamento). Um indicador fixo (ponto no gatilho do menu, item "Atualizar" no
+  menu, botão na barra lateral larga) fica enquanto houver atualização e é
+  rechecado ao voltar do segundo plano. Fora de uma instalação Android pela
+  Play, toda chamada responde "sem atualização" em silêncio. Testada com um
+  serviço falso; **o fluxo real do plugin só roda num build instalado pela Play e
+  não foi observado** (o ponto no menu também não foi visto num aparelho).
+
 ## Restrições / pendências conhecidas (não inventadas — verificadas no código)
 
 - **Edição de allocation individual existe no código mas não é alcançável
@@ -472,12 +716,6 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   há nenhuma lista de allocations na UI que a invoque — o comentário no
   próprio arquivo já sinaliza que isso existe pronto "pra quando uma lista de
   allocations for adicionada". Não é uma lacuna acidental.
-
-- **`deleteCategory` não trata caixinhas com pernas de transferência.**
-  Apagar uma categoria que tem pernas de `transferId` deixaria a perna
-  pareada em outra caixinha órfã e desalinharia aquele saldo. Não é
-  alcançável pela UI hoje (nenhuma categoria de produção tem pernas de
-  transferência) — ver `docs/BACKEND.pt-br.md`, "Option B residual limitations".
 
 - **Restaurar um backup com uma "dívida congelada" — CORRIGIDO (F1), testado
   contra o emulador.** Uma dívida congelada é uma caixinha `spend` que ficou
@@ -502,17 +740,18 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
   BACKEND.pt-br.md`, "Option B residual limitations" (item F1), para o mecanismo
   completo.
 
-- **Não há guard no app contra converter uma caixinha `spend` negativa em
-  `save`, ou apagá-la, enquanto a dívida está aberta.** `categorias_page.dart`
-  deixa trocar o `kind` ou chamar `deleteCategory` sem checar o saldo atual —
-  é essa a origem real do estado "`save` com dívida" / "órfã com dívida" que
-  o restore (`replaceAll` passo 0) e o backfill hoje recusam de propósito
-  como `BALANCE CORRUPTION`, pra não destruir a conservação de dinheiro.
-  Recomendação (ainda não implementada): bloquear ou exigir confirmação
-  explícita antes de trocar o `kind` de uma caixinha `spend` negativa, e
-  bloquear apagar uma caixinha com saldo negativo. Ver `docs/BACKEND.pt-br.md`,
-  "Option B residual limitations", último item. TODO: confirmar quando essa
-  correção entra no roadmap.
+- **Converter uma caixinha `spend` negativa em `save`, ou apagá-la, agora é
+  barrado no app** (este item era uma pendência aberta). `updateCategory` recusa
+  a conversão spend → save enquanto o doc de saldo está negativo e
+  `deleteCategory` recusa saldo negativo; a tela de Categorias desabilita o botão
+  de remover com explicação. As rules (`catDebtFree`, `convertsSpendToSave`)
+  seguem como a garantia que não dá pra contornar.
+
+- **O comentário de App Check em `lib/main.dart` está desatualizado.** Diz que o
+  app "NOT in the Play Console yet"; o app está publicado. O comportamento não
+  mudou (Play Integrity em release, provider de debug em debug, web pulada até
+  existir uma chave reCAPTCHA v3). Correção só de comentário, deixada pra quem
+  mexer em `lib/` da próxima vez.
 
 - **`lib/widgets/app_shell.dart` cita `FLUTTER_MIGRATION.md` num comentário**
   ("per §4 of FLUTTER_MIGRATION.md") — esse arquivo não existe mais no repo
@@ -524,14 +763,22 @@ adições mais recentes, com o mesmo desenho: ausentes valem "sai da conta" e
 
 ## Testes
 
-`test/` espelha a estrutura de `lib/`: `features/*_test.dart` (widget tests
-por tela), `services/*_test.dart` (incl. `aggregation_service_test.dart` para
-a matemática de dinheiro, que é pura e fácil de testar isoladamente),
-`models/db_json_test.dart` (round-trip do backup JSON), `utils/*_test.dart`,
-`widgets/*_test.dart`, e `test/rules/` — um harness Node standalone (fora da
+`flutter test` roda 715 testes (todos passando em 2026-11-16, quando isto foi
+escrito). `test/` espelha a estrutura de `lib/`: `features/*_test.dart` (widget
+tests por tela, incluindo `layout_sweep_test.dart`, que renderiza todas as telas
+de 320 a 900 px, fonte x1.3, em pt e en pra pegar overflow, e os testes de
+tutorial/estados vazios/navegação), `services/*_test.dart` (incl.
+`aggregation_service_test.dart` para a matemática de dinheiro,
+`auth_service_test.dart`, `tutorial_progress_test.dart`), `providers/*_test.dart`
+(idioma, tema, catch-up recorrente), `models/*_test.dart` (round-trip do backup
+JSON), `utils/*_test.dart`, `widgets/*_test.dart` (shell, motor de tutorial,
+lançamento rápido, splash), e `test/rules/` — um harness Node standalone (fora da
 árvore Flutter/pubspec) com dois arquivos rodados juntos via `npm test`:
-`rules.test.mjs` (as regras do Firestore contra o emulador — o único jeito de
-exercitar os caminhos `getAfter()`/genesis-teardown, que não rodam a partir
-do Dart) e `backfill.test.mjs` (cobertura de regressão pra classificação de
-dívida-vs-corrupção do `scripts/backfill_balances.mjs`, rodado como
-subprocesso real). Ver `docs/DEPLOY.pt-br.md` para como isso roda em CI.
+`rules.test.mjs` (128 testes das regras do Firestore contra o emulador — o único
+jeito de exercitar os caminhos `getAfter()`/genesis-teardown, que não rodam a
+partir do Dart) e `backfill.test.mjs` (9 testes da classificação
+dívida-vs-corrupção do `scripts/backfill_balances.mjs`, rodado como subprocesso
+real). As contagens das rules foram lidas dos arquivos; o harness não foi rodado
+nesta passada de documentação. Ver `docs/DEPLOY.pt-br.md` para como isso roda em
+CI. Não há testes automatizados em aparelho real nem contra o plugin real de
+atualização in-app da Play.

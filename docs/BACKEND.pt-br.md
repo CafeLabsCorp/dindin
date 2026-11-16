@@ -2,7 +2,9 @@
 
 **[Read in English](BACKEND.md)**
 
-Referência operacional pro backend em Firestore do Dindin. Ler isto antes de
+Referência operacional pro backend em Firestore do Dindin (descreve a versão
+1.2.1+7, conferida contra `firestore.rules`, `lib/services/firestore_service.dart` e
+`test/rules` em 2026-11-16; o harness das rules foi lido, não rodado). Ler isto antes de
 qualquer deploy que toque `firestore.rules`, `firestore.indexes.json`, ou
 `functions/`.
 
@@ -58,13 +60,17 @@ deploy/rollback.
      apagados, num batch já commitado, antes do delete do ledger. Apagar o
      usuário de Auth antes dos dados do Firestore deixaria `users/{uid}`
      inalcançável pra sempre (uids nunca são reemitidos).
-  3. `user.delete()` pode lançar `FirebaseAuthException(code:
-     'requires-recent-login')` — apagar a conta de Auth exige um login
-     *recente*. A UI mostra isso como "saia e entre de novo, depois tente de
-     novo" em vez de um erro genérico; os dados do Firestore já foram
-     apagados nesse ponto (seguro — `scripts/sweep_orphans.mjs` abaixo é
-     exatamente a rede de segurança pra uma exclusão que morre entre os
-     passos 1 e 2).
+  3. **O login recente é conferido ANTES do passo 1.** `SettingsPage` chama
+     `AuthService.hasRecentLogin()` (lê o `auth_time` do ID token, margem de 4
+     minutos sob a janela de ~5 min do Firebase) e, se a sessão é antiga demais,
+     mostra "saia e entre de novo, depois tente de novo" e **não apaga nada**.
+     (Antes da 1.1.2 os dados do Firestore eram apagados primeiro e o
+     `user.delete()` falhava depois com `requires-recent-login`, deixando uma
+     conta viva e vazia.) A pessoa ainda precisa sair e entrar de novo;
+     reautenticar na hora não foi construído. Se o `user.delete()` ainda assim
+     lançar `requires-recent-login` (a margem não é garantia), a mesma mensagem
+     aparece, e o `scripts/sweep_orphans.mjs` abaixo é a rede de segurança pra
+     uma exclusão que morre entre os passos 1 e 2.
   - Nenhum registro-tombstone que IDENTIFIQUE o usuário é escrito ou
     esperado depois de uma exclusão bem-sucedida — não sobra nada legível sob
     `users/{uid}` pra ninguém ler (as rules travam em `request.auth.uid`, e
@@ -167,6 +173,28 @@ design.
     mão pelo console do Firebase (que nunca toca o Firestore). `--dry-run`
     por padrão; exige `--confirm` pra escrever. Rodar periodicamente (ver o
     cabeçalho do script pra invocação e credenciais).
+
+## App Check (postura contra abuso)
+
+O `lib/main.dart` chama `FirebaseAppCheck.instance.activate` na partida, dentro de
+um try/catch pra uma falha nunca impedir o app de abrir:
+
+- **Android:** `AndroidPlayIntegrityProvider` em build de release,
+  `AndroidDebugProvider` com `kDebugMode` (imprime um token que precisa ser
+  registrado uma vez em Firebase Console → App Check → Apps → tokens de debug pra
+  builds locais continuarem funcionando).
+- **Web:** não ativado. Precisa de uma chave de site reCAPTCHA v3
+  (`_recaptchaV3SiteKey` ainda é o placeholder `REPLACE_WITH_RECAPTCHA_V3_SITE_KEY`)
+  e o mantenedor decidiu em 2026-09-21 adiar o App Check na web (a alternativa,
+  reCAPTCHA Enterprise, exige faturamento vinculado, o que contradiz ficar no
+  Spark sem cartão). Conforme o registro dessa decisão.
+- **O Enforce está DESLIGADO.** O app só *envia* tokens; o "Enforce" do Firestore
+  e do Authentication no Firebase Console não foi ligado, de propósito, até as
+  métricas do console mostrarem tráfego real do Android como verificado. Ligar
+  também barraria o cliente web, que não envia token. Item em aberto em
+  `docs/PENDENCIAS.pt-br.md`. O cabeçalho do `firestore.rules` ("ABUSE / OVERLOAD
+  POSTURE") explica que as rules sozinhas não limitam taxa e que o App Check é o
+  que limita a cota do Spark.
 
 ## Verificação de e-mail (não-bloqueante)
 
@@ -289,6 +317,39 @@ Firebase Auth — não mexe em `firestore.rules`.
   índice abaixo de `chargedInstallments` — mover o vencimento nunca reescreve
   histórico — e só o DIA se move, nunca a sequência de meses.
 
+- `subscriptions/{id}.autoChargeEnabled` — `bool` opcional, gravado só quando
+  `false` (ausente = `true`). Com `false`, `catchUpSubscriptions` pula a
+  assinatura e as datas vencidas ficam pendentes até a pessoa lançá-las com
+  "Cobrar agora" (`chargeSubscriptionNow`, que ignora a flag). Sem invariante
+  próprio.
+- `users/{uid}/meta/settings` — `{ analyticsOptOut: bool }`. Única chave
+  permitida (`keys().hasOnly`). Doc ausente = coleta LIGADA. É um doc separado
+  do `meta/account` de propósito: o validador deste ancora o modelo de dinheiro
+  e é mantido o mais estreito possível.
+- `users/{uid}/meta/tutorials` — quais tutoriais do onboarding a pessoa já viu:
+  `{ <pagina>: { state: 'done' | 'skipped', v: int } }`, uma chave opcional por
+  página, lista fechada `dashboard`, `receitas`, `gastos`, `assinaturas`,
+  `parcelamentos`, `categorias`, `ajustes` (`validTutorials`/
+  `validTutorialEntry` em `firestore.rules`; `v` é a versão do tutorial, inteiro
+  de 1 a 1000). Estado de UI, não dinheiro: nenhum saldo o toca, só o motor de
+  tutorial o lê e ele não entra no backup JSON. É um doc próprio (não um campo
+  de `settings`) pra o validador de `settings` continuar tão estreito quanto é.
+  O app grava com `set(..., merge: true)` (uma página por vez), zera uma página
+  com `FieldValue.delete()` e todas com um delete do documento (permitido pela
+  regra genérica de delete em `meta`). Os ids de `TutorialPage` em
+  `lib/models/tutorial_progress.dart` PRECISAM ficar em sincronia com essa lista
+  fechada: um oitavo tutorial exige mudança nas rules e, portanto,
+  `scripts/deploy.sh`. Coberto por `describe('meta/tutorials (onboarding
+  progress)')` (6 testes). Até as rules serem publicadas (feito pelo mantenedor
+  em 2026-11-13, antes da 1.2.0), o app guardava o progresso só na sessão, então
+  os tutoriais reapareceriam na abertura seguinte.
+- `accountDeletionLog/{autoId}` — coleção de topo, trilha de auditoria só de
+  criação; ver "`accountDeletionLog`" acima.
+- `incomes/{id}.createdAt` e `expenses/{id}.createdAt` — timestamp ISO opcional,
+  gravado pelo relógio do cliente (`FirestoreService._now`); só serve pra
+  ordenar linhas de mesma `date`. Ausente nos documentos antigos (eles ficam
+  depois dos que têm).
+
 Backups JSON antigos (sem `monthlyBudget`, sem `transferId`, sem
 `kind`/`goalAmount`, sem `allowNegative`, sem `subscriptions`, sem
 `installmentPurchases`, sem `sourceType`/`sourceId`, sem `categoryId` nas
@@ -322,6 +383,42 @@ Esses são um **cache derivado, não fonte de verdade**:
   desalinhasse, a UI continuaria mostrando a verdade; os docs de saldo
   existem pra deixar as RULES aplicarem não-negatividade e dar ao cliente
   checagens O(1) antes de escrever.
+
+### O saldo do Dashboard re-soma o ledger (janela de leitura)
+
+Dois consumidores leem as mesmas coleções com dois propósitos, e de propósito
+NÃO são a mesma consulta:
+
+- **As listas** (Receitas, Gastos, Parcelamentos) usam os streams com janela
+  `watchIncomes`/`watchAllocations`/`watchExpenses`: `orderBy('date', desc)` mais
+  `.limit(2000)` (`_ledgerLimit` em `firestore_service.dart`; categorias,
+  assinaturas e parcelamentos usam teto de 500, `_smallCollectionLimit`). O
+  `orderBy` não é opcional: um `.limit()` sozinho devolve documentos por id e
+  poderia largar linhas RECENTES mantendo antigas. Linhas de mesma `date` são
+  reordenadas no cliente por `createdAt` (um `orderBy('createdAt')` no Firestore
+  descartaria em silêncio os docs antigos sem o campo). O `fetchAll()`
+  (exportação) também não tem limite.
+- **O Dashboard** (`summaryProvider`) usa os streams completos, sem limite,
+  `watchAllIncomes`/`watchAllAllocations`/`watchAllExpenses`, e soma em Dart
+  (`aggregation_service.buildSummary`). O saldo da conta e o de cada caixinha
+  mostrados ali são **re-somados do ledger inteiro a cada snapshot**, não lidos de
+  `meta/account`/`balances/{id}`.
+
+Por quê: o saldo do Dashboard é o número em que a pessoa confia com o próprio
+dinheiro. Somar a lista com janela subcontaria em silêncio numa conta com mais de
+2000 linhas por coleção, e ler os docs denormalizados mostraria o que um cache
+divergente tiver (ver "Option B residual limitations": um cliente pode reescrever
+os próprios docs de saldo). Re-somar é correto por construção. O custo é real e
+aceito: toda sessão lê o histórico inteiro da conta (conta na cota diária de
+leituras do plano Spark) e todo snapshot re-soma tudo em memória. Deve ser
+revisto se aparecerem contas com dezenas de milhares de linhas. Só o gráfico de
+histórico mensal de uma conta muito antiga ainda pode cair fora da janela de 2000
+linhas das listas; os totais do Dashboard não.
+
+Os docs denormalizados continuam sendo o que eram: uma âncora O(1) para os
+`getAfter()` das rules e para as checagens prévias do cliente. O script de
+backfill (`scripts/backfill_balances.mjs`) e o `replaceAll` os reconstroem a
+partir do ledger.
 
 ## Assinaturas (gastos recorrentes): catch-up disparado pelo cliente, não um agendamento no servidor
 
@@ -422,6 +519,26 @@ assinatura/parcelamento. A contagem só aparece depois que o catch-up terminou
 se o próprio catch-up falhar, o aviso diz isso, em vez de culpar o saldo:
 `recurringChargesCatchUpProvider` loga e propaga a falha como `AsyncError` em
 vez de engolir, e a tela distingue os dois estados.
+
+### Um documento ruim não para os outros
+
+`catchUpSubscriptions` tenta cada assinatura dentro do próprio `try`, e o
+`recurringChargesCatchUpProvider` roda `catchUpInstallmentPurchases` mesmo se a
+rodada de assinaturas falhou. O primeiro erro é relançado no fim, então o
+provider ainda termina como `AsyncError` ("a rodada não terminou limpa") enquanto
+todo o resto foi cobrado. Antes, um documento malformado ou negado pelas rules
+abortava todas as cobranças seguintes. Coberto por
+`test/services/firestore_service_test.dart` e
+`test/providers/recurring_catch_up_provider_test.dart`.
+
+### Voltando depois de dias
+
+O catch-up roda uma vez por sessão e o `todayProvider` é lido uma vez, então um
+app deixado em segundo plano por dias manteria o dia em que começou. O `AppShell`
+(`didChangeAppLifecycleState`, estado `resumed`) compara o "hoje" guardado com a
+data real e, se o dia mudou, invalida os dois providers (no máximo uma vez por
+dia). O puxar-pra-atualizar nas páginas que listam cobranças (`CatchUpRefresh`)
+roda o catch-up sob demanda.
 
 ## Aplicação de integridade de dinheiro: DECIDIDO — Option B (só regras, tier Spark grátis)
 
@@ -689,17 +806,33 @@ Fazer 3 antes de 2 deixa os saldos dessincronizados no dia um.
   segurança (sem leitura/escrita cross-user) é aplicada incondicionalmente
   por `isOwner()`.
 - **Edições de allocation/expense são restritas** pra manter as rules
-  tratáveis: `updateAllocation` mantém a mesma caixinha, `updateExpense`
-  mantém o mesmo alvo (caixinha vs conta). Re-homing é delete + recriar.
-  Esses caminhos de edição não são alcançáveis pela UI atual (só
-  create/delete estão conectados), então isso não é uma regressão visível
-  ao usuário hoje.
-- **Transferências não são totalmente suportadas em `deleteCategory`.**
-  Apagar uma categoria que tem pernas de transferência deixaria a perna
-  pareada em outra caixinha órfã e desalinharia aquele saldo.
-  Transferências não são alcançáveis pela UI ainda; conectar um fluxo
-  dedicado antes de habilitá-las. Nenhum dado de produção tem pernas de
-  transferência hoje.
+  tratáveis: `updateAllocation` mantém a mesma caixinha, `updateExpense` mantém o
+  mesmo alvo (caixinha vs conta). Re-homing é delete + recriar. A folha de edição
+  (`edit_transaction_sheet.dart`) alcança esses caminhos para receitas e gastos
+  nas listas. Ela também tem um caso `EditableAllocation` para allocations
+  comuns, mas nenhuma tela constrói um hoje (ver "Restrições" em
+  `docs/ARQUITETURA.pt-br.md`), então `updateAllocation` é exercitado por testes,
+  não pela UI. Uma perna de transferência nunca é editável sozinha. **As três
+  edições somam o delta num passo só (`saldo + (novo - velho)`), exatamente como
+  as rules**, porque as rules comparam com `==` exato e `(saldo - velho) + novo`
+  difere no último bit para certos valores (isso causava `permission-denied`
+  ocasional numa edição legítima; confirmado no emulador, fixado por
+  `describe('edits: balance arithmetic parity with the rules (floating point)')`,
+  9 testes).
+- **`deleteCategory` recusa uma caixinha que participou de transferência.**
+  Transferências são alcançáveis pela UI. Apagar uma caixinha com perna de
+  transferência deixaria a perna pareada na outra caixinha órfã e, no caso da
+  caixinha de origem, subiria `meta/account` acima do ledger (a soma devolvida à
+  conta só conta alocações comuns). O cliente lança um `StateError` ("took part
+  in a transfer; undo the transfer first", localizado como
+  `errorCategoryHasTransfer`); a pessoa desfaz a transferência (`deleteAllocation`
+  em qualquer perna remove as duas) e então apaga. A tela de Categorias
+  desabilita o botão de remover de antemão com explicação. Mais duas recusas,
+  ambas antes de escrever qualquer coisa: saldo negativo, e mais de 495
+  registros na cascata (`FirestoreService.maxCascadeDocs`; a cascata é uma
+  transação, que comporta no máximo 500 escritas, e as rules a leem como um
+  commit só, então não dá pra fatiar; localizada como `errorCategoryTooBig`).
+  Fixado pelos testes `deleteCategory cascade`.
 - **F1 — restaurar um backup com uma dívida CONGELADA poderia falhar no
   meio do caminho — CORRIGIDO, verificado contra o emulador.** Uma dívida
   congelada é uma caixinha `spend` que ficou negativa e depois teve seu
@@ -780,28 +913,16 @@ Fazer 3 antes de 2 deixa os saldos dessincronizados no dia um.
     deixa o deploy prosseguir. Isso fecha o defeito original onde uma
     única dívida aberta em produção teria bloqueado todo deploy futuro de
     rules/schema, não só os que tocam `allowNegative`.
-- **Pendência conhecida: sem guard do lado do app contra converter uma
-  caixinha `spend` negativa em `save`, ou apagá-la, enquanto ainda deve
-  uma dívida.** Essa é a ÚNICA coisa que ficou em aberto da revisão de
-  segurança do `allowNegative` que ainda não foi corrigida. Hoje,
-  `categorias_page.dart` deixa o usuário trocar o `kind` de uma caixinha
-  de `spend` pra `save`, ou apagá-la de vez
-  (`FirestoreService.deleteCategory`), sem nenhuma checagem no saldo
-  atual — essa é a origem real da forma "caixinha save com dívida" /
-  "órfã com dívida" que `replaceAll` (passo 0, acima) e
-  `scripts/backfill_balances.mjs` agora recusam corretamente como
-  `BALANCE CORRUPTION` por design, pra proteger o invariante de
-  conservação de dinheiro em vez de apagar ou atribuir mal a dívida
-  silenciosamente. Recusar isso no restore/backfill é a linha de defesa
-  final certa, mas significa que um usuário que faz isso hoje pode se
-  encurralar num backup que depois falha ao restaurar (corretamente, mas
-  de forma confusa) até que ele conserte o `kind`/saldo da categoria à
-  mão. Correção recomendada (ainda não implementada): adicionar um guard
-  no app que bloqueia (ou avisa e exige confirmação explícita pra)
-  trocar uma caixinha `spend` de saldo negativo pra `save`, e bloqueia
-  apagar uma caixinha enquanto seu saldo é negativo, forçando a dívida a
-  ser paga ou explicitamente perdoada primeiro. TODO: confirmar quando
-  esse guard será agendado/implementado.
+- **Guard do lado do app contra converter uma caixinha `spend` negativa em
+  `save`, ou apagá-la, enquanto deve uma dívida — IMPLEMENTADO** (era a única
+  pendência que restava da revisão de segurança do `allowNegative`).
+  `updateCategory` lê o doc de saldo e recusa spend → save enquanto ele está
+  negativo; `deleteCategory` recusa saldo negativo dentro da transação; a tela de
+  Categorias desabilita o botão de remover (`hasUnsettledDebt`) de antemão. As
+  rules (`convertsSpendToSave`, `catDebtFree`) seguem como a garantia que vale
+  mesmo se o cliente for contornado, então a pessoa não consegue mais, pela UI
+  normal, se encurralar num backup que o passo 0 do `replaceAll` recusa como
+  `BALANCE CORRUPTION`.
 
 ## Superfície de integração
 
@@ -838,13 +959,20 @@ escreve através dele em vez de instanciar `FirestoreService` sozinha.
 | `watchExpenses()` | `users/{uid}/expenses` |
 | `watchSubscriptions()` | `users/{uid}/subscriptions` |
 | `watchInstallmentPurchases()` | `users/{uid}/installmentPurchases` |
+| `watchAllIncomes()` / `watchAllAllocations()` / `watchAllExpenses()` | as mesmas três coleções do ledger, **sem `.limit()`** — usados só pelo resumo do Dashboard (ver "O saldo do Dashboard re-soma o ledger") |
+| `watchAnalyticsOptOut()` | `users/{uid}/meta/settings` (`analyticsOptOut`, padrão `false`) |
+| `watchTutorialProgress()` | `users/{uid}/meta/tutorials` |
+
+`watchIncomes`/`watchAllocations`/`watchExpenses` têm janela (as 2000 mais
+recentes por `date`); `watchCategories`/`watchSubscriptions`/
+`watchInstallmentPurchases` têm teto de 500.
 
 Um stream nunca lança erro no sentido de requisição — um permission-denied
 ou uma conexão caída aparece como `AsyncError` no `StreamProvider`
 correspondente, que as telas (via `ref.watch(...).value`) hoje tratam do
 mesmo jeito que "ainda não carregou", em vez de um estado de erro dedicado.
-TODO: confirmar se uma UI de erro de stream dedicada está planejada; hoje um
-stream negado/quebrado só parece que nunca termina de carregar.
+Nenhuma UI de erro de stream dedicada está planejada (mantenedor, 2026-11-16);
+hoje um stream negado/quebrado só parece que nunca termina de carregar.
 
 **Escritas — um método do `FirestoreService` por operação, cada um uma
 transação do Firestore.** "Falha com" lista a(s) mensagem(ns) de `StateError`
@@ -866,13 +994,24 @@ documento óbvio.
     found'`; `'cannot convert a caixinha with a negative balance to a
     savings box; settle the debt first'` (converter `spend` → `save`
     enquanto a caixinha tem dívida).
-  - `deleteCategory(id)`. Falha com: `'cannot delete a caixinha with a
-    negative balance; settle the debt first'`. Também escreve:
-    cascade-delete de todo doc de `allocations`/`expenses` que referencia
-    essa categoria, restaura `meta/account` pela soma das allocations
-    não-transferência que tinham saído dela, e apaga `balances/{id}`. NÃO
-    trata categoria com pernas de transferência — ver "Known constraints"
-    em `docs/ARQUITETURA.pt-br.md`.
+  - `deleteCategory(id)`. Falha com: `'cannot delete a caixinha that took part
+    in a transfer; undo the transfer first'` (`errorCategoryHasTransfer`),
+    `'too many records to remove at once; remove some first'` (mais de 495
+    allocations+expenses, `errorCategoryTooBig`), `'cannot delete a caixinha with
+    a negative balance; settle the debt first'`. As três são lançadas antes de
+    escrever qualquer coisa. Também escreve: cascade-delete de todo doc de
+    `allocations`/`expenses` que referencia essa categoria, restaura
+    `meta/account` pela soma das allocations que tinham saído dela, e apaga
+    `balances/{id}`.
+  - **Comportamento offline das escritas não transacionais abaixo
+    (`createCategory`, `updateCategory`, criações/exclusões de assinatura e
+    parcelamento e o toggle de cobrança automática):** passam por
+    `FirestoreService.ackOrQueue`, que espera até 4 s pelo ack do servidor e então
+    retorna, deixando a escrita na fila local do Firestore pra ser enviada quando
+    a conexão voltar. Uma negação das rules dentro dos 4 s ainda é lançada; depois
+    disso, uma negação já não alcança a tela. As transações de dinheiro
+    (`createExpense`, receitas, allocations, transferências, edições) não são
+    embrulhadas: falham na hora offline.
 
 - **Receitas** — `users/{uid}/incomes/{id}`, `validIncome`. Só mexem em
   `meta/account`:
@@ -969,6 +1108,29 @@ documento óbvio.
     'installment'`, parando quando `chargedInstallments ==
     installments` por parcelamento.
 
+- **Docs de estado do app** — não são dinheiro, não são validados contra o
+  ledger:
+  - `setAnalyticsOptOut(bool)` → `users/{uid}/meta/settings` (validado:
+    `keys().hasOnly(['analyticsOptOut'])`, bool).
+  - `setTutorialProgress(page, state, {version})` →
+    `meta/tutorials.set({page: {state, v}}, merge)`; `resetTutorial(page)` →
+    `FieldValue.delete()` naquela chave; `resetAllTutorials()` → apaga o doc.
+    Falha com `permission-denied` para id de página desconhecido, `state` que não
+    seja `done`/`skipped`, ou `v` fora de 1..1000. O app engole (registra no log)
+    essa falha e mantém a página como "vista" na sessão.
+- **Exclusão de conta** — `deleteAllUserData()` (docs de saldo + `meta/settings`
+  + `meta/tutorials` primeiro, em batches já commitados, com um create de
+  `accountDeletionLog` no primeiro batch; depois as coleções do ledger, em
+  pedaços), depois `AuthService.deleteAccount()`. Precedida por
+  `AuthService.hasRecentLogin()` na `SettingsPage`. Ver "Dados do usuário:
+  exportação e exclusão" e "`accountDeletionLog`" acima.
+- **Estado só local (não é superfície de integração; listado pra ninguém
+  procurar no Firestore):** idioma (`localeProvider`) e tema (`themeModeProvider`,
+  chave `themeMode`) ficam em `shared_preferences` no aparelho.
+- **Atualização in-app da Google Play** (`AppUpdateService`, plugin
+  `in_app_update`): `isUpdateAvailable()`, `startUpdate()` (flexible; true só
+  depois que o download termina), `restartToInstall()`. Só Android instalado pela
+  Play; qualquer outro caso responde "sem atualização".
 - **Backup/restore** (`ImportExportService`, em cima de
   `FirestoreService.fetchAll()`/`replaceAll(AppDb)`): não é endereçado por
   um caminho do Firestore — `fetchAll` lê as seis coleções do ledger num

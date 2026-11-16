@@ -2,7 +2,9 @@
 
 **[Leia em Português](BACKEND.pt-br.md)**
 
-Operational reference for Dindin's Firestore backend. Read this before any
+Operational reference for Dindin's Firestore backend (describes version 1.2.1+7,
+checked against `firestore.rules`, `lib/services/firestore_service.dart` and
+`test/rules` on 2026-11-16; the rules harness was read, not run). Read this before any
 deploy that touches `firestore.rules`, `firestore.indexes.json`, or `functions/`.
 
 ## Deploy gate: back up production data FIRST (mandatory, human step)
@@ -51,12 +53,17 @@ plus CI and rollback for rules/hosting, is now encoded in `scripts/deploy.sh`
      gone, in an already-committed batch, before the ledger delete. Deleting
      the Auth user before the Firestore data would instead strand
      `users/{uid}` unreachable forever (uids are never reissued).
-  3. `user.delete()` can throw `FirebaseAuthException(code:
-     'requires-recent-login')` — Auth account deletion requires a *recent*
-     sign-in. The UI surfaces this as "sign out and back in, then retry"
-     rather than a generic error; the Firestore data is already gone by this
-     point (safe — `scripts/sweep_orphans.mjs` below is exactly the backstop
-     for a deletion that dies between steps 1 and 2).
+  3. **Recent login is checked BEFORE step 1.** `SettingsPage` calls
+     `AuthService.hasRecentLogin()` (reads the ID token's `auth_time`, 4-minute
+     margin under Firebase's ~5-minute window) and, if the session is too old,
+     shows "sign out and back in, then retry" and **deletes nothing**. (Before
+     1.1.2 the Firestore data was wiped first and `user.delete()` then failed
+     with `requires-recent-login`, leaving a live, empty account.) The user
+     still has to sign out and in again; re-authenticating in place was not
+     built. If `user.delete()` still throws `requires-recent-login` (the
+     margin is not a guarantee), the same message shows, and
+     `scripts/sweep_orphans.mjs` below is the backstop for a deletion that dies
+     between steps 1 and 2.
   - No tombstone IDENTIFYING the user is written or expected after a
     successful deletion — there is nothing left under `users/{uid}` for
     anyone to read (rules key on `request.auth.uid`, and a deleted uid is
@@ -156,6 +163,28 @@ step by design.
     never touches Firestore). `--dry-run` by default; requires `--confirm` to
     write. Run periodically (see its header for the invocation and
     credentials).
+
+## App Check (abuse posture)
+
+`lib/main.dart` calls `FirebaseAppCheck.instance.activate` at startup, wrapped
+in a try/catch so a failure can never block the app:
+
+- **Android:** `AndroidPlayIntegrityProvider` in release builds,
+  `AndroidDebugProvider` under `kDebugMode` (prints a token that must be
+  registered once in Firebase Console → App Check → Apps → debug tokens for local
+  builds to keep working).
+- **Web:** not activated. It needs a reCAPTCHA v3 site key
+  (`_recaptchaV3SiteKey` is still the placeholder `REPLACE_WITH_RECAPTCHA_V3_SITE_KEY`),
+  and the maintainer decided on 2026-09-21 to defer web App Check (the
+  alternative, reCAPTCHA Enterprise, needs a billing account linked, which
+  contradicts staying on Spark without a card). Per that decision record.
+- **Enforcement is OFF.** The app only *sends* tokens; "Enforce" for Firestore and
+  Authentication in the Firebase Console has not been turned on, deliberately,
+  until the console metrics show real Android traffic as verified. Turning it on
+  would also reject the web client, which sends no token. Open item in
+  `docs/PENDENCIAS.md`. `firestore.rules`' own header ("ABUSE / OVERLOAD
+  POSTURE") explains that rules alone cannot rate-limit and that App Check is what
+  bounds the Spark quota.
 
 ## Email verification (non-blocking)
 
@@ -276,6 +305,39 @@ touch `firestore.rules`.
   any index below `chargedInstallments` — moving the due day never rewrites
   history — and only the DAY moves, never the month sequence.
 
+- `subscriptions/{id}.autoChargeEnabled` — optional `bool`, stored only when
+  `false` (absent = `true`). With `false`, `catchUpSubscriptions` skips the
+  subscription and its due dates stay pending until the user posts them with
+  "Cobrar agora" (`chargeSubscriptionNow`, which ignores the flag). No invariant
+  of its own.
+- `users/{uid}/meta/settings` — `{ analyticsOptOut: bool }`. Only key allowed
+  (`keys().hasOnly`). Missing doc = collection ON. Deliberately a separate doc
+  from `meta/account`, whose validator anchors the money model and is kept as
+  narrow as possible.
+- `users/{uid}/meta/tutorials` — which onboarding tutorials the user has seen:
+  `{ <page>: { state: 'done' | 'skipped', v: int } }`, one optional key per
+  page, closed list `dashboard`, `receitas`, `gastos`, `assinaturas`,
+  `parcelamentos`, `categorias`, `ajustes` (`validTutorials`/`validTutorialEntry`
+  in `firestore.rules`; `v` is the tutorial version, integer 1..1000). UI
+  state, not money: no balance touches it, nothing reads it but the tutorial
+  engine, and it is not in the JSON backup. Kept as its own doc (not a field of
+  `settings`) so that doc's validator stays as narrow as it is. The app
+  writes with `set(..., merge: true)` (one page at a time), resets a page with
+  `FieldValue.delete()` and all pages with a document delete (allowed by the
+  generic `meta` delete rule). `lib/models/tutorial_progress.dart`'s
+  `TutorialPage` ids MUST stay in sync with that closed list: adding an eighth
+  tutorial needs a rules change and therefore `scripts/deploy.sh`. Covered by
+  `describe('meta/tutorials (onboarding progress)')` (6 tests). Until the rules
+  were deployed (done by the maintainer on 2026-11-13, before 1.2.0), the app
+  kept progress only in the session, so tutorials would have reappeared on the
+  next open.
+- `accountDeletionLog/{autoId}` — top-level, create-only audit trail; see
+  "`accountDeletionLog`" above.
+- `incomes/{id}.createdAt` and `expenses/{id}.createdAt` — optional ISO
+  timestamp, set by the client clock (`FirestoreService._now`); only used to
+  order rows that share a `date`. Absent on older documents (they sort after
+  the ones that have it).
+
 Old JSON backups (no `monthlyBudget`, no `transferId`, no `kind`/`goalAmount`,
 no `allowNegative`, no `subscriptions`, no `installmentPurchases`, no
 `sourceType`/`sourceId`, no `categoryId` on the recurring collections, no
@@ -304,6 +366,42 @@ These are a **derived cache, not source of truth**:
   `aggregation_service.dart`. So even if a balance doc ever drifted, the UI
   would still show the truth; the balance docs exist to let the RULES enforce
   non-negativity and to give the client O(1) pre-write checks.
+
+### Dashboard balance re-sums the ledger (read windowing)
+
+Two different consumers read the same collections for two different purposes,
+and they are deliberately NOT the same query:
+
+- **Lists** (Receitas, Gastos, Parcelamentos) use the windowed streams
+  `watchIncomes`/`watchAllocations`/`watchExpenses`: `orderBy('date', desc)`
+  plus `.limit(2000)` (`_ledgerLimit` in `firestore_service.dart`;
+  categories/subscriptions/installment purchases use a 500 cap,
+  `_smallCollectionLimit`). The `orderBy` is not optional: a bare `.limit()`
+  returns documents by id and could drop RECENT rows while keeping old ones.
+  Rows that share a `date` are re-sorted client-side by `createdAt` (a
+  Firestore `orderBy('createdAt')` would silently drop older docs without the
+  field). `fetchAll()` (export) has no limit either.
+- **The Dashboard** (`summaryProvider`) uses the full, unlimited
+  `watchAllIncomes`/`watchAllAllocations`/`watchAllExpenses`, then sums them in
+  Dart (`aggregation_service.buildSummary`). The account balance and each
+  caixinha's balance shown there are **re-summed from the whole ledger on every
+  snapshot**, not read from `meta/account`/`balances/{id}`.
+
+Why: the Dashboard balance is the number users trust with their money. Summing
+the windowed list would silently undercount for an account with more than 2000
+rows per collection, and reading the denormalized docs would show whatever a
+drifted cache holds (see "Option B residual limitations": a client can rewrite
+its own balance docs). Re-summing is correct by construction. The cost is real
+and accepted: every session reads the entire history of the account (counted against the
+Spark tier's daily read quota), and every snapshot re-sums everything in
+memory. It should be revisited if accounts with
+tens of thousands of rows appear. Only the monthly history chart of a very
+long-lived account can still fall outside the 2000-row window of the lists; the
+Dashboard totals cannot.
+
+The denormalized docs remain what they were: an O(1) anchor for the rules'
+`getAfter()` checks and for the client's pre-write checks. The backfill script
+(`scripts/backfill_balances.mjs`) and `replaceAll` rebuild them from the ledger.
 
 ## Subscriptions (recurring expenses): client-triggered catch-up, not a server schedule
 
@@ -402,6 +500,25 @@ yet. And if catch-up itself fails, the warning says so instead of blaming the
 balance: `recurringChargesCatchUpProvider` logs and surfaces the failure as
 an `AsyncError` instead of swallowing it, and the screen tells the two states
 apart.
+
+### One bad document does not stop the others
+
+`catchUpSubscriptions` tries each subscription inside its own `try`, and
+`recurringChargesCatchUpProvider` runs `catchUpInstallmentPurchases` even if the
+subscription pass failed. The first error is rethrown at the end, so the
+provider still ends as an `AsyncError` ("the run did not finish cleanly") while
+everything else was billed. Before this, one malformed or rule-denied document
+aborted all later charges. Covered by `test/services/firestore_service_test.dart`
+and `test/providers/recurring_catch_up_provider_test.dart`.
+
+### Coming back after days
+
+The catch-up runs once per session, and `todayProvider` is read once, so an app
+left in the background for days would keep the day it started on. `AppShell`
+(`didChangeAppLifecycleState`, state `resumed`) compares the stored "today" with
+the real date and, when the day changed, invalidates both providers (at most once
+per day). Pull-to-refresh on the pages that list charges (`CatchUpRefresh`) re-runs
+the catch-up on demand.
 
 ## Money-integrity enforcement: DECIDED — Option B (rules-only, free Spark tier)
 
@@ -663,8 +780,17 @@ Doing 3 before 2 leaves balances desynced on day one.
 - **Allocation/expense edits are restricted** to keep the rules tractable:
   `updateAllocation` keeps the same caixinha, `updateExpense` keeps the same
   target (caixinha vs account). Re-homing is delete + recreate. The edit sheet
-  (`edit_transaction_sheet.dart`) reaches these paths for incomes, expenses and
-  plain allocations; a transfer leg is not editable on its own.
+  (`edit_transaction_sheet.dart`) reaches these paths for incomes and expenses
+  from the lists. It also has an `EditableAllocation` case for plain
+  allocations, but no screen currently builds one (see "Known constraints" in
+  `docs/ARQUITETURA.md`), so `updateAllocation` is exercised by tests, not by
+  the UI. A transfer leg is never editable on its own. **All three updates add
+  the delta in one step (`balance + (new - old)`), exactly like the rules**,
+  because the rules compare with exact `==` and `(balance - old) + new` differs
+  in the last bit for some values (that used to cause an occasional
+  `permission-denied` on a legitimate edit; confirmed on the emulator, pinned by
+  `describe('edits: balance arithmetic parity with the rules (floating point)')`,
+  9 tests).
 - **`deleteCategory` refuses a caixinha that took part in a transfer.**
   Transfers are reachable from the UI. Deleting a caixinha that holds a
   transfer leg would orphan the paired leg in the other caixinha and, for a
@@ -672,8 +798,13 @@ Doing 3 before 2 leaves balances desynced on day one.
   the account only counts plain allocations). The client throws a `StateError`
   ("took part in a transfer; undo the transfer first", localized as
   `errorCategoryHasTransfer`); the user undoes the transfer (`deleteAllocation`
-  on either leg removes both) and then deletes. Pinned by the `deleteCategory
-  cascade` tests.
+  on either leg removes both) and then deletes. The Categorias screen disables
+  the remove button up front with an explanation. Two more refusals, both before
+  anything is written: a negative balance, and more than 495 records to cascade
+  (`FirestoreService.maxCascadeDocs`; the cascade is one transaction, which holds
+  at most 500 writes, and the rules read it as one commit so it can't be split;
+  localized as `errorCategoryTooBig`). Pinned by the `deleteCategory cascade`
+  tests.
 - **F1 — restoring a backup with a FROZEN debt could fail partway through —
   FIXED, verified against the emulator.** A frozen debt is a `spend` caixinha
   that went negative and then either had its `allowNegative` toggle turned
@@ -748,26 +879,15 @@ Doing 3 before 2 leaves balances desynced on day one.
     the original defect where a single open debt in production would have
     blocked every future rules/schema deploy, not just ones touching
     `allowNegative`.
-- **Known pending: no app-side guard against converting a negative `spend`
-  caixinha to `save`, or deleting it, while it still owes a debt.** This is
-  the ONE thing left open from the `allowNegative` security review that is
-  not yet fixed. Today, `categorias_page.dart` lets the user flip a
-  caixinha's `kind` from `spend` to `save`, or delete it outright
-  (`FirestoreService.deleteCategory`), with no check on its current balance —
-  that's the actual origin of the "save caixinha with a debt" / "orphan with a
-  debt" shape that `replaceAll` (step 0, above) and
-  `scripts/backfill_balances.mjs` now correctly refuse as `BALANCE
-  CORRUPTION` by design, to protect the conservation-of-money invariant,
-  rather than silently erasing or misattributing the debt. Refusing it in
-  restore/backfill is the right last line of defense, but it means a user who
-  does this today can back themselves into a backup that later fails to
-  restore (correctly, but confusingly) until they fix the category's `kind`/
-  balance by hand. Recommended fix (not yet implemented): add a guard in the
-  app that blocks (or warns and requires explicit confirmation for) switching
-  a negative-balance `spend` caixinha to `save`, and blocks deleting a
-  caixinha while its balance is negative, forcing the debt to be paid down or
-  explicitly forgiven first. TODO: confirmar when this guard will be
-  scheduled/implemented.
+- **App-side guard against converting a negative `spend` caixinha to `save`,
+  or deleting it, while it owes a debt — IMPLEMENTED** (this used to be the one
+  open item from the `allowNegative` security review). `updateCategory` reads the
+  balance doc and refuses spend → save while it is negative; `deleteCategory`
+  refuses a negative balance inside its transaction; the Categorias screen
+  disables the remove button (`hasUnsettledDebt`) up front. The rules
+  (`convertsSpendToSave`, `catDebtFree`) remain the guarantee that holds even if
+  the client is bypassed, so a user can no longer back themselves into a backup
+  that `replaceAll` step 0 refuses as `BALANCE CORRUPTION` through the normal UI.
 
 ## Integration surface
 
@@ -803,13 +923,20 @@ mapped to the matching Dart model:
 | `watchExpenses()` | `users/{uid}/expenses` |
 | `watchSubscriptions()` | `users/{uid}/subscriptions` |
 | `watchInstallmentPurchases()` | `users/{uid}/installmentPurchases` |
+| `watchAllIncomes()` / `watchAllAllocations()` / `watchAllExpenses()` | same three ledger collections, **no `.limit()`** — used only by the Dashboard summary (see "Dashboard balance re-sums the ledger") |
+| `watchAnalyticsOptOut()` | `users/{uid}/meta/settings` (`analyticsOptOut`, default `false`) |
+| `watchTutorialProgress()` | `users/{uid}/meta/tutorials` |
+
+`watchIncomes`/`watchAllocations`/`watchExpenses` are windowed (latest 2000 by
+`date`); `watchCategories`/`watchSubscriptions`/`watchInstallmentPurchases` are
+capped at 500.
 
 A stream never throws in the request sense — a permission-denied or dropped
 connection surfaces as an `AsyncError` on the matching `StreamProvider`,
 which screens (via `ref.watch(...).value`) currently treat the same as "not
-loaded yet" rather than a dedicated error state. TODO: confirmar whether a
-dedicated stream-error UI is planned; today a denied/broken stream just looks
-like it never finishes loading.
+loaded yet" rather than a dedicated error state. No dedicated
+stream-error UI is planned (maintainer, 2026-11-16); today a denied/broken
+stream just looks like it never finishes loading.
 
 **Writes — one `FirestoreService` method per operation, each a Firestore
 transaction.** "Fails with" lists the `StateError` message(s) thrown BEFORE
@@ -830,12 +957,24 @@ what changes beyond the obvious document.
     `'category not found'`; `'cannot convert a caixinha with a negative
     balance to a savings box; settle the debt first'` (converting `spend` →
     `save` while the caixinha holds a debt).
-  - `deleteCategory(id)`. Fails with: `'cannot delete a caixinha with a
-    negative balance; settle the debt first'`. Also writes: cascade-deletes
-    every `allocations`/`expenses` doc referencing this category, restores
-    `meta/account` by the sum of the non-transfer allocations that had drawn
-    from it, and deletes `balances/{id}`. Does NOT handle a category holding
-    transfer legs — see "Known constraints" in `docs/ARQUITETURA.md`.
+  - `deleteCategory(id)`. Fails with: `'cannot delete a caixinha that took
+    part in a transfer; undo the transfer first'` (`errorCategoryHasTransfer`),
+    `'too many records to remove at once; remove some first'` (more than 495
+    allocations+expenses, `errorCategoryTooBig`), `'cannot delete a caixinha
+    with a negative balance; settle the debt first'`. All three are thrown
+    before anything is written. Also writes: cascade-deletes every
+    `allocations`/`expenses` doc referencing this category, restores
+    `meta/account` by the sum of the allocations that had drawn from it, and
+    deletes `balances/{id}`.
+  - **Offline behavior of the non-transactional writes below
+    (`createCategory`, `updateCategory`, the subscription/installment creates,
+    deletes and the auto-charge toggle):** they go through
+    `FirestoreService.ackOrQueue`, which waits up to 4 s for the server ack and
+    then returns, leaving the write in Firestore's local queue to be sent when
+    the connection returns. A rules denial inside the 4 s still throws; after
+    it, a denial can no longer reach the screen. Money transactions
+    (`createExpense`, incomes, allocations, transfers, edits) are not wrapped:
+    they fail immediately offline.
 
 - **Incomes** — `users/{uid}/incomes/{id}`, `validIncome`. Only ever move
   `meta/account`:
@@ -928,6 +1067,29 @@ what changes beyond the obvious document.
     as `catchUpSubscriptions`, tagged `sourceType: 'installment'`, stopping
     once `chargedInstallments == installments` per purchase.
 
+- **App state docs** — not money, not validated against the ledger:
+  - `setAnalyticsOptOut(bool)` → `users/{uid}/meta/settings` (validated:
+    `keys().hasOnly(['analyticsOptOut'])`, bool).
+  - `setTutorialProgress(page, state, {version})` →
+    `meta/tutorials.set({page: {state, v}}, merge)`; `resetTutorial(page)` →
+    `FieldValue.delete()` on that key; `resetAllTutorials()` → deletes the doc.
+    Fails with `permission-denied` for an unknown page id, a `state` other than
+    `done`/`skipped`, or `v` outside 1..1000. The app swallows (logs) such a
+    failure and keeps the page "seen" for the session.
+- **Account deletion** — `deleteAllUserData()` (balance docs + `meta/settings`
+  + `meta/tutorials` first, in already-committed batches, with one
+  `accountDeletionLog` create in the first batch; then the ledger collections,
+  chunked), then `AuthService.deleteAccount()`. Preceded by
+  `AuthService.hasRecentLogin()` in `SettingsPage`. See "User data: export &
+  deletion" and "`accountDeletionLog`" above.
+- **Local-only state (not an integration surface, listed so nobody looks for it
+  in Firestore):** language (`localeProvider`) and theme
+  (`themeModeProvider`, key `themeMode`) live in `shared_preferences` on the
+  device.
+- **Google Play in-app update** (`AppUpdateService`, plugin `in_app_update`):
+  `isUpdateAvailable()`, `startUpdate()` (flexible; true only once the download
+  finished), `restartToInstall()`. Android installed from Play only; anything
+  else answers "no update".
 - **Backup/restore** (`ImportExportService`, on top of
   `FirestoreService.fetchAll()`/`replaceAll(AppDb)`): not addressed by a
   Firestore path — `fetchAll` reads the six ledger collections into a JSON
