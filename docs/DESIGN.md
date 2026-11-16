@@ -349,7 +349,7 @@ rules (not implementation detail — that lives in the code, which is the
 current source of truth for exact behavior):
 
 - **One adaptive breakpoint (720px)** decides dialog-vs-bottom-sheet
-  (`showAdaptiveFormSheet`), rail-vs-bottom-nav (`AppShell`), and
+  (`showAdaptiveFormSheet`), side-rail-vs-single-menu (`AppShell`), and
   side-by-side-vs-stacked form fields (`ResponsiveFormRow`) everywhere in the
   app — a single rule a user learns once, not a per-feature judgment call.
 - **Tap-a-row-to-edit**, with delete demoted to a small trailing
@@ -385,3 +385,66 @@ are implemented in `lib/features/**` and `lib/widgets/edit_transaction_sheet.dar
 `caixinha_budget_bar.dart`, `adaptive_form_sheet.dart`, `responsive_form_row.dart`
 — read those directly for current behavior rather than a spec that can drift
 from what's shipped.
+
+
+## 6. Theme choice, brand manual and onboarding visuals
+
+Added with versions 1.2.0 and 1.2.1. The tokens in sections 1-3 did not change;
+what follows is how they are chosen, where the identity is defined above this
+file, and the new visual pieces.
+
+- **Theme selector (Sistema / Claro / Escuro).** Ajustes → Tema is a
+  `SegmentedButton`; the choice is kept in `shared_preferences` on the device
+  (key `themeMode`; "Sistema" removes it) and applied through
+  `MaterialApp.themeMode` (`lib/providers/theme_provider.dart`,
+  `lib/app.dart`). The labels shrink instead of wrapping to a second line at
+  320-360 px width and text scale up to x1.3 (checked by
+  `test/features/layout_sweep_test.dart` and the settings test; not checked on
+  a real phone).
+- **Official dark background: `#16130F`** (`AppPalette.darkBackground`), decided
+  by the maintainer on 2026-11-12. It is the same value as the adaptive launcher
+  icon background, the landing site and the Play listing art. Cards are
+  `#201C17` (`darkSurface`) and dialogs/menus `#2A241D` (`darkSurfaceElevated`).
+  The brand manual originally called `#201C17` the dark "paper"; the manual was
+  corrected to match the app.
+- **The brand manual is the source of truth for the identity and lives in
+  another repository.** Dindin's manual v1.1 (palette, typography, illustration
+  style, wax seal and coin, "Fixed / Series / Variable" rules for marketing
+  pieces) is in the company knowledge repo `cafelabs-vault`, under
+  `marca/dindin/` (text version `manual/dindin-manual.md`, tokens in
+  `dindin-tokens.json`). It is **not copied here**: read it there for any new
+  store art, post or screen. This file documents what the app ships; the manual
+  documents the brand.
+- **Conformance status.** On 2026-11-12 every light and dark token in
+  `lib/theme/colors.dart` was compared with the manual's token file and matched;
+  text contrast pairs pass 4.5:1, and the two pairs below that (terracotta and
+  amber on the light background, 4.3:1 and 4.2:1) only appear as button and bar
+  fills, never as text. Rendered and checked against the manual: Ajustes and
+  Categorias in both themes. **Not checked against the manual:** the Dashboard
+  charts, Receitas, Gastos, Assinaturas, Parcelamentos, the login page and
+  dialogs, and the whole app on a real device (see `docs/PENDENCIAS.md`).
+- **Illustrations** (`assets/illustrations/`): `dindin-moeda.svg` (the D coin),
+  `dindin-selo.svg` (terracotta wax seal with a D), and the foliage sprig
+  (`dindin-ramo-alto-fundo-claro.svg` / `...-escuro.svg`, light and dark
+  variants). Per the manual, illustrations are flat stationery-style art; the
+  in-app menu keeps Material icons (the manual restricts the coin and the
+  line illustrations to illustrations, not navigation).
+  Empty-state pictures (`lib/widgets/guided_empty_state.dart`): Receitas = one
+  coin, Parcelamentos = three coins of growing size, Categorias = a mirrored pair
+  of leaves (all SVG from the manual); Gastos (shopping cart) and Assinaturas
+  (`Icons.event_repeat_outlined`, calendar with return) are Material outlined
+  icons in leaf green (`LineIconIllustration`), not SVG. The calendar-with-return
+  icon is not in the manual: the maintainer chose to keep it on 2026-11-12 and it
+  was registered in the manual in `cafelabs-vault`.
+- **Onboarding visuals** ("Lanterna" direction): the tutorial is a dark veil with
+  a rounded cut-out and ring around the real widget and a balloon shaped like the
+  brand manual's step card. The terracotta wax seal appears only when all seven
+  tutorials are seen (Ajustes → Tutoriais) and is the single terracotta point of
+  the onboarding. Full rationale, the rejected alternative, copy of every step
+  and the QA checklist: `docs/onboarding-design.md` (Portuguese). Static mockup:
+  `docs/onboarding-mockup.html`.
+- **Opening animation.** 1.5 s on cold start: the logo bag at its normal size
+  on the theme's background color (`lightBackground` / `darkBackground`; in
+  "Sistema" the device's brightness), three `dindin-moeda.svg` coins fall into
+  it and shake it, then it zooms and fades into the app. Not played when the OS
+  asks for reduced motion. Implementation and limits: `docs/ARQUITETURA.md`.

@@ -368,7 +368,7 @@ implementação — isso vive no código, que é a fonte de verdade atual pro
 comportamento exato):
 
 - **Um breakpoint adaptativo (720px)** decide dialog-vs-bottom-sheet
-  (`showAdaptiveFormSheet`), rail-vs-bottom-nav (`AppShell`), e
+  (`showAdaptiveFormSheet`), barra-lateral-vs-menu-único (`AppShell`), e
   lado-a-lado-vs-empilhado nos campos de formulário (`ResponsiveFormRow`) em
   todo lugar no app — uma única regra que o usuário aprende uma vez, não uma
   decisão por feature.
@@ -409,3 +409,65 @@ erro estão implementados em `lib/features/**` e
 `adaptive_form_sheet.dart`, `responsive_form_row.dart` — ler esses
 diretamente pro comportamento atual em vez de uma spec que pode se desalinhar
 do que está de fato em produção.
+
+
+## 6. Escolha de tema, manual de marca e visuais do onboarding
+
+Entraram com as versões 1.2.0 e 1.2.1. Os tokens das seções 1 a 3 não mudaram; o
+que segue é como são escolhidos, onde a identidade é definida acima deste arquivo
+e as peças visuais novas.
+
+- **Seletor de tema (Sistema / Claro / Escuro).** Ajustes → Tema é um
+  `SegmentedButton`; a escolha fica em `shared_preferences` no aparelho (chave
+  `themeMode`; "Sistema" a remove) e é aplicada por `MaterialApp.themeMode`
+  (`lib/providers/theme_provider.dart`, `lib/app.dart`). Os rótulos encolhem em
+  vez de quebrar numa segunda linha em 320-360 px de largura e fonte até x1.3
+  (conferido por `test/features/layout_sweep_test.dart` e pelo teste de Ajustes;
+  não conferido num celular real).
+- **Fundo escuro oficial: `#16130F`** (`AppPalette.darkBackground`), decidido pelo
+  mantenedor em 2026-11-12. É o mesmo valor do fundo do ícone adaptativo, do site
+  da landing e da arte da ficha da Play. Os cartões são `#201C17` (`darkSurface`)
+  e diálogos/menus `#2A241D` (`darkSurfaceElevated`). O manual de marca chamava
+  `#201C17` de "papel" escuro; o manual foi corrigido pra bater com o app.
+- **O manual de marca é a fonte de verdade da identidade e mora em outro
+  repositório.** O manual do Dindin v1.1 (paleta, tipografia, estilo de
+  ilustração, selo de cera e moeda, regras "Fixo / Série / Variável" pras peças de
+  divulgação) está no repositório de conhecimento da empresa, `cafelabs-vault`, em
+  `marca/dindin/` (versão em texto `manual/dindin-manual.md`, tokens em
+  `dindin-tokens.json`). **Não é copiado aqui**: leia lá para qualquer arte de
+  loja, post ou tela nova. Este arquivo documenta o que o app entrega; o manual
+  documenta a marca.
+- **Situação de conformidade.** Em 2026-11-12 todos os tokens claros e escuros de
+  `lib/theme/colors.dart` foram comparados com o arquivo de tokens do manual e
+  bateram; os pares de contraste de texto passam de 4,5:1, e os dois pares abaixo
+  disso (terracota e âmbar sobre o fundo claro, 4,3:1 e 4,2:1) só aparecem como
+  preenchimento de botão e de barra, nunca como texto. Renderizados e conferidos
+  contra o manual: Ajustes e Categorias nos dois temas. **Não conferidos contra o
+  manual:** os gráficos do Dashboard, Receitas, Gastos, Assinaturas,
+  Parcelamentos, a tela de login e os diálogos, e o app inteiro num aparelho real
+  (ver `docs/PENDENCIAS.pt-br.md`).
+- **Ilustrações** (`assets/illustrations/`): `dindin-moeda.svg` (a moeda com D),
+  `dindin-selo.svg` (selo de cera terracota com D) e o ramo de folhas
+  (`dindin-ramo-alto-fundo-claro.svg` / `...-escuro.svg`, variantes clara e
+  escura). Pelo manual, ilustrações são planas, de papelaria; o menu do app
+  mantém ícones Material (o manual restringe a moeda e as ilustrações de linha a
+  ilustrações, não à navegação). Figuras dos estados vazios
+  (`lib/widgets/guided_empty_state.dart`): Receitas = uma moeda, Parcelamentos =
+  três moedas de tamanho crescente, Categorias = um par de folhas espelhado (todos
+  SVG do manual); Gastos (carrinho) e Assinaturas (`Icons.event_repeat_outlined`,
+  calendário com volta) são ícones Material outlined em verde-folha
+  (`LineIconIllustration`), não SVG. O ícone de calendário com volta não está no
+  manual: o mantenedor decidiu mantê-lo em 2026-11-12 e ele foi registrado no
+  manual no `cafelabs-vault`.
+- **Visuais do onboarding** (direção "Lanterna"): o tutorial é um véu escuro com
+  recorte arredondado e anel em volta do widget real e um balão no formato do
+  cartão de passo do manual. O selo de cera terracota só aparece quando os sete
+  tutoriais foram vistos (Ajustes → Tutoriais) e é o único ponto terracota do
+  onboarding. Racional completo, a alternativa rejeitada, o texto de cada passo e
+  o checklist de QA: `docs/onboarding-design.md`. Mockup estático:
+  `docs/onboarding-mockup.html`.
+- **Animação de abertura.** 1,5 s na partida a frio: o saco da logo no tamanho
+  normal sobre a cor de fundo do tema (`lightBackground` / `darkBackground`; em
+  "Sistema" o brilho do aparelho), três moedas `dindin-moeda.svg` caem nele e o
+  balançam, depois ele se aproxima e some pro app. Não toca quando o sistema pede
+  movimento reduzido. Implementação e limites: `docs/ARQUITETURA.pt-br.md`.

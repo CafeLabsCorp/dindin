@@ -1,6 +1,14 @@
 # Dindin: proposta de design do onboarding
 
-Status: **proposta**, ainda não implementada. Nada aqui é código do app.
+Status (2026-11-16): **implementado** na 1.2.0 (aprovada na Google Play) e
+ajustado na 1.2.1 (enviada, aguardando análise). Este documento nasceu como
+proposta de design e foi mantido como o racional: o texto abaixo descreve a
+proposta, e a seção "10. O que foi construído e onde deviou da proposta" no fim
+registra o que de fato existe. Para o funcionamento atual, ver
+`docs/ARQUITETURA.pt-br.md` (Rastro C e decisões técnicas). **Tudo foi validado
+só em testes (widget tests e rules no emulador) e em capturas renderizadas; nada
+foi conferido num aparelho real.** O mockup estático abaixo continua sendo o
+desenho de referência, não uma captura do app.
 Mockup visual estático (claro e escuro, 360 e 320 px, estados vazios, Ajustes):
 [`onboarding-mockup.html`](onboarding-mockup.html). Abra no navegador a partir
 desta pasta (ele carrega as fontes de `../assets/fonts/`).
@@ -565,3 +573,46 @@ Ainda **sem decisão** (ficam pra fase dos estados vazios e da navegação; nada
 3. Seção "Tutoriais" em Ajustes.
 4. Tutoriais das outras páginas.
 5. Estados vazios e navegação mais descobrível (depende das decisões em aberto).
+
+## 10. O que foi construído e onde deviou da proposta
+
+Conferido no código em 2026-11-16.
+
+- **Motor** (`lib/widgets/tutorial/tutorial.dart`): rota modal com véu, recorte,
+  anel e balão (direção A "Lanterna"). Voltar do sistema e Esc = Pular;
+  `TutorialResult.unavailable` quando o alvo não está montado (não grava).
+  **Limite conhecido:** alvo numa lista construída sob demanda, bem abaixo da
+  dobra, não existe ainda e o tutorial encerra como indisponível; por isso os
+  alvos ficam perto do topo.
+- **Disparador** (`tutorial_host.dart`): espera o progresso salvo carregar, a aba
+  estar visível, nenhum diálogo por cima, o teclado fechado e, desde a 1.2.1, o
+  menu de páginas fechado (`navMenuOpen`, em `lib/widgets/nav_menu_state.dart`),
+  porque o menu é um diálogo na rota raiz e a rota da página não o enxerga.
+  Antes disso o tutorial podia aparecer por cima do menu aberto (bug corrigido em
+  2026-11-16). Tenta a cada 600 ms, até 30 vezes, depois desiste em silêncio.
+- **Sete tutoriais**: Dashboard 4 passos, Ajustes 2, Receitas/Gastos/Assinaturas/
+  Parcelamentos/Categorias 3 cada (contados no código).
+- **Progresso**: `users/{uid}/meta/tutorials`, `{pagina: {state, v}}`, com versão
+  por página (decisão 5) e cópia da sessão. Regra `validTutorials` em
+  `firestore.rules`, 6 testes no emulador. Publicada em produção pelo mantenedor
+  em 2026-11-13.
+- **Decisões que estavam em aberto e foram resolvidas:** 4 (botões de lançar no
+  Dashboard): dois botões, "Lançar receita" e "Lançar gasto" (não um "+"
+  flutuante); desde a 1.2.1 abrem um popup (`lib/widgets/quick_entry_sheet.dart`)
+  em vez de levar à página. 7 (ícone de calendário fora do manual): mantido em
+  Assinaturas, registrado no manual (decisão do mantenedor, 2026-11-12). 8
+  (cartão "Primeiros passos"): feito, no Dashboard. 9 (selo ao completar os 7):
+  feito, em Ajustes → Tutoriais. 10 (barra inferior): **não construída**; ficou
+  só como plano B.
+- **Assumido (e ainda reversível):** o rótulo "Cadastrar" nos estados vazios de
+  Assinaturas e Parcelamentos (aprovado em 2026-11-12); ícones de linha
+  (Gastos, Assinaturas) são Material outlined, não SVG próprio; os textos
+  chamam a tela de "Dashboard".
+- **Navegação descobrível** (seção 6): chevron do título virou chip tonal com
+  área de toque de 48 dp (`menu_chevron.dart`) e cada linha do menu tem uma
+  descrição de uma linha.
+- **Ainda não validado:** nenhum dos itens do checklist da seção 7.1 que depende
+  de aparelho real (TalkBack, teclado físico, rotação, fonte do sistema grande,
+  desempenho do véu) foi executado num aparelho; os testes cobrem leitor de tela
+  por semântica, 320 px com fonte x1.3 e movimento reduzido. Ver
+  `docs/PENDENCIAS.pt-br.md`.
