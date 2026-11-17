@@ -5,15 +5,15 @@
 ## Resume here
 
 - **Phase:** documentation pass for version 1.2.1+7 (sent to Google Play on
-  2026-11-16, awaiting review). All docs in `docs/` and both READMEs were
+  2026-11-16, approved and live on 2026-11-17). All docs in `docs/` and both READMEs were
   reconciled against the code on 2026-11-16; nothing committed yet.
 - **Next step:** the maintainer reviews the working-tree diff and commits. When
   Google approves 1.2.1, record it in the published-versions table of
   `docs/DEPLOY.md` (and `.pt-br`) and in `README.md`'s status block. Then close
   or move items in `docs/PENDENCIAS.md`.
 - **Waiting on the user:** trader-status declaration in Play Console (by
-  2027-02-01); real-device check of onboarding, opening animation, in-app update
-  indicator and the theme selector on a narrow screen.
+  2027-02-01); real-device check of the onboarding and the theme selector on a narrow
+  screen (animation and in-app update indicator confirmed 2026-11-17).
 
 ## Units
 

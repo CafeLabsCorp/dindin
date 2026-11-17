@@ -9,14 +9,11 @@ developer needs to know. Other docs link here instead of repeating items.
 ## Open
 
 - [ ] **Not verified on a real device:** the onboarding tutorials (7 pages,
-  guided empty states, first-steps card, navigation chip), the opening
-  animation, the Play in-app update indicator (badge/menu item, only the
-  snackbar has been seen), and the theme selector on a narrow phone screen.
-  Covered only by widget tests (715 pass), the rules emulator and rendered
-  captures. _origem:_ docs, 2026-11-16. _gravidade:_ importante.
-- [ ] **Version 1.2.1+7 is awaiting Google's review** (sent 2026-11-16).
-  1.2.0+6 is the last version confirmed live. _origem:_ docs, 2026-11-16.
-  _gravidade:_ menor.
+  guided empty states, first-steps card, navigation chip) and the theme
+  selector on a narrow phone screen. Covered only by widget tests (715 pass),
+  the rules emulator and rendered captures. Confirmed on a real device by the
+  maintainer on 2026-11-17: the opening animation and the in-app update
+  indicator (dot in the menu, on a phone with 1.2.0 while 1.2.1 was live). _origem:_ docs, 2026-11-16. _gravidade:_ importante.
 - [ ] **Play Console: declare trader (comerciante) status by 2027-02-01.**
   Without it the developer profile and its apps are removed from Play
   worldwide. Maintainer's decision. See `docs/PLAY_CONSOLE.md`. _origem:_ docs,

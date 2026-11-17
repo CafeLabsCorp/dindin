@@ -19,12 +19,11 @@ to light or dark in Ajustes → Tema. Windows desktop was dropped as a
 target on 2026-08-30 (no App Check provider for it, never packaged) and the
 `windows/` folder was removed on 2026-11-16.
 
-**Status (2026-11-16):** version **1.2.1+7**. The web app is live at
+**Status (2026-11-17):** version **1.2.1+7**. The web app is live at
 `app.dindin.cafelabs.net` (also https://dindin-cafelabs.web.app). On Android the
 app is in production on Google Play, Brazil only
 ([listing](https://play.google.com/store/apps/details?id=com.cafelabs.dindin)):
-1.2.0 is the latest version confirmed live, and 1.2.1 was sent to Play on
-2026-11-16 and is awaiting review. Published versions and the release flow:
+1.2.1 is approved and live (sent 2026-11-16, confirmed 2026-11-17). Published versions and the release flow:
 `docs/DEPLOY.md`. Legal pages (public, hosted by the `dindin-landing` site, not
 in `docs/`): privacy policy https://dindin.cafelabs.net/privacidade; terms of use
 (`/termos`) and account deletion (`/excluir-conta`) on the same host. The source

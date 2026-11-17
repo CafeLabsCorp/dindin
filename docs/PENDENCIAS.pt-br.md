@@ -13,9 +13,6 @@ Gravidade: `bloqueia lançamento`, `importante`, `menor`.
 
 ## Em aberto
 
-- [ ] A 1.2.1+7 foi enviada à Play e aguarda a análise do Google; registrar o
-  resultado em `docs/DEPLOY.pt-br.md` (tabela de versões publicadas) quando for
-  aprovada. _origem:_ docs, 2026-11-16. _gravidade:_ importante.
 - [ ] **Não verificado em aparelho real: o onboarding.** Sete tutoriais
   (`lib/widgets/tutorial/`), estados vazios guiados, cartão "Primeiros passos",
   selo de cera em Ajustes → Tutoriais, chip e descrições do menu, popup de
@@ -23,17 +20,12 @@ Gravidade: `bloqueia lançamento`, `importante`, `menor`.
   emulador, capturas renderizadas. Falta: TalkBack, rotação, fonte grande do
   sistema, teclado físico e desempenho do véu num celular.
   _origem:_ mobile/docs, 2026-11-16. _gravidade:_ importante.
-- [ ] **Não verificado em aparelho real: seletor de tema e animação de abertura**
-  (`lib/widgets/splash_gate.dart`), incluindo o possível flash branco/preto da
-  janela nativa antes do primeiro quadro do Flutter, e o rótulo "Sistema" sem
-  quebrar em 320-360 px (só medido em testes).
-  _origem:_ mobile/docs, 2026-11-16. _gravidade:_ importante.
-- [ ] **Não verificada: a atualização in-app.** O indicador fixo (ponto + item
-  "Atualizar" no menu) nunca foi visto num aparelho, porque exige um build
-  instalado pela Play com uma versão mais nova publicada; o download da
-  atualização flexible e o snackbar "Reiniciar" só rodam contra o plugin real da
-  Play e são testados apenas com um serviço falso.
-  _origem:_ mobile/docs, 2026-11-16. _gravidade:_ importante.
+- [ ] **Não verificado em aparelho real: o seletor de tema** com o rótulo
+  "Sistema" sem quebrar em 320-360 px (só medido em testes). A animação de
+  abertura (`lib/widgets/splash_gate.dart`) e a atualização in-app (ponto no
+  menu, num aparelho com a 1.2.0 com a 1.2.1 no ar) foram confirmadas em
+  aparelho real pelo mantenedor em 2026-11-17.
+  _origem:_ mobile/docs, 2026-11-17. _gravidade:_ menor.
 - [ ] **Tema claro e conformidade com o manual de marca só em parte conferidos.**
   Os tokens batem com o manual (2026-11-12). Renderizados e conferidos: Ajustes e
   Categorias. Não conferidos: gráficos do Dashboard, Receitas, Gastos,

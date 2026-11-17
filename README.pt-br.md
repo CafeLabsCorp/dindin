@@ -19,12 +19,11 @@ claro ou escuro em Ajustes → Tema. O desktop Windows deixou de ser alvo em
 2026-08-30 (sem provider de App Check pra ele, nunca empacotado) e a pasta
 `windows/` foi removida em 2026-11-16.
 
-**Situação (2026-11-16):** versão **1.2.1+7**. O app web está no ar em
+**Situação (2026-11-17):** versão **1.2.1+7**. O app web está no ar em
 `app.dindin.cafelabs.net` (também https://dindin-cafelabs.web.app). No Android o
 app está em produção na Google Play, só Brasil
 ([ficha](https://play.google.com/store/apps/details?id=com.cafelabs.dindin)): a
-1.2.0 é a última versão confirmada no ar, e a 1.2.1 foi enviada à Play em
-2026-11-16 e aguarda análise. Versões publicadas e o fluxo de release:
+1.2.1 está aprovada e no ar (enviada em 2026-11-16, confirmada em 2026-11-17). Versões publicadas e o fluxo de release:
 `docs/DEPLOY.pt-br.md`. Páginas legais (públicas, hospedadas pelo site
 `dindin-landing`, não em `docs/`): política de privacidade
 https://dindin.cafelabs.net/privacidade; termos de uso (`/termos`) e exclusão de

@@ -5,16 +5,16 @@
 ## Retomar daqui
 
 - **Fase:** passada de documentação da versão 1.2.1+7 (enviada à Google Play em
-  2026-11-16, aguardando análise). Todos os docs de `docs/` e os dois READMEs
+  2026-11-16, aprovada e no ar em 2026-11-17). Todos os docs de `docs/` e os dois READMEs
   foram reconciliados com o código em 2026-11-16; nada commitado ainda.
 - **Próximo passo:** o mantenedor revisa o diff do working tree e commita. Quando
   o Google aprovar a 1.2.1, registrar na tabela de versões publicadas do
   `docs/DEPLOY.md` (e `.pt-br`) e no bloco de status do `README.md`. Depois fechar
   ou mover itens em `docs/PENDENCIAS.pt-br.md`.
 - **Aguardando o usuário:** declaração de comerciante no Play Console (até
-  2027-02-01); conferência em aparelho real do onboarding, da animação de
-  abertura, do indicador de atualização in-app e do seletor de tema em tela
-  estreita.
+  2027-02-01); conferência em aparelho real do onboarding e do seletor de tema em tela
+  estreita (animação e indicador de atualização in-app confirmados em
+  2026-11-17).
 
 ## Unidades
 

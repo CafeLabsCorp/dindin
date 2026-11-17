@@ -9,9 +9,9 @@ Play Console listing itself (Data Safety, store assets, testing tracks) and
 Google Sign-In's OAuth configuration/troubleshooting, see
 `docs/PLAY_CONSOLE.md`.
 
-Status at the time of writing (2026-11-16): version **1.2.1+7** was sent to
-Google Play on 2026-11-16 and is awaiting Google's review; **1.2.0+6 is the
-latest version confirmed approved and live**. See "Current release flow and
+Status at the time of writing (2026-11-17): version **1.2.1+7** was sent to
+Google Play on 2026-11-16 and is **approved and live** (confirmed by the
+maintainer on 2026-11-17). See "Current release flow and
 published versions" below.
 
 Two distribution channels ship from this one repository, and they behave
@@ -78,7 +78,7 @@ confirmations; Play Console itself was not consulted for this document):
 | 1.1.1+4 (`v1.1.1`) | 2026-11-10 | Fixed "update available" indicator (badge + menu item), re-checked on resume |
 | 1.1.2+5 (`v1.1.2`) | sent and approved 2026-11-11 | Fixes from the `mobile` review: block deleting a caixinha with transfers, edit arithmetic equal to the rules, local-time month, recent login before account deletion; dark store art |
 | 1.2.0+6 (`v1.2.0`) | generated 2026-11-13, approved 2026-11-16 | Onboarding (7 tutorials, guided empty states, first-steps card, discoverable navigation), theme selector, rest of the `mobile` review (495-record cascade limit, offline `ackOrQueue`, day-change refresh, resilient catch-ups, in-app update restarts only on tap) |
-| 1.2.1+7 (`v1.2.1`) | sent 2026-11-16, **awaiting review** | Tutorial no longer overlaps the page menu, quick-entry popup from the Dashboard, theme selector label fix, opening animation |
+| 1.2.1+7 (`v1.2.1`) | sent 2026-11-16, **approved and live** (2026-11-17) | Tutorial no longer overlaps the page menu, quick-entry popup from the Dashboard, theme selector label fix, opening animation |
 
 `versionCode`s 1-2 were used before 1.1.0 (testing tracks); the
 exact history of those two uploads is unknown (the maintainer doesn't remember;

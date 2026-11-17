@@ -9,9 +9,9 @@ ficha do Play Console em si (Segurança dos Dados, assets da loja, trilhas de
 teste) e pra configuração/depuração OAuth do login com Google, ver
 `docs/PLAY_CONSOLE.pt-br.md`.
 
-Situação na hora da escrita (2026-11-16): a versão **1.2.1+7** foi enviada à
-Google Play em 2026-11-16 e aguarda a análise do Google; **a 1.2.0+6 é a
-última versão confirmada como aprovada e no ar**. Ver "Fluxo atual de release e
+Situação na hora da escrita (2026-11-17): a versão **1.2.1+7** foi enviada à
+Google Play em 2026-11-16 e está **aprovada e no ar** (confirmado pelo
+mantenedor em 2026-11-17). Ver "Fluxo atual de release e
 versões publicadas" abaixo.
 
 Dois canais de distribuição saem deste mesmo repositório, e eles não se
@@ -78,7 +78,7 @@ mantenedor; o Play Console em si não foi consultado para este documento):
 | 1.1.1+4 (`v1.1.1`) | 2026-11-10 | Indicador fixo de "atualização disponível" (ponto + item no menu), rechecado ao voltar do segundo plano |
 | 1.1.2+5 (`v1.1.2`) | enviada e aprovada em 2026-11-11 | Correções da revisão do `mobile`: bloquear apagar caixinha com transferência, aritmética de edição igual à das rules, mês em hora local, login recente antes de excluir a conta; arte escura da loja |
 | 1.2.0+6 (`v1.2.0`) | gerada 2026-11-13, aprovada 2026-11-16 | Onboarding (7 tutoriais, estados vazios guiados, cartão de primeiros passos, navegação descobrível), seletor de tema, resto da revisão do `mobile` (limite de cascata de 495, `ackOrQueue` offline, renovação na virada de dia, catch-ups resilientes, atualização in-app só reinicia no toque) |
-| 1.2.1+7 (`v1.2.1`) | enviada 2026-11-16, **aguardando análise** | Tutorial não sobrepõe mais o menu de páginas, popup de lançamento rápido no Dashboard, correção do rótulo do seletor de tema, animação de abertura |
+| 1.2.1+7 (`v1.2.1`) | enviada 2026-11-16, **aprovada e no ar** (2026-11-17) | Tutorial não sobrepõe mais o menu de páginas, popup de lançamento rápido no Dashboard, correção do rótulo do seletor de tema, animação de abertura |
 
 Os `versionCode`s 1-2 foram usados antes da 1.1.0 (trilhas de teste); o
 histórico exato desses dois uploads é desconhecido (o mantenedor não lembra; só
